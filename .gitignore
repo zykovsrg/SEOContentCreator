@@ -6,3 +6,6 @@
 
 # macOS
 .DS_Store
+
+# Visual brainstorm working files
+.superpowers/
