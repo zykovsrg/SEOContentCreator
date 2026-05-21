@@ -1,0 +1,8 @@
+# Added by code-review-graph
+.code-review-graph/
+
+# Local Claude Code settings (personal, not shared)
+.claude/settings.local.json
+
+# macOS
+.DS_Store
