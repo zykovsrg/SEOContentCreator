@@ -12,10 +12,16 @@ final class Topic {
     var updatedAt: Date
     var externalDocURL: String?
     var publishedAt: Date?
+    var currentVersionID: UUID?
+    var semantics: [String]
 
     @Relationship var direction: KnowledgeNode?
     @Relationship var doctor: KnowledgeNode?
     @Relationship var attachedNodes: [KnowledgeNode]
+    @Relationship(deleteRule: .cascade, inverse: \ArticleVersion.topic)
+    var versions: [ArticleVersion]
+    @Relationship(deleteRule: .cascade, inverse: \GenerationJob.topic)
+    var jobs: [GenerationJob]
 
     init(
         title: String,
@@ -32,6 +38,9 @@ final class Topic {
         self.direction = direction
         self.doctor = doctor
         self.attachedNodes = []
+        self.semantics = []
+        self.versions = []
+        self.jobs = []
         self.notes = notes
         self.useStyle = useStyle
         self.createdAt = .now
@@ -41,5 +50,10 @@ final class Topic {
     var articleType: ArticleType {
         get { ArticleType(rawValue: articleTypeRaw) ?? .info }
         set { articleTypeRaw = newValue.rawValue }
+    }
+
+    var currentVersion: ArticleVersion? {
+        guard let id = currentVersionID else { return nil }
+        return versions.first { $0.uuid == id }
     }
 }
