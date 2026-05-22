@@ -68,4 +68,23 @@ struct StageExecutorTests {
         #expect(topic.jobs.first?.status == .error)
         #expect(executor.lastErrorMessage == "Укажите API-ключ в Настройках")
     }
+
+    @Test func checkingStagePopulatesRemarksNoVersion() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease)
+        context.insert(topic)
+        let template = StageTemplate(stage: .finalReview, systemPrompt: "s", userPromptTemplate: "{{текущий_текст}}")
+        context.insert(template)
+
+        let json = #"{"remarks":[{"category":"Орфография","quote":"тест","suggestion":"текст","explanation":"опечатка"}]}"#
+        let executor = StageExecutor(streamProvider: cannedStream([json]), keyProvider: { "k" })
+        await executor.execute(stage: .finalReview, topic: topic, template: template,
+                               currentText: "тест", in: context)
+
+        #expect(executor.remarks.count == 1)
+        #expect(executor.remarks.first?.category == "Орфография")
+        #expect(topic.currentVersion == nil)         // checking creates no version
+        #expect(executor.lastResultVersionID == nil)
+        #expect(topic.jobs.first?.status == .success)
+    }
 }

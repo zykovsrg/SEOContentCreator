@@ -15,6 +15,8 @@ final class StageExecutor {
     var lastErrorMessage: String?
     /// ID of the version created by the most recent successful run (awaiting accept/reject).
     var lastResultVersionID: UUID?
+    /// Transient remarks from the most recent checking run (not persisted).
+    var remarks: [Remark] = []
 
     private let streamProvider: StreamProvider
     private let keyProvider: KeyProvider
@@ -49,6 +51,7 @@ final class StageExecutor {
         streamingText = ""
         lastErrorMessage = nil
         lastResultVersionID = nil
+        remarks = []
 
         let job = GenerationJob(stage: stage, agentName: stage.agentName, modelName: template.modelName)
         job.topic = topic
@@ -69,23 +72,29 @@ final class StageExecutor {
                 streamingText = collected
             }
 
-            let parsed = StageOutputParser.parse(rawText: collected, stage: stage)
-            let version = ArticleVersion(
-                stage: stage, source: .generated, text: parsed.body,
-                agentName: stage.agentName, templateID: template.uuid, modelName: template.modelName
-            )
-            version.h1 = parsed.h1
-            version.seoTitle = parsed.seoTitle
-            version.seoDescription = parsed.seoDescription
-            version.topic = topic
-            context.insert(version)
+            if stage.kind == .checking {
+                remarks = RemarksParser.parse(rawText: collected)
+                job.status = .success
+                job.finishedAt = .now
+            } else {
+                let parsed = StageOutputParser.parse(rawText: collected, stage: stage)
+                let version = ArticleVersion(
+                    stage: stage, source: .generated, text: parsed.body,
+                    agentName: stage.agentName, templateID: template.uuid, modelName: template.modelName
+                )
+                version.h1 = parsed.h1
+                version.seoTitle = parsed.seoTitle
+                version.seoDescription = parsed.seoDescription
+                version.topic = topic
+                context.insert(version)
 
-            topic.updatedAt = .now
+                topic.updatedAt = .now
 
-            job.status = .success
-            job.finishedAt = .now
-            job.resultVersionID = version.uuid
-            lastResultVersionID = version.uuid
+                job.status = .success
+                job.finishedAt = .now
+                job.resultVersionID = version.uuid
+                lastResultVersionID = version.uuid
+            }
         } catch {
             job.status = .error
             job.finishedAt = .now
