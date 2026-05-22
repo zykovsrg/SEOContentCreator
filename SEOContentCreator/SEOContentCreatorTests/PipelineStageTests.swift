@@ -18,4 +18,23 @@ struct PipelineStageTests {
             #expect(PipelineStage(rawValue: stage.rawValue) == stage)
         }
     }
+
+    @Test func checkingStagesHaveOwnAgents() {
+        #expect(PipelineStage.seoCheck.agentName == "ИИ-SEO")
+        #expect(PipelineStage.factCheck.agentName == "ИИ-фактчекер")
+        #expect(PipelineStage.finalReview.agentName == "ИИ-редактор")
+    }
+
+    @Test func stageKindIsClassified() {
+        #expect(PipelineStage.draft.kind == .author)
+        #expect(PipelineStage.semanticsInText.kind == .author)
+        #expect(PipelineStage.seoCheck.kind == .checking)
+        #expect(PipelineStage.finalReview.kind == .checking)
+    }
+
+    @Test func checkingTitlesAreRussian() {
+        #expect(PipelineStage.seoCheck.title == "Проверка SEO")
+        #expect(PipelineStage.factCheck.title == "Фактчекинг")
+        #expect(PipelineStage.finalReview.title == "Финальная вычитка")
+    }
 }
