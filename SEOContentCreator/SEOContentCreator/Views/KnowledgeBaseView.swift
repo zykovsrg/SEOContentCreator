@@ -12,11 +12,24 @@ struct KnowledgeBaseView: View {
         allNodes.filter { $0.parent == nil }
     }
 
+    private var searchResults: [KnowledgeNode] {
+        var f = KnowledgeTreeFilter()
+        f.searchText = search
+        return f.apply(to: allNodes)
+    }
+
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                ForEach(roots) { root in
-                    OutlineGroup(root, children: \.childrenOrNil) { node in
+                if search.isEmpty {
+                    ForEach(roots) { root in
+                        OutlineGroup(root, children: \.childrenOrNil) { node in
+                            Label(node.title, systemImage: icon(for: node.nodeType))
+                                .tag(node)
+                        }
+                    }
+                } else {
+                    ForEach(searchResults) { node in
                         Label(node.title, systemImage: icon(for: node.nodeType))
                             .tag(node)
                     }
