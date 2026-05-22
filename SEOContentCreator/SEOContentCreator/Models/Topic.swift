@@ -3,7 +3,6 @@ import SwiftData
 
 @Model
 final class Topic {
-    var id: UUID
     var title: String
     var articleTypeRaw: String
     var targetVolume: Int?
@@ -25,7 +24,6 @@ final class Topic {
         notes: String = "",
         useStyle: Bool = false
     ) {
-        self.id = UUID()
         self.title = title
         self.articleTypeRaw = articleType.rawValue
         self.targetVolume = targetVolume
