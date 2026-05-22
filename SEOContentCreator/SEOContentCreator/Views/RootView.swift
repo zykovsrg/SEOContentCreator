@@ -1,6 +1,8 @@
 import SwiftUI
+import SwiftData
 
 struct RootView: View {
+    @Environment(\.modelContext) private var context
     @State private var selection: AppSection? = .contentPlan
 
     var body: some View {
@@ -20,6 +22,9 @@ struct RootView: View {
                     description: Text("Раздел появится в следующем под-проекте.")
                 )
             }
+        }
+        .task {
+            StageTemplateSeeder.seedIfNeeded(in: context)
         }
     }
 }
