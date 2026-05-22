@@ -9,3 +9,11 @@
 
 # Visual brainstorm working files
 .superpowers/
+
+# Xcode
+*.xcuserstate
+xcuserdata/
+DerivedData/
+build/
+*.xcscmblueprint
+*.xccheckout
