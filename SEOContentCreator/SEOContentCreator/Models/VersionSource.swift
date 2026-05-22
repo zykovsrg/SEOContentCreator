@@ -7,6 +7,7 @@ enum VersionSource: String, Codable {
     case acceptedPartial
     case rollback
     case importFromDocs
+    case checkApplied
 
     var title: String {
         switch self {
@@ -16,6 +17,7 @@ enum VersionSource: String, Codable {
         case .acceptedPartial: return "Принято частично"
         case .rollback:        return "Откат"
         case .importFromDocs:  return "Импорт из Docs"
+        case .checkApplied:    return "Правки проверки"
         }
     }
 }
