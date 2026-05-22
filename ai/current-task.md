@@ -8,31 +8,32 @@ review
 
 ## Goal
 
-Продуктовый дизайн (спека v7.4) и фронтенд-дизайн ключевых экранов завершены. Следующий шаг: план реализации SwiftUI-приложения (writing-plans) — только по явному запросу пользователя (код пока не пишем).
+Под-проект 1 «Фундамент» реализован (SwiftUI). Следующий шаг: план и реализация под-проекта 2 «База знаний» (древовидный справочник + прикрепление узлов к темам) — по запросу пользователя.
 
 ## Use Superpowers
 
-yes — writing-plans для плана реализации.
+yes — writing-plans для плана под-проекта 2, executing-plans для реализации.
 
 ## Relevant files
 
 - docs/superpowers/specs/2026-05-19-content-system-redesign-design.md (продуктовая спека, v7.4)
-- docs/superpowers/specs/2026-05-21-frontend-design.md (фронтенд-дизайн экранов)
-- ai/decisions.md (Вариант B, стек SwiftUI)
+- docs/superpowers/specs/2026-05-21-frontend-design.md (фронтенд-дизайн)
+- docs/superpowers/plans/2026-05-21-foundation.md (план Фундамента — выполнен)
+- SEOContentCreator/ (Xcode-проект)
 
 ## Done criteria
 
-- (Готово) Продуктовая спека согласована.
-- (Готово) Стек выбран — нативный SwiftUI.
-- (Готово) Фронтенд-дизайн ключевых экранов согласован.
-- (Далее) Составлен план реализации (writing-plans).
+- (Готово) Продуктовый дизайн + фронтенд-дизайн.
+- (Готово) Под-проект 1 «Фундамент»: тесты зелёные, smoke пройден.
+- (Далее) План под-проекта 2 «База знаний».
+- (Далее) Реализация под-проектов 2–7.
 
 ## Agent handoff
 
-Last agent: фронтенд-дизайн (brainstorming с визуальными макетами)
+Last agent: реализация Фундамента (executing-plans, TDD)
 
-What changed: согласованы все ключевые экраны (Контент-план, Рабочее пространство темы с side-by-side, приём правок, База знаний, Бриф, Очередь, Шаблоны с переменными); создан docs/superpowers/specs/2026-05-21-frontend-design.md; в спеку добавлены модель переменных (2.5) и категории Шаблонов (4.4).
+What changed: создан Xcode-проект SwiftUI; реализованы ArticleType, Topic (SwiftData), BriefValidation, TopicStatus, ContentPlanFilter (с unit-тестами), RootView, SidebarView, ContentPlanView, BriefView. Из Topic убрано явное поле id (persistentModelID). Коммиты в main, запушено.
 
-Open risks: блокеров нет. Старые промты (hadassah-content-system/prompts/) переносятся вручную при реализации.
+Open risks: блокеров нет. UI-тестов нет (только unit). Поля direction/doctor в Topic пока текст — в под-проекте 2 станут ссылками на узлы Базы знаний.
 
-Next agent should check: продуктовую спеку + документ фронтенд-дизайна; затем — план реализации по запросу пользователя.
+Next agent should check: план Фундамента (выполнен); спеку (2.13 База знаний, 4.6); затем писать план под-проекта 2.

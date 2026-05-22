@@ -6,7 +6,7 @@
 
 Персональная (single-user) писательская студия для одного редактора. Ведёт каждую тему статьи по пайплайну от брифа до публикации: сбор семантики, генерация и доработка текста несколькими ИИ-агентами, проверки (SEO, фактчекинг, вычитка), финальная публикация в Google Docs. Цель — производить медицинские SEO-статьи быстро и с контролем качества и фактов.
 
-Статус: фаза продуктового дизайна. Кода ещё нет. Полная спека — `docs/superpowers/specs/2026-05-19-content-system-redesign-design.md`.
+Статус: дизайн завершён, идёт поэтапная реализация (7 под-проектов). Реализован под-проект 1 «Фундамент» (SwiftUI). Полная спека — `docs/superpowers/specs/2026-05-19-content-system-redesign-design.md`.
 
 ## Стек
 
@@ -14,21 +14,24 @@
 
 ## Как запустить локально
 
-TBD (кода ещё нет).
+Открыть `SEOContentCreator/SEOContentCreator.xcodeproj` в Xcode → Cmd+R.
 
 ## Как собрать
 
-TBD (кода ещё нет).
+`cd SEOContentCreator && xcodebuild -scheme SEOContentCreator -destination 'platform=macOS' build`
 
 ## Как запустить тесты
 
-TBD (кода ещё нет).
+`cd SEOContentCreator && xcodebuild test -scheme SEOContentCreator -destination 'platform=macOS' -only-testing:SEOContentCreatorTests`
 
 ## Главные папки и файлы
 
-- `docs/superpowers/specs/2026-05-19-content-system-redesign-design.md` — полная продуктовая спека (источник истины по логике продукта).
+- `SEOContentCreator/SEOContentCreator.xcodeproj` — Xcode-проект (схема SEOContentCreator).
+- `SEOContentCreator/SEOContentCreator/` — исходники (Models/, Logic/, Views/).
+- `SEOContentCreator/SEOContentCreatorTests/` — unit-тесты (Swift Testing).
+- `docs/superpowers/specs/` — продуктовая спека + фронтенд-дизайн.
+- `docs/superpowers/plans/` — планы реализации по под-проектам.
 - `ai/` — AI-архитектура разработки.
-- Кода приложения пока нет.
 
 ## Главные экраны или модули
 
