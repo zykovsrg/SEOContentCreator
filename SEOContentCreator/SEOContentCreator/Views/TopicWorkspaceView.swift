@@ -42,7 +42,7 @@ struct TopicWorkspaceView: View {
                         onReject: { rejectedRemarkIDs.insert($0.id); acceptedRemarkIDs.remove($0.id) },
                         onSelect: { highlightedQuote = $0.quote }
                     )
-                    .frame(width: 340)
+                    .frame(width: 380)
                 }
                 Divider()
                 HStack {

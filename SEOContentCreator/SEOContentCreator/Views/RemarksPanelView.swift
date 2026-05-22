@@ -10,7 +10,7 @@ struct RemarksPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Замечания: \(remarks.count)").font(.caption).foregroundStyle(.secondary).padding(6)
+            Text("Замечания: \(remarks.count)").font(.headline).foregroundStyle(.secondary).padding(8)
             Divider()
             if remarks.isEmpty {
                 ContentUnavailableView("Замечаний нет", systemImage: "checkmark.seal")
@@ -26,28 +26,28 @@ struct RemarksPanelView: View {
     }
 
     @ViewBuilder private func card(_ remark: Remark) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(remark.category).font(.caption).bold().foregroundStyle(.blue)
-            Text(remark.explanation).font(.subheadline)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(remark.category).font(.headline).foregroundStyle(.blue)
+            Text(remark.explanation).font(.body)
             if !remark.suggestion.isEmpty {
-                Text("было: \(remark.quote)").font(.caption).foregroundStyle(.secondary)
-                Text("станет: \(remark.suggestion)").font(.caption).foregroundStyle(.green)
+                Text("было: \(remark.quote)").font(.callout).foregroundStyle(.secondary)
+                Text("станет: \(remark.suggestion)").font(.callout).foregroundStyle(.green)
             }
             HStack {
                 Button("Принять") { onAccept(remark) }
-                    .controlSize(.small).buttonStyle(.borderedProminent)
+                    .controlSize(.regular).buttonStyle(.borderedProminent)
                     .disabled(acceptedIDs.contains(remark.id))
                 Button("Отклонить") { onReject(remark) }
-                    .controlSize(.small)
+                    .controlSize(.regular)
                     .disabled(rejectedIDs.contains(remark.id))
                 Spacer()
                 if acceptedIDs.contains(remark.id) {
-                    Label("принято", systemImage: "checkmark").font(.caption).foregroundStyle(.green)
+                    Label("принято", systemImage: "checkmark").font(.subheadline).foregroundStyle(.green)
                 } else if rejectedIDs.contains(remark.id) {
-                    Label("отклонено", systemImage: "xmark").font(.caption).foregroundStyle(.secondary)
+                    Label("отклонено", systemImage: "xmark").font(.subheadline).foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }
