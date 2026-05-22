@@ -11,5 +11,9 @@ struct SEOContentCreatorApp: App {
             Topic.self, KnowledgeNode.self,
             ArticleVersion.self, GenerationJob.self, StageTemplate.self
         ])
+
+        Settings {
+            SettingsView()
+        }
     }
 }
