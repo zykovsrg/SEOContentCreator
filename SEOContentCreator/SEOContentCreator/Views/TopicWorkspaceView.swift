@@ -11,6 +11,9 @@ struct TopicWorkspaceView: View {
     @State private var executor: StageExecutor?
     @State private var comparisonText: String?     // left column override (lane compare)
     @State private var pendingVersionID: UUID?     // just-generated version awaiting accept
+    @State private var acceptedRemarkIDs: Set<UUID> = []
+    @State private var rejectedRemarkIDs: Set<UUID> = []
+    @State private var highlightedQuote: String?
     @State private var showVersions = false
     @State private var showLog = false
     @State private var showProductBlocks = false
@@ -24,18 +27,44 @@ struct TopicWorkspaceView: View {
             StageBarView(selectedStage: $selectedStage, topic: topic)
                 .padding(.vertical, 8)
             Divider()
-            SideBySideView(
-                leftText: comparisonText ?? topic.currentVersion?.text,
-                rightText: rightText,
-                isStreaming: executor?.isRunning ?? false
-            )
-            Divider()
-            AcceptRejectBar(
-                canAct: pendingVersion != nil && !(executor?.isRunning ?? false),
-                onAcceptAll: acceptAll,
-                onAcceptPartial: { showPartialAccept = true },
-                onReject: reject
-            )
+            if isReviewing {
+                HStack(spacing: 0) {
+                    ScrollView {
+                        HighlightedText(text: workingCopy, highlight: highlightedQuote)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding()
+                    }
+                    Divider()
+                    RemarksPanelView(
+                        remarks: executor?.remarks ?? [],
+                        acceptedIDs: acceptedRemarkIDs,
+                        rejectedIDs: rejectedRemarkIDs,
+                        onAccept: { acceptedRemarkIDs.insert($0.id); rejectedRemarkIDs.remove($0.id) },
+                        onReject: { rejectedRemarkIDs.insert($0.id); acceptedRemarkIDs.remove($0.id) },
+                        onSelect: { highlightedQuote = $0.quote }
+                    )
+                    .frame(width: 340)
+                }
+                Divider()
+                HStack {
+                    Spacer()
+                    Button("Отклонить всё", role: .destructive) { endReview() }
+                    Button("Готово") { finishReview() }.keyboardShortcut(.defaultAction)
+                }
+                .padding(8)
+            } else {
+                SideBySideView(
+                    leftText: comparisonText ?? topic.currentVersion?.text,
+                    rightText: rightText,
+                    isStreaming: executor?.isRunning ?? false
+                )
+                Divider()
+                AcceptRejectBar(
+                    canAct: pendingVersion != nil && !(executor?.isRunning ?? false),
+                    onAcceptAll: acceptAll,
+                    onAcceptPartial: { showPartialAccept = true },
+                    onReject: reject
+                )
+            }
         }
         .navigationTitle(topic.title)
         .toolbar { toolbarContent }
@@ -67,6 +96,19 @@ struct TopicWorkspaceView: View {
     private var pendingVersion: ArticleVersion? {
         guard let id = pendingVersionID else { return nil }
         return topic.versions.first { $0.uuid == id && !$0.isArchived }
+    }
+
+    private var isReviewing: Bool {
+        !(executor?.remarks.isEmpty ?? true)
+    }
+
+    private var reviewBaseText: String {
+        topic.currentVersion?.text ?? ""
+    }
+
+    private var workingCopy: String {
+        let accepted = (executor?.remarks ?? []).filter { acceptedRemarkIDs.contains($0.id) }
+        return RemarkApplier.apply(base: reviewBaseText, accepted: accepted)
     }
 
     private var header: some View {
@@ -103,6 +145,9 @@ struct TopicWorkspaceView: View {
     private func runStage(_ stage: PipelineStage, blocks: [String]) {
         guard let executor else { return }
         comparisonText = nil
+        acceptedRemarkIDs = []
+        rejectedRemarkIDs = []
+        highlightedQuote = nil
         let template = fetchTemplate(for: stage)
         let current = topic.currentVersion?.text
         Task {
@@ -150,5 +195,26 @@ struct TopicWorkspaceView: View {
         topic.updatedAt = .now
         pendingVersionID = nil
         comparisonText = nil
+    }
+
+    private func finishReview() {
+        let base = reviewBaseText
+        let accepted = (executor?.remarks ?? []).filter { acceptedRemarkIDs.contains($0.id) }
+        let result = RemarkApplier.apply(base: base, accepted: accepted)
+        if result != base {
+            let version = ArticleVersion(stage: selectedStage, source: .checkApplied, text: result)
+            version.topic = topic
+            context.insert(version)
+            topic.currentVersionID = version.uuid
+            topic.updatedAt = .now
+        }
+        endReview()
+    }
+
+    private func endReview() {
+        executor?.remarks = []
+        acceptedRemarkIDs = []
+        rejectedRemarkIDs = []
+        highlightedQuote = nil
     }
 }
