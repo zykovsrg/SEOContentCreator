@@ -12,8 +12,8 @@ struct BriefValidationTests {
     }
 
     @Test func draftRequiresTitleAndDirection() {
-        #expect(BriefValidation.canStartDraft(title: "Тема", direction: "") == false)
-        #expect(BriefValidation.canStartDraft(title: "", direction: "Лучевая терапия") == false)
-        #expect(BriefValidation.canStartDraft(title: "Тема", direction: "Лучевая терапия") == true)
+        #expect(BriefValidation.canStartDraft(title: "Тема", hasDirection: false) == false)
+        #expect(BriefValidation.canStartDraft(title: "", hasDirection: true) == false)
+        #expect(BriefValidation.canStartDraft(title: "Тема", hasDirection: true) == true)
     }
 }

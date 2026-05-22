@@ -16,7 +16,7 @@ struct ContentPlanView: View {
         Table(visibleTopics, selection: $selection) {
             TableColumn("Тема") { Text($0.title) }
             TableColumn("Тип") { Text($0.articleType.title) }
-            TableColumn("Направление") { Text($0.direction.isEmpty ? "—" : $0.direction) }
+            TableColumn("Направление") { Text($0.direction?.title ?? "—") }
             TableColumn("Статус") { Text(TopicStatus.compute(for: $0).label) }
         }
         .contextMenu(forSelectionType: Topic.ID.self) { ids in

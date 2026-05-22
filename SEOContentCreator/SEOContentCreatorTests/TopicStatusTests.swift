@@ -9,12 +9,14 @@ struct TopicStatusTests {
     }
 
     @Test func readyWhenTitleAndDirectionPresent() {
-        let t = Topic(title: "Тема", articleType: .info, direction: "Лучевая терапия")
+        let dir = KnowledgeNode(title: "Лучевая терапия", type: .direction)
+        let t = Topic(title: "Тема", articleType: .info, direction: dir)
         #expect(TopicStatus.compute(for: t) == .ready)
     }
 
     @Test func publishedWhenPublishedAtSet() {
-        let t = Topic(title: "Тема", articleType: .info, direction: "Лучевая терапия")
+        let dir = KnowledgeNode(title: "Лучевая терапия", type: .direction)
+        let t = Topic(title: "Тема", articleType: .info, direction: dir)
         t.publishedAt = .now
         #expect(TopicStatus.compute(for: t) == .published)
     }

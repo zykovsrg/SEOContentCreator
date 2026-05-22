@@ -4,9 +4,9 @@ import Testing
 struct ContentPlanFilterTests {
     private func sample() -> [Topic] {
         [
-            Topic(title: "Лечение рака простаты", articleType: .disease, direction: "Лучевая терапия"),
-            Topic(title: "Услуга КТ-симуляция", articleType: .service, direction: "Лучевая терапия"),
-            Topic(title: "Реабилитация", articleType: .info, direction: "")
+            Topic(title: "Лечение рака простаты", articleType: .disease),
+            Topic(title: "Услуга КТ-симуляция", articleType: .service),
+            Topic(title: "Реабилитация", articleType: .info)
         ]
     }
 

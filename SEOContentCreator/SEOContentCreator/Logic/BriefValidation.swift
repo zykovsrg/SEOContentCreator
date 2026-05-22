@@ -5,8 +5,7 @@ enum BriefValidation {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    static func canStartDraft(title: String, direction: String) -> Bool {
-        canCreate(title: title)
-        && !direction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    static func canStartDraft(title: String, hasDirection: Bool) -> Bool {
+        canCreate(title: title) && hasDirection
     }
 }

@@ -5,13 +5,19 @@ struct BriefView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
-    /// Existing topic to edit, or nil to create a new one.
+    @Query(filter: #Predicate<KnowledgeNode> { $0.nodeTypeRaw == "direction" },
+           sort: \KnowledgeNode.title)
+    private var directions: [KnowledgeNode]
+    @Query(filter: #Predicate<KnowledgeNode> { $0.nodeTypeRaw == "doctor" },
+           sort: \KnowledgeNode.title)
+    private var doctors: [KnowledgeNode]
+
     var topic: Topic?
 
     @State private var title = ""
     @State private var articleType: ArticleType = .disease
-    @State private var direction = ""
-    @State private var doctor = ""
+    @State private var direction: KnowledgeNode?
+    @State private var doctor: KnowledgeNode?
     @State private var volume = ""
     @State private var useStyle = false
     @State private var notes = ""
@@ -22,14 +28,20 @@ struct BriefView: View {
             Picker("Тип статьи *", selection: $articleType) {
                 ForEach(ArticleType.allCases) { Text($0.title).tag($0) }
             }
-            TextField("Направление", text: $direction)
-            TextField("Врач", text: $doctor)
+            Picker("Направление *", selection: $direction) {
+                Text("Не выбрано").tag(KnowledgeNode?.none)
+                ForEach(directions) { Text($0.title).tag(KnowledgeNode?.some($0)) }
+            }
+            Picker("Врач", selection: $doctor) {
+                Text("Не выбран").tag(KnowledgeNode?.none)
+                ForEach(doctors) { Text($0.title).tag(KnowledgeNode?.some($0)) }
+            }
             TextField("Целевой объём (знаков)", text: $volume)
             Toggle("Использовать Стиль/Главред", isOn: $useStyle)
             TextField("Заметки", text: $notes, axis: .vertical).lineLimit(3...6)
         }
         .formStyle(.grouped)
-        .frame(minWidth: 420, minHeight: 360)
+        .frame(minWidth: 440, minHeight: 380)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Отмена") { dismiss() }

@@ -6,8 +6,6 @@ final class Topic {
     var title: String
     var articleTypeRaw: String
     var targetVolume: Int?
-    var direction: String   // plain text for now; becomes a Knowledge Base node in sub-project 2
-    var doctor: String      // plain text for now
     var notes: String
     var useStyle: Bool
     var createdAt: Date
@@ -15,12 +13,16 @@ final class Topic {
     var externalDocURL: String?
     var publishedAt: Date?
 
+    @Relationship var direction: KnowledgeNode?
+    @Relationship var doctor: KnowledgeNode?
+    @Relationship var attachedNodes: [KnowledgeNode]
+
     init(
         title: String,
         articleType: ArticleType,
         targetVolume: Int? = nil,
-        direction: String = "",
-        doctor: String = "",
+        direction: KnowledgeNode? = nil,
+        doctor: KnowledgeNode? = nil,
         notes: String = "",
         useStyle: Bool = false
     ) {
@@ -29,6 +31,7 @@ final class Topic {
         self.targetVolume = targetVolume
         self.direction = direction
         self.doctor = doctor
+        self.attachedNodes = []
         self.notes = notes
         self.useStyle = useStyle
         self.createdAt = .now

@@ -7,7 +7,7 @@ enum TopicStatus: Equatable {
 
     static func compute(for topic: Topic) -> TopicStatus {
         if topic.publishedAt != nil { return .published }
-        if BriefValidation.canStartDraft(title: topic.title, direction: topic.direction) {
+        if BriefValidation.canStartDraft(title: topic.title, hasDirection: topic.direction != nil) {
             return .ready
         }
         return .idea
