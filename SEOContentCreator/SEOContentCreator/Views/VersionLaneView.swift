@@ -3,6 +3,7 @@ import SwiftData
 
 struct VersionLaneView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
     @Bindable var topic: Topic
     var onCompare: (ArticleVersion) -> Void
 
@@ -59,9 +60,12 @@ struct VersionLaneView: View {
     }
 
     private func makeCurrent(_ v: ArticleVersion) {
+        // Already current — nothing to roll back to.
+        guard topic.currentVersionID != v.uuid else { return }
         let rollback = ArticleVersion(stageLabel: "rollback", source: .rollback, text: v.text)
+        rollback.note = "Откат к версии: \(v.stageTitle)"
         rollback.topic = topic
-        topic.versions.append(rollback)
+        context.insert(rollback)
         topic.currentVersionID = rollback.uuid
         topic.updatedAt = .now
     }
