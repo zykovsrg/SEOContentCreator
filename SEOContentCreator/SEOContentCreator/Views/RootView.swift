@@ -14,7 +14,9 @@ struct RootView: View {
                 ContentPlanView()
             case .knowledgeBase:
                 KnowledgeBaseView()
-            case .queue, .templates:
+            case .templates:
+                TemplatesView()
+            case .queue:
                 let section = selection ?? .contentPlan
                 ContentUnavailableView(
                     section.title,
