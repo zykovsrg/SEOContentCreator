@@ -7,6 +7,6 @@ struct SEOContentCreatorApp: App {
         WindowGroup {
             RootView()
         }
-        .modelContainer(for: Topic.self)
+        .modelContainer(for: [Topic.self, KnowledgeNode.self])
     }
 }
