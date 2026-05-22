@@ -8,6 +8,8 @@
 
 **Tech Stack:** Swift, SwiftUI, SwiftData, Swift Testing, Xcode 16+, macOS.
 
+> **Статус исполнения (2026-05-22):** все 9 задач реализованы, сборка и все unit-тесты зелёные. Правка по ходу: из `Topic` убрано явное поле `id` (для `@Model` используется `persistentModelID`). Осталась ручная smoke-проверка (запуск приложения).
+
 **Scope note:** This is sub-project 1 of 7 (see `docs/superpowers/specs/2026-05-19-content-system-redesign-design.md`). No AI, no pipeline, no versions yet — only topic management. `direction`/`doctor` are plain text here; sub-project 2 (Knowledge Base) will replace them with node references.
 
 ---
