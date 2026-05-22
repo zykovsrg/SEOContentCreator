@@ -1,17 +1,12 @@
-//
-//  SEOContentCreatorApp.swift
-//  SEOContentCreator
-//
-//  Created by Sergei Zykov on 22.05.2026.
-//
-
 import SwiftUI
+import SwiftData
 
 @main
 struct SEOContentCreatorApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
         }
+        .modelContainer(for: Topic.self)
     }
 }
