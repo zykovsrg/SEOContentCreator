@@ -24,7 +24,7 @@ struct StageExecutorTests {
         }
     }
 
-    @Test func successCreatesCurrentVersionAndSuccessfulJob() async throws {
+    @Test func successCreatesPendingVersionNotAutoCurrent() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease,
                           direction: KnowledgeNode(title: "ЛТ", type: .direction))
@@ -40,8 +40,12 @@ struct StageExecutorTests {
                                currentText: nil, in: context)
 
         #expect(executor.isRunning == false)
-        #expect(topic.currentVersion?.text == "Часть 1 Часть 2")
-        #expect(topic.currentVersion?.stageRaw == "draft")
+        // Generated version lands in the lane but is NOT auto-current — the user must accept it.
+        #expect(topic.currentVersion == nil)
+        let created = topic.versions.first { $0.uuid == executor.lastResultVersionID }
+        #expect(created?.text == "Часть 1 Часть 2")
+        #expect(created?.stageRaw == "draft")
+        #expect(created?.source == .generated)
         #expect(topic.jobs.first?.status == .success)
         #expect(executor.lastErrorMessage == nil)
     }

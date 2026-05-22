@@ -13,6 +13,8 @@ final class StageExecutor {
     var streamingText: String = ""
     var isRunning: Bool = false
     var lastErrorMessage: String?
+    /// ID of the version created by the most recent successful run (awaiting accept/reject).
+    var lastResultVersionID: UUID?
 
     private let streamProvider: StreamProvider
     private let keyProvider: KeyProvider
@@ -46,6 +48,7 @@ final class StageExecutor {
         isRunning = true
         streamingText = ""
         lastErrorMessage = nil
+        lastResultVersionID = nil
 
         let job = GenerationJob(stage: stage, agentName: stage.agentName, modelName: template.modelName)
         job.topic = topic
@@ -77,12 +80,12 @@ final class StageExecutor {
             version.topic = topic
             context.insert(version)
 
-            topic.currentVersionID = version.uuid
             topic.updatedAt = .now
 
             job.status = .success
             job.finishedAt = .now
             job.resultVersionID = version.uuid
+            lastResultVersionID = version.uuid
         } catch {
             job.status = .error
             job.finishedAt = .now

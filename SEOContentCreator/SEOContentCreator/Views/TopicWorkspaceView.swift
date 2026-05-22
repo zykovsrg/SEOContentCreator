@@ -9,7 +9,8 @@ struct TopicWorkspaceView: View {
     @AppStorage("openAIModel") private var model = "gpt-4.1"
     @State private var selectedStage: PipelineStage = .draft
     @State private var executor: StageExecutor?
-    @State private var comparisonText: String?     // left column (previous current)
+    @State private var comparisonText: String?     // left column override (lane compare)
+    @State private var pendingVersionID: UUID?     // just-generated version awaiting accept
     @State private var showVersions = false
     @State private var showLog = false
     @State private var showProductBlocks = false
@@ -30,7 +31,7 @@ struct TopicWorkspaceView: View {
             )
             Divider()
             AcceptRejectBar(
-                canAct: pendingGeneratedVersion != nil,
+                canAct: pendingVersion != nil && !(executor?.isRunning ?? false),
                 onAcceptAll: acceptAll,
                 onAcceptPartial: { showPartialAccept = true },
                 onReject: reject
@@ -47,7 +48,8 @@ struct TopicWorkspaceView: View {
         }
         .sheet(isPresented: $showSemantics) { SemanticsEditorSheet(topic: topic) }
         .sheet(isPresented: $showPartialAccept) {
-            if let pending = pendingGeneratedVersion, let base = comparisonText {
+            if let pending = pendingVersion {
+                let base = topic.currentVersion?.text ?? ""
                 PartialAcceptSheet(oldText: base, newText: pending.text) { acceptedIndices in
                     applyPartial(base: base, generated: pending, indices: acceptedIndices)
                 }
@@ -58,12 +60,13 @@ struct TopicWorkspaceView: View {
 
     private var rightText: String? {
         if let executor, executor.isRunning { return executor.streamingText }
-        return pendingGeneratedVersion?.text
+        return pendingVersion?.text
     }
 
-    /// The most recent generated version that hasn't been archived (awaiting accept/reject).
-    private var pendingGeneratedVersion: ArticleVersion? {
-        topic.currentVersion?.source == .generated ? topic.currentVersion : nil
+    /// The just-generated version awaiting accept/reject (in the lane, not yet current).
+    private var pendingVersion: ArticleVersion? {
+        guard let id = pendingVersionID else { return nil }
+        return topic.versions.first { $0.uuid == id && !$0.isArchived }
     }
 
     private var header: some View {
@@ -99,12 +102,13 @@ struct TopicWorkspaceView: View {
 
     private func runStage(_ stage: PipelineStage, blocks: [String]) {
         guard let executor else { return }
-        comparisonText = topic.currentVersion?.text   // remember pre-generation text for the left column
+        comparisonText = nil
         let template = fetchTemplate(for: stage)
         let current = topic.currentVersion?.text
         Task {
             await executor.execute(stage: stage, topic: topic, template: template,
                                    currentText: current, selectedBlocks: blocks, in: context)
+            pendingVersionID = executor.lastResultVersionID
         }
     }
 
@@ -121,19 +125,17 @@ struct TopicWorkspaceView: View {
     }
 
     private func acceptAll() {
-        // Generated version is already current; just clear the comparison view.
+        guard let pending = pendingVersion else { return }
+        topic.currentVersionID = pending.uuid
+        topic.updatedAt = .now
+        pendingVersionID = nil
         comparisonText = nil
     }
 
     private func reject() {
-        guard let pending = pendingGeneratedVersion else { return }
-        pending.isArchived = true
-        // Restore previous current version: the newest non-archived version before this one.
-        let prior = topic.versions
-            .filter { !$0.isArchived && $0.uuid != pending.uuid }
-            .sorted { $0.createdAt > $1.createdAt }
-            .first
-        topic.currentVersionID = prior?.uuid
+        guard let pending = pendingVersion else { return }
+        pending.isArchived = true   // current version stays unchanged
+        pendingVersionID = nil
         comparisonText = nil
     }
 
@@ -146,6 +148,7 @@ struct TopicWorkspaceView: View {
         context.insert(version)
         topic.currentVersionID = version.uuid
         topic.updatedAt = .now
+        pendingVersionID = nil
         comparisonText = nil
     }
 }
