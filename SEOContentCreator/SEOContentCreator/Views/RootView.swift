@@ -10,7 +10,9 @@ struct RootView: View {
             switch selection ?? .contentPlan {
             case .contentPlan:
                 ContentPlanView()
-            case .queue, .templates, .knowledgeBase:
+            case .knowledgeBase:
+                KnowledgeBaseView()
+            case .queue, .templates:
                 let section = selection ?? .contentPlan
                 ContentUnavailableView(
                     section.title,
