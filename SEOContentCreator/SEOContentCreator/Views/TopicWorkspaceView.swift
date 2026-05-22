@@ -4,6 +4,7 @@ import SwiftData
 struct TopicWorkspaceView: View {
     @Environment(\.modelContext) private var context
     @Bindable var topic: Topic
+    var onBack: () -> Void
 
     @AppStorage("openAIModel") private var model = "gpt-4.1"
     @State private var selectedStage: PipelineStage = .draft
@@ -83,6 +84,9 @@ struct TopicWorkspaceView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            Button { onBack() } label: { Label("Контент-план", systemImage: "chevron.left") }
+        }
         ToolbarItem { Button { showSemantics = true } label: { Label("Семантика", systemImage: "list.bullet") } }
         ToolbarItem { Button { showVersions = true } label: { Label("Версии", systemImage: "clock.arrow.circlepath") } }
         ToolbarItem { Button { showLog = true } label: { Label("Лог", systemImage: "doc.text") } }
