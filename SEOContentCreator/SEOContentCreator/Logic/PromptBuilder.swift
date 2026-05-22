@@ -16,6 +16,9 @@ struct PromptBuilder {
 
         let sources = (topic.direction?.sources ?? []).joined(separator: "\n")
         let semantics = topic.semantics.joined(separator: "\n")
+        let knowledge = topic.attachedNodes.map { node in
+            node.content.isEmpty ? node.title : "\(node.title): \(node.content)"
+        }.joined(separator: "\n")
 
         let substitutions: [String: String] = [
             "{{тема}}": topic.title,
@@ -26,6 +29,7 @@ struct PromptBuilder {
             "{{преимущества}}": advantages,
             "{{источники_направления}}": sources,
             "{{семантика}}": semantics,
+            "{{база_знаний}}": knowledge,
             "{{текущий_текст}}": currentText ?? ""
         ]
         for (key, value) in substitutions {

@@ -53,4 +53,16 @@ struct PromptBuilderTests {
         #expect(result.user.contains("CTA"))
         #expect(result.user.contains("Блок врача"))
     }
+
+    @Test func substitutesKnowledgeBase() {
+        let t = StageTemplate(stage: .factCheck, systemPrompt: "x",
+                              userPromptTemplate: "Справочник:\n{{база_знаний}}")
+        let topic = Topic(title: "T", articleType: .disease)
+        let adv = KnowledgeNode(title: "Преимущество", type: .advantage, content: "Лечение за один визит")
+        let doc = KnowledgeNode(title: "Усычкин С.В.", type: .doctor, content: "Стаж 20 лет")
+        topic.attachedNodes = [adv, doc]
+        let result = PromptBuilder().build(template: t, topic: topic, currentText: "текст")
+        #expect(result.user.contains("Лечение за один визит"))
+        #expect(result.user.contains("Усычкин С.В.: Стаж 20 лет"))
+    }
 }
