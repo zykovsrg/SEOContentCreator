@@ -38,7 +38,13 @@ struct KnowledgeBaseView: View {
             .searchable(text: $search, prompt: "Поиск по справочнику")
             .toolbar {
                 ToolbarItem {
-                    Button { addRoot() } label: { Label("Узел", systemImage: "plus") }
+                    Menu {
+                        ForEach(NodeType.allCases) { type in
+                            Button(type.title) { addRoot(type: type) }
+                        }
+                    } label: {
+                        Label("Узел", systemImage: "plus")
+                    }
                 }
             }
             .navigationTitle("База знаний")
@@ -62,10 +68,21 @@ struct KnowledgeBaseView: View {
         }
     }
 
-    private func addRoot() {
-        let node = KnowledgeNode(title: "Новый раздел", type: .folder)
+    private func addRoot(type: NodeType) {
+        let node = KnowledgeNode(title: defaultTitle(for: type), type: type)
         context.insert(node)
         selection = node
+    }
+
+    private func defaultTitle(for type: NodeType) -> String {
+        switch type {
+        case .direction: return "Новое направление"
+        case .doctor:    return "Новый врач"
+        case .advantage: return "Новое преимущество"
+        case .fact:      return "Новый факт"
+        case .source:    return "Новый источник"
+        case .folder:    return "Новый раздел"
+        }
     }
 }
 
@@ -76,11 +93,12 @@ private struct NodeDetailView: View {
     var body: some View {
         Form {
             TextField("Заголовок", text: $node.title)
-            Picker("Тип", selection: Binding(
-                get: { node.nodeType },
-                set: { node.nodeType = $0 }
-            )) {
-                ForEach(NodeType.allCases) { Text($0.title).tag($0) }
+            LabeledContent("Тип") {
+                Menu(node.nodeType.title) {
+                    ForEach(NodeType.allCases) { type in
+                        Button(type.title) { node.nodeType = type }
+                    }
+                }
             }
             TextField("Содержимое", text: $node.content, axis: .vertical).lineLimit(3...8)
             Section("Действия") {
