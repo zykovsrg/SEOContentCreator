@@ -1,6 +1,6 @@
 # Current Task
 
-Status: active
+Status: idle
 
 ## Mode
 
@@ -8,47 +8,62 @@ review
 
 ## Goal
 
-Под-проекты 1–5 реализованы (SwiftUI). Под-проект 5 «Редактор промтов этапов» (срез A раздела «Шаблоны») завершён: единый источник дефолтов (StageTemplateDefaults), справочник переменных (TemplateVariables), список этапов + редактор системного/пользовательского промта, параметры модели (модель/температура/max tokens), «Сбросить к стандартному». Дополнительно: поддержка моделей GPT-5/o-series (max_completion_tokens), предупреждение об обрыве по лимиту токенов, расширенный список моделей в Настройках. Багфикс 2026-05-23: для GPT-5/o-series не отправляем temperature (OpenAI её запрещает), плашка ошибки в рабочем пространстве, человекочитаемые тексты ошибок. Под-проект 6 определён — срез B раздела «Шаблоны» (ИИ-роли + блоки контекста): проведён brainstorming, спека написана и согласована (docs/superpowers/specs/2026-05-23-ai-roles-design.md, коммит c3306bf). Реализация передана в другой ИИ-агент (решение пользователя — экономия токенов); подготовлен промт-передача. В этой сессии код среза B не писался.
+Текущая задача закрыта. Под-проекты 1–6 реализованы и проверены:
+
+- Под-проект 1 «Фундамент».
+- Под-проект 2 «База знаний».
+- Под-проект 3 «Ядро генерации».
+- Под-проект 4 «Проверяющие этапы».
+- Под-проект 5 «Редактор промтов этапов» (срез A раздела «Шаблоны») + багфикс GPT-5/o-series.
+- Под-проект 6 «ИИ-роли и блоки контекста» (срез B раздела «Шаблоны»), коммит `08c2f0c`, запушено в `main`.
+
+Новая задача ещё не выбрана.
 
 ## Use Superpowers
 
-yes — writing-plans для плана следующего под-проекта, executing-plans для реализации.
+no — включать только по явному запросу пользователя или если следующая задача будет крупной, архитектурной, TDD-heavy, migration-heavy, subagent-heavy или с неясным blast radius.
 
 ## Relevant files
 
-- docs/superpowers/specs/2026-05-19-content-system-redesign-design.md (продуктовая спека, v7.4)
-- docs/superpowers/specs/2026-05-21-frontend-design.md (фронтенд-дизайн)
-- docs/superpowers/specs/2026-05-22-checking-stages-design.md (под-проект 4 — спека)
-- docs/superpowers/plans/2026-05-21-foundation.md (под-проект 1 — выполнен)
-- docs/superpowers/plans/2026-05-22-knowledge-base.md (под-проект 2 — выполнен)
-- docs/superpowers/plans/2026-05-22-generation-core.md (под-проект 3 — выполнен)
-- docs/superpowers/plans/2026-05-22-checking-stages.md (под-проект 4 — выполнен)
-- docs/superpowers/specs/2026-05-22-template-editor-design.md (под-проект 5 — спека)
-- docs/superpowers/plans/2026-05-22-template-editor.md (под-проект 5 — выполнен)
-- docs/superpowers/specs/2026-05-23-ai-roles-design.md (под-проект 6 / срез B «ИИ-роли» — спека, согласована)
-- SEOContentCreator/ (Xcode-проект)
+- `SEOContentCreator/` — Xcode-проект.
+- `ai/project-context.md` — команды сборки/тестов и контекст проекта.
+- `ai/changelog.md` — история последних завершённых под-проектов.
+- `ai/decisions.md` — активные архитектурные и продуктовые решения.
+- `docs/superpowers/specs/2026-05-19-content-system-redesign-design.md` — продуктовая спека.
+- `docs/superpowers/specs/2026-05-23-ai-roles-design.md` — спека под-проекта 6.
 
 ## Done criteria
 
-- (Готово) Дизайн + фронтенд-дизайн.
-- (Готово) Под-проект 1 «Фундамент».
-- (Готово) Под-проект 2 «База знаний».
-- (Готово) Под-проект 3 «Ядро генерации» — тесты зелёные, smoke пройден.
-- (Готово) Под-проект 4 «Проверяющие этапы» — тесты зелёные, smoke пройден (реальные проверки OpenAI).
-- (Готово) Под-проект 5 «Редактор промтов этапов» (срез A «Шаблонов») — компиляция зелёная, smoke пройден (правка промта влияет на генерацию, «Сбросить к стандартному», параметры модели, справочник переменных). Плюс багфикс GPT-5/o-series.
-- (В работе) Под-проект 6 = срез B «ИИ-роли» (блоки контекста + роли): дизайн/спека готовы и согласованы; реализация — в другом ИИ-агенте по спеке. Остальные срезы «Шаблонов» (C типы статей, D продуктовые блоки, E скиллы/песочница) — отдельными под-проектами. Прочие кандидаты: этап «Стиль», полная «Семантика», очередь, публикация в Google Docs.
-- (Далее) Под-проект 7.
+Нет активной задачи. Для следующей задачи пользователь должен задать:
+
+- Mode: `implementation` / `review` / `task-finish` / `architecture-update`.
+- Goal: что должно измениться.
+- Relevant files: известные файлы или `unknown`.
+- Done criteria: как понять, что задача готова.
 
 ## Agent handoff
 
-Last agent: багфикс GPT-5 + brainstorming/спека под-проекта 6 (срез B «ИИ-роли»)
+Last completed task: под-проект 6 «ИИ-роли и блоки контекста».
 
-What changed (эта сессия, 2026-05-23, коммит 2f0f624): багфикс — в OpenAIClient для GPT-5/o-series больше НЕ отправляется `temperature` (OpenAI её запрещает для этих моделей; раньше «Черновик» молча не генерировался, ошибка пряталась в логе); добавлена красная плашка ошибки в TopicWorkspaceView (раньше показывались только предупреждения); OpenAIError → LocalizedError с человекочитаемыми текстами (401/429/HTTP/badResponse). Тесты OpenAIClient: MockURLProtocol теперь захватывает тело запроса + 2 теста (температура не уходит для gpt-5.4, уходит для gpt-4.1). Запушено.
+What changed:
 
-What changed (эта же сессия, 2026-05-23, коммит c3306bf): проведён brainstorming под-проекта 6, выбран срез B «ИИ-роли». Решения: правим 4 роли (закрепление за этапами фиксировано), знания = общие переиспользуемые блоки (Вариант 1), миграция A (авто-укорачивание системных промтов этапов). Написана и согласована спека docs/superpowers/specs/2026-05-23-ai-roles-design.md. Реализацию пользователь ведёт в другом ИИ-агенте — составлен подробный промт-передача. Память обновлена по подтверждению пользователя.
+- Добавлены редактируемые `AIRole` и `ContextBlock`.
+- Добавлены дефолты ролей/блоков и `RoleContextAssembler`.
+- `PromptBuilder` собирает system prompt из `roleContext + template.systemPrompt`.
+- `StageExecutor` берёт роль по `PipelineStage.roleKey`, подставляет блоки и сохраняет имя роли как снимок для новых запусков.
+- `StageTemplateSeeder` засевает роли/блоки и мигрирует старые systemPrompt до коротких дефолтов через `templatesDefaultsVersion = 2`.
+- `TemplatesView` получил категории «Промты этапов», «ИИ-роли», «Редполитика и источники».
+- `StageBarView` показывает имя роли из `AIRole.name`.
 
-What changed (прошлая сессия): под-проект 5 (срез A «Шаблонов») — StageTemplateDefaults (единый источник дефолтов), TemplateVariables (справочник), TemplatesView (список этапов + редактор промтов + параметры модели + «Сбросить к стандартному»), подключён в RootView. Плюс поддержка GPT-5/o-series (OpenAIClient.usesMaxCompletionTokens → max_completion_tokens), предупреждение об обрыве (.finish(reason:)), параметры модели в редакторе, расширенный список моделей в Настройках.
+Verification:
 
-Open risks: блокеров нет. Юнит-тесты из командной строки НЕ выполняются — тест-раннер зависает («test runner hung before establishing connection», особенность среды; build проходит). Для проверки кода из CLI: `cd SEOContentCreator && xcodebuild build-for-testing -scheme SEOContentCreator -destination 'platform=macOS'`; реальный запуск тестов — Cmd+U в Xcode. Часть GPT-5-моделей в списке даёт HTTP 404 (нет доступа на стороне аккаунта OpenAI) — список оставлен как есть по решению пользователя; рабочие модели сейчас: gpt-4.1, gpt-4o. UI-тестов нет. Сохраняются прежние риски: миграции SwiftData на реальных данных; минимальная «Семантика»; срезы «Шаблонов» C–E не сделаны.
+- `xcodebuild build-for-testing -scheme SEOContentCreator -destination 'platform=macOS' -derivedDataPath /private/tmp/SEOContentCreatorDerivedData OTHER_SWIFT_FLAGS='-disable-sandbox'` — зелёный в Codex.
+- `xcodebuild -scheme SEOContentCreator -destination 'platform=macOS' build -derivedDataPath /private/tmp/SEOContentCreatorDerivedData OTHER_SWIFT_FLAGS='-disable-sandbox'` — зелёный в Codex.
+- Cmd+U в Xcode: unit-тесты зелёные — 87 tests / 25 suites; UI-тесты зелёные — 4 tests.
+- Smoke пользователем пройден.
 
-Next agent should check: срез B ведёт внешний ИИ-агент по спеке docs/superpowers/specs/2026-05-23-ai-roles-design.md (она ГЛАВНАЯ) — там же ключевые файлы (PipelineStage, PromptBuilder, StageExecutor, StageTemplateDefaults, StageTemplateSeeder, TemplatesView). Если срез B вернётся сюда — продолжай по этой спеке. Для будущих под-проектов — спеку §4.4 (срезы C–E: типы статей, продуктовые блоки, скиллы/песочница; раздел 5 «Стиль»; §2 «Семантика»); процесс: brainstorming → спека → writing-plans → согласование → executing-plans (TDD).
+Open risks:
+
+- В Codex CLI тест-раннер macOS не запускается из-за sandbox/testmanagerd; проверять реальные тесты через Cmd+U в Xcode.
+- Часть GPT-5-моделей может давать HTTP 404 из-за доступа аккаунта OpenAI; рабочие модели: `gpt-4.1`, `gpt-4o`.
+- Остались будущие срезы «Шаблонов» C–E (типы статей, продуктовые блоки, скиллы/песочница), а также возможные будущие под-проекты: этап «Стиль», полная «Семантика», очередь, публикация в Google Docs.
