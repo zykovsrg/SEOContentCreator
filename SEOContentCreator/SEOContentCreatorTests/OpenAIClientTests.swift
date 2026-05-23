@@ -5,10 +5,30 @@ import Foundation
 final class MockURLProtocol: URLProtocol {
     nonisolated(unsafe) static var stubBody = ""
     nonisolated(unsafe) static var statusCode = 200
+    nonisolated(unsafe) static var lastRequestBody: Data?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    private static func bodyData(from request: URLRequest) -> Data? {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
+
     override func startLoading() {
+        Self.lastRequestBody = Self.bodyData(from: request)
         let response = HTTPURLResponse(
             url: request.url!, statusCode: Self.statusCode,
             httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "text/event-stream"]
@@ -86,5 +106,37 @@ struct OpenAIClientTests {
         #expect(!OpenAIClient.usesMaxCompletionTokens(model: "gpt-4.1"))
         #expect(!OpenAIClient.usesMaxCompletionTokens(model: "gpt-4o"))
         #expect(!OpenAIClient.usesMaxCompletionTokens(model: "gpt-4o-mini"))
+    }
+
+    @Test func omitsTemperatureForNewModels() async throws {
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.stubBody = "data: [DONE]\n\n"
+        MockURLProtocol.lastRequestBody = nil
+        let client = OpenAIClient(session: mockSession())
+        for try await _ in client.streamCompletion(
+            apiKey: "k", system: "s", user: "u",
+            model: "gpt-5.4", temperature: 0.6, maxTokens: 5000
+        ) {}
+        let body = try #require(MockURLProtocol.lastRequestBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["temperature"] == nil)
+        #expect(json["max_completion_tokens"] as? Int == 5000)
+        #expect(json["max_tokens"] == nil)
+    }
+
+    @Test func sendsTemperatureForLegacyModels() async throws {
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.stubBody = "data: [DONE]\n\n"
+        MockURLProtocol.lastRequestBody = nil
+        let client = OpenAIClient(session: mockSession())
+        for try await _ in client.streamCompletion(
+            apiKey: "k", system: "s", user: "u",
+            model: "gpt-4.1", temperature: 0.6, maxTokens: 5000
+        ) {}
+        let body = try #require(MockURLProtocol.lastRequestBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["temperature"] as? Double == 0.6)
+        #expect(json["max_tokens"] as? Int == 5000)
+        #expect(json["max_completion_tokens"] == nil)
     }
 }

@@ -27,6 +27,17 @@ struct TopicWorkspaceView: View {
             StageBarView(selectedStage: $selectedStage, topic: topic)
                 .padding(.vertical, 8)
             Divider()
+            if let error = executor?.lastErrorMessage {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.octagon.fill").foregroundStyle(.red)
+                    Text(error).font(.callout)
+                    Spacer()
+                    Button("Скрыть") { executor?.lastErrorMessage = nil }
+                }
+                .padding(8)
+                .background(Color.red.opacity(0.12))
+                Divider()
+            }
             if let warning = executor?.lastWarningMessage {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)

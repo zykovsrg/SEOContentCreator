@@ -6,11 +6,24 @@ enum OpenAIStreamEvent: Equatable {
 }
 
 struct OpenAIClient {
-    enum OpenAIError: Error, Equatable {
+    enum OpenAIError: Error, Equatable, LocalizedError {
         case unauthorized
         case rateLimited
         case http(Int)
         case badResponse
+
+        var errorDescription: String? {
+            switch self {
+            case .unauthorized:
+                return "Ошибка авторизации (401): OpenAI отклонил запрос. Проверьте API-ключ в Настройках или доступ аккаунта к выбранной модели."
+            case .rateLimited:
+                return "Превышен лимит запросов (429). Подождите немного и попробуйте снова."
+            case .http(let code):
+                return "Ошибка OpenAI (HTTP \(code)). Попробуйте позже или смените модель в разделе «Шаблоны»."
+            case .badResponse:
+                return "Не удалось разобрать ответ OpenAI."
+            }
+        }
     }
 
     let session: URLSession
@@ -47,16 +60,20 @@ struct OpenAIClient {
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     var body: [String: Any] = [
                         "model": model,
-                        "temperature": temperature,
                         "stream": true,
                         "messages": [
                             ["role": "system", "content": system],
                             ["role": "user", "content": user]
                         ]
                     ]
-                    let tokenParam = Self.usesMaxCompletionTokens(model: model)
-                        ? "max_completion_tokens" : "max_tokens"
-                    body[tokenParam] = maxTokens
+                    if Self.usesMaxCompletionTokens(model: model) {
+                        // GPT-5.x / o-series use max_completion_tokens and reject a
+                        // custom temperature (only the default is allowed), so omit it.
+                        body["max_completion_tokens"] = maxTokens
+                    } else {
+                        body["temperature"] = temperature
+                        body["max_tokens"] = maxTokens
+                    }
                     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
                     let (bytes, response) = try await session.bytes(for: request)
