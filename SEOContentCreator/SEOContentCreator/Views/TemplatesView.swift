@@ -49,7 +49,6 @@ private struct TemplateEditorView: View {
     @State private var model = "gpt-4.1"
     @State private var temperature = 0.6
     @State private var maxTokens = 8000
-    @State private var showAdvanced = false
     @State private var showVariables = false
     @State private var savedNote: String?
 
@@ -68,14 +67,16 @@ private struct TemplateEditorView: View {
                 Text("Пользовательский промт (инструкция с переменными)").font(.headline)
                 TextEditor(text: $user).frame(minHeight: 200).border(.gray.opacity(0.3))
 
-                DisclosureGroup("Расширенные", isExpanded: $showAdvanced) {
-                    Picker("Модель", selection: $model) {
-                        ForEach(models, id: \.self) { Text($0).tag($0) }
-                    }
-                    Stepper("Температура: \(temperature, specifier: "%.1f")",
-                            value: $temperature, in: 0...1, step: 0.1)
-                    Stepper("Max tokens: \(maxTokens)", value: $maxTokens, in: 1000...16000, step: 1000)
+                Text("Параметры модели").font(.headline)
+                Picker("Модель", selection: $model) {
+                    ForEach(models, id: \.self) { Text($0).tag($0) }
                 }
+                .frame(maxWidth: 360, alignment: .leading)
+                Stepper("Температура: \(temperature, specifier: "%.1f")",
+                        value: $temperature, in: 0...1, step: 0.1)
+                    .frame(maxWidth: 360, alignment: .leading)
+                Stepper("Max tokens: \(maxTokens)", value: $maxTokens, in: 1000...16000, step: 1000)
+                    .frame(maxWidth: 360, alignment: .leading)
 
                 DisclosureGroup("Переменные {{…}}", isExpanded: $showVariables) {
                     ForEach(TemplateVariables.all) { v in
