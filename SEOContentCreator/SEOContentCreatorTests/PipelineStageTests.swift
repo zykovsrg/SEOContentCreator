@@ -37,4 +37,13 @@ struct PipelineStageTests {
         #expect(PipelineStage.factCheck.title == "Фактчекинг")
         #expect(PipelineStage.finalReview.title == "Финальная вычитка")
     }
+
+    @Test func roleKeysAreAssignedForEveryStage() {
+        #expect(PipelineStage.draft.roleKey == "author")
+        #expect(PipelineStage.productBlocks.roleKey == "author")
+        #expect(PipelineStage.semanticsInText.roleKey == "author")
+        #expect(PipelineStage.seoCheck.roleKey == "seo")
+        #expect(PipelineStage.factCheck.roleKey == "factChecker")
+        #expect(PipelineStage.finalReview.roleKey == "editor")
+    }
 }

@@ -5,7 +5,8 @@ struct PromptBuilder {
         template: StageTemplate,
         topic: Topic,
         currentText: String?,
-        selectedBlocks: [String] = []
+        selectedBlocks: [String] = [],
+        roleContext: String = ""
     ) -> (system: String, user: String) {
         var user = template.userPromptTemplate
 
@@ -40,6 +41,15 @@ struct PromptBuilder {
             user += "\n\nВключить продуктовые блоки: " + selectedBlocks.joined(separator: ", ")
         }
 
-        return (template.systemPrompt, user)
+        let system = [roleContext, template.systemPrompt]
+            .compactMap { nonEmpty($0) }
+            .joined(separator: "\n\n")
+
+        return (system, user)
+    }
+
+    private func nonEmpty(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

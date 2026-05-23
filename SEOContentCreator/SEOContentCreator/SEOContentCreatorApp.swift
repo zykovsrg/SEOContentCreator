@@ -9,7 +9,8 @@ struct SEOContentCreatorApp: App {
         }
         .modelContainer(for: [
             Topic.self, KnowledgeNode.self,
-            ArticleVersion.self, GenerationJob.self, StageTemplate.self
+            ArticleVersion.self, GenerationJob.self, StageTemplate.self,
+            ContextBlock.self, AIRole.self
         ])
 
         Settings {

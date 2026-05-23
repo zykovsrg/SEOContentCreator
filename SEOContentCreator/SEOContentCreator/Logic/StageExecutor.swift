@@ -56,15 +56,19 @@ final class StageExecutor {
         lastResultVersionID = nil
         remarks = []
 
-        let job = GenerationJob(stage: stage, agentName: stage.agentName, modelName: template.modelName)
+        let role = fetchRole(for: stage, in: context)
+        let agentName = role?.name ?? stage.agentName
+        let job = GenerationJob(stage: stage, agentName: agentName, modelName: template.modelName)
         job.topic = topic
         context.insert(job)
 
         do {
             let key = try keyProvider()
+            let roleContext = buildRoleContext(for: role, in: context)
             let prompt = PromptBuilder().build(
                 template: template, topic: topic,
-                currentText: currentText, selectedBlocks: selectedBlocks
+                currentText: currentText, selectedBlocks: selectedBlocks,
+                roleContext: roleContext
             )
             var collected = ""
             var truncated = false
@@ -92,7 +96,7 @@ final class StageExecutor {
                 let parsed = StageOutputParser.parse(rawText: collected, stage: stage)
                 let version = ArticleVersion(
                     stage: stage, source: .generated, text: parsed.body,
-                    agentName: stage.agentName, templateID: template.uuid, modelName: template.modelName
+                    agentName: agentName, templateID: template.uuid, modelName: template.modelName
                 )
                 version.h1 = parsed.h1
                 version.seoTitle = parsed.seoTitle
@@ -121,5 +125,19 @@ final class StageExecutor {
         }
 
         isRunning = false
+    }
+
+    private func fetchRole(for stage: PipelineStage, in context: ModelContext) -> AIRole? {
+        let roleKey = stage.roleKey
+        let roleDescriptor = FetchDescriptor<AIRole>(
+            predicate: #Predicate { $0.key == roleKey }
+        )
+        return (try? context.fetch(roleDescriptor))?.first
+    }
+
+    private func buildRoleContext(for role: AIRole?, in context: ModelContext) -> String {
+        guard let role else { return "" }
+        let blocks = (try? context.fetch(FetchDescriptor<ContextBlock>())) ?? []
+        return RoleContextAssembler.assemble(role: role, blocks: blocks)
     }
 }

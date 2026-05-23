@@ -10,6 +10,7 @@ struct StageExecutorTests {
         let container = try ModelContainer(
             for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
                  GenerationJob.self, StageTemplate.self,
+                 ContextBlock.self, AIRole.self,
             configurations: config
         )
         return ModelContext(container)
@@ -112,5 +113,33 @@ struct StageExecutorTests {
         let created = topic.versions.first { $0.uuid == executor.lastResultVersionID }
         #expect(created?.text == "Обрезанный текст")
         #expect(topic.jobs.first?.status == .success)
+    }
+
+    @Test func passesRoleContextIntoPromptBuilder() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease)
+        context.insert(topic)
+        context.insert(AIRole(key: "author", name: "Новый автор", mandate: "Мандат роли", blockKeys: ["editorialPolicy"]))
+        context.insert(ContextBlock(key: "editorialPolicy", title: "Редполитика", text: "Текст редполитики"))
+        let template = StageTemplate(stage: .draft, systemPrompt: "Промт этапа", userPromptTemplate: "{{тема}}")
+        context.insert(template)
+
+        var capturedSystem = ""
+        let provider: StageExecutor.StreamProvider = { _, system, _, _, _, _ in
+            capturedSystem = system
+            return AsyncThrowingStream { c in
+                c.yield(.token("Текст"))
+                c.finish()
+            }
+        }
+        let executor = StageExecutor(streamProvider: provider, keyProvider: { "k" })
+
+        await executor.execute(stage: .draft, topic: topic, template: template,
+                               currentText: nil, in: context)
+
+        #expect(capturedSystem == "Мандат роли\n\nТекст редполитики\n\nПромт этапа")
+        #expect(topic.jobs.first?.agentName == "Новый автор")
+        let created = topic.versions.first { $0.uuid == executor.lastResultVersionID }
+        #expect(created?.agentName == "Новый автор")
     }
 }

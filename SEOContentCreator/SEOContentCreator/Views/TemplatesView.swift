@@ -1,9 +1,17 @@
 import SwiftUI
 import SwiftData
 
+private enum TemplateSelection: Hashable {
+    case stage(UUID)
+    case role(UUID)
+    case block(UUID)
+}
+
 struct TemplatesView: View {
     @Query private var templates: [StageTemplate]
-    @State private var selectedID: UUID?
+    @Query private var roles: [AIRole]
+    @Query private var blocks: [ContextBlock]
+    @State private var selection: TemplateSelection?
 
     private var sortedTemplates: [StageTemplate] {
         templates.sorted { lhs, rhs in
@@ -11,33 +19,99 @@ struct TemplatesView: View {
         }
     }
 
+    private var sortedRoles: [AIRole] {
+        roles.sorted { lhs, rhs in
+            roleOrder(lhs.key) < roleOrder(rhs.key)
+        }
+    }
+
+    private var sortedBlocks: [ContextBlock] {
+        blocks.sorted { lhs, rhs in
+            blockOrder(lhs.key) < blockOrder(rhs.key)
+        }
+    }
+
     private func order(_ raw: String) -> Int {
         PipelineStage.allCases.firstIndex { $0.rawValue == raw } ?? Int.max
     }
 
+    private func roleOrder(_ key: String) -> Int {
+        RoleDefaults.all.firstIndex { $0.key == key } ?? Int.max
+    }
+
+    private func blockOrder(_ key: String) -> Int {
+        ContextBlockDefaults.canonicalOrder.firstIndex(of: key) ?? Int.max
+    }
+
     private var selectedTemplate: StageTemplate? {
-        templates.first { $0.uuid == selectedID }
+        guard case .stage(let id) = selection else { return nil }
+        return templates.first { $0.uuid == id }
+    }
+
+    private var selectedRole: AIRole? {
+        guard case .role(let id) = selection else { return nil }
+        return roles.first { $0.uuid == id }
+    }
+
+    private var selectedBlock: ContextBlock? {
+        guard case .block(let id) = selection else { return nil }
+        return blocks.first { $0.uuid == id }
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            List(selection: $selectedID) {
+            List(selection: $selection) {
                 Section("Промты этапов") {
                     ForEach(sortedTemplates) { t in
-                        Text(t.stage?.title ?? t.stageRaw).tag(t.uuid)
+                        Text(t.stage?.title ?? t.stageRaw).tag(TemplateSelection.stage(t.uuid))
+                    }
+                }
+
+                Section("ИИ-роли") {
+                    ForEach(sortedRoles) { role in
+                        Text(role.name).tag(TemplateSelection.role(role.uuid))
+                    }
+                }
+
+                Section("Редполитика и источники") {
+                    ForEach(sortedBlocks) { block in
+                        Text(block.title).tag(TemplateSelection.block(block.uuid))
                     }
                 }
             }
-            .frame(width: 240)
+            .frame(width: 260)
             Divider()
-            if let t = selectedTemplate {
-                TemplateEditorView(template: t).id(t.uuid)
-            } else {
-                ContentUnavailableView("Выберите этап", systemImage: "doc.text")
-            }
+            detail
         }
         .navigationTitle("Шаблоны")
-        .onAppear { if selectedID == nil { selectedID = sortedTemplates.first?.uuid } }
+        .onAppear(perform: ensureSelection)
+        .onChange(of: templates.map(\.uuid)) { _, _ in ensureSelection() }
+        .onChange(of: roles.map(\.uuid)) { _, _ in ensureSelection() }
+        .onChange(of: blocks.map(\.uuid)) { _, _ in ensureSelection() }
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        if let t = selectedTemplate {
+            TemplateEditorView(template: t).id(t.uuid)
+        } else if let role = selectedRole {
+            RoleEditorView(role: role, blocks: sortedBlocks).id(role.uuid)
+        } else if let block = selectedBlock {
+            ContextBlockEditorView(block: block, roles: sortedRoles).id(block.uuid)
+        } else {
+            ContentUnavailableView("Выберите шаблон", systemImage: "doc.text")
+        }
+    }
+
+    private func ensureSelection() {
+        if selection != nil { return }
+        if let first = sortedTemplates.first {
+            selection = .stage(first.uuid)
+        } else if let first = sortedRoles.first {
+            selection = .role(first.uuid)
+        } else if let first = sortedBlocks.first {
+            selection = .block(first.uuid)
+        }
     }
 }
 
@@ -66,8 +140,10 @@ private struct TemplateEditorView: View {
                 Text("Версия шаблона: \(template.templateVersion)")
                     .font(.caption).foregroundStyle(.secondary)
 
-                Text("Системный промт (роль, правила, методичка)").font(.headline)
-                TextEditor(text: $system).frame(minHeight: 160).border(.gray.opacity(0.3))
+                Text("Дополнение к системному промту этапа").font(.headline)
+                Text("Основная роль и общие правила берутся из разделов «ИИ-роли» и «Редполитика и источники».")
+                    .font(.caption).foregroundStyle(.secondary)
+                TextEditor(text: $system).frame(minHeight: 120).border(.gray.opacity(0.3))
 
                 Text("Пользовательский промт (инструкция с переменными)").font(.headline)
                 TextEditor(text: $user).frame(minHeight: 200).border(.gray.opacity(0.3))
@@ -134,6 +210,169 @@ private struct TemplateEditorView: View {
         model = c.modelName
         temperature = c.temperature
         maxTokens = c.maxTokens
+        save()
+        savedNote = "Сброшено к стандартному"
+    }
+}
+
+private struct RoleEditorView: View {
+    @Bindable var role: AIRole
+    let blocks: [ContextBlock]
+
+    @State private var name = ""
+    @State private var mandate = ""
+    @State private var selectedBlockKeys: Set<String> = []
+    @State private var savedNote: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(role.name).font(.title2).bold()
+                Text("Версия роли: \(role.version)")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                TextField("Имя", text: $name)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 420)
+
+                Text("Установка роли").font(.headline)
+                TextEditor(text: $mandate)
+                    .frame(minHeight: 180)
+                    .border(.gray.opacity(0.3))
+
+                Text("Использует блоки").font(.headline)
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(blocks) { block in
+                        Toggle(block.title, isOn: binding(for: block.key))
+                    }
+                }
+
+                Text("Отвечает за этапы").font(.headline)
+                Text(stageTitles.isEmpty ? "Нет закреплённых этапов" : stageTitles.joined(separator: ", "))
+                    .foregroundStyle(.secondary)
+
+                HStack {
+                    Button("Сохранить") { save() }.buttonStyle(.borderedProminent)
+                    Button("Сбросить к стандартному") { resetToDefault() }
+                    Spacer()
+                    if let savedNote { Text(savedNote).font(.caption).foregroundStyle(.green) }
+                }
+                .padding(.top, 4)
+            }
+            .padding()
+        }
+        .onAppear(perform: load)
+    }
+
+    private var stageTitles: [String] {
+        PipelineStage.allCases
+            .filter { $0.roleKey == role.key }
+            .map(\.title)
+    }
+
+    private func binding(for key: String) -> Binding<Bool> {
+        Binding(
+            get: { selectedBlockKeys.contains(key) },
+            set: { isOn in
+                if isOn {
+                    selectedBlockKeys.insert(key)
+                } else {
+                    selectedBlockKeys.remove(key)
+                }
+            }
+        )
+    }
+
+    private func load() {
+        name = role.name
+        mandate = role.mandate
+        selectedBlockKeys = Set(role.blockKeys)
+    }
+
+    private func save() {
+        role.name = name
+        role.mandate = mandate
+        role.blockKeys = orderedSelectedBlockKeys()
+        role.version += 1
+        role.updatedAt = .now
+        savedNote = "Сохранено (версия \(role.version))"
+    }
+
+    private func resetToDefault() {
+        guard let defaults = RoleDefaults.defaultForKey(role.key) else { return }
+        name = defaults.name
+        mandate = defaults.mandate
+        selectedBlockKeys = Set(defaults.blockKeys)
+        save()
+        savedNote = "Сброшено к стандартному"
+    }
+
+    private func orderedSelectedBlockKeys() -> [String] {
+        let canonical = ContextBlockDefaults.canonicalOrder.filter { selectedBlockKeys.contains($0) }
+        let extra = blocks
+            .map(\.key)
+            .filter { selectedBlockKeys.contains($0) && !canonical.contains($0) }
+        return canonical + extra
+    }
+}
+
+private struct ContextBlockEditorView: View {
+    @Bindable var block: ContextBlock
+    let roles: [AIRole]
+
+    @State private var text = ""
+    @State private var savedNote: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(block.title).font(.title2).bold()
+                Text("Версия блока: \(block.version)")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                Text("Текст блока").font(.headline)
+                TextEditor(text: $text)
+                    .frame(minHeight: 260)
+                    .border(.gray.opacity(0.3))
+
+                Text("Используется ролями").font(.headline)
+                Text(usedByRoles.isEmpty ? "Не используется" : usedByRoles.joined(separator: ", "))
+                    .foregroundStyle(.secondary)
+
+                HStack {
+                    Button("Сохранить") { save() }.buttonStyle(.borderedProminent)
+                    Button("Сбросить к стандартному") { resetToDefault() }
+                    Spacer()
+                    if let savedNote { Text(savedNote).font(.caption).foregroundStyle(.green) }
+                }
+                .padding(.top, 4)
+            }
+            .padding()
+        }
+        .onAppear(perform: load)
+    }
+
+    private var usedByRoles: [String] {
+        roles
+            .filter { $0.blockKeys.contains(block.key) }
+            .map(\.name)
+    }
+
+    private func load() {
+        text = block.text
+    }
+
+    private func save() {
+        block.text = text
+        block.version += 1
+        block.updatedAt = .now
+        savedNote = "Сохранено (версия \(block.version))"
+    }
+
+    private func resetToDefault() {
+        guard let defaults = ContextBlockDefaults.defaultForKey(block.key) else { return }
+        block.title = defaults.title
+        text = defaults.text
         save()
         savedNote = "Сброшено к стандартному"
     }

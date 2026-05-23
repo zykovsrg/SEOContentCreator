@@ -65,4 +65,34 @@ struct PromptBuilderTests {
         #expect(result.user.contains("Лечение за один визит"))
         #expect(result.user.contains("Усычкин С.В.: Стаж 20 лет"))
     }
+
+    @Test func prependsRoleContextToSystemPrompt() {
+        let t = StageTemplate(stage: .draft, systemPrompt: "Промт этапа", userPromptTemplate: "{{тема}}")
+        let topic = Topic(title: "T", articleType: .info)
+
+        let result = PromptBuilder().build(
+            template: t,
+            topic: topic,
+            currentText: nil,
+            roleContext: "Контекст роли"
+        )
+
+        #expect(result.system == "Контекст роли\n\nПромт этапа")
+        #expect(result.user == "T")
+    }
+
+    @Test func emptyRoleContextKeepsExistingSystemPrompt() {
+        let t = StageTemplate(stage: .draft, systemPrompt: "Промт этапа", userPromptTemplate: "{{тема}}")
+        let topic = Topic(title: "T", articleType: .info)
+
+        let result = PromptBuilder().build(
+            template: t,
+            topic: topic,
+            currentText: nil,
+            roleContext: ""
+        )
+
+        #expect(result.system == "Промт этапа")
+        #expect(result.user == "T")
+    }
 }

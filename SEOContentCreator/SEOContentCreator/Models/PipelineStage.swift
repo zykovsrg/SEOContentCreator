@@ -41,4 +41,13 @@ enum PipelineStage: String, CaseIterable, Identifiable, Codable {
         case .finalReview: return "ИИ-редактор"
         }
     }
+
+    var roleKey: String {
+        switch self {
+        case .draft, .productBlocks, .semanticsInText: return "author"
+        case .seoCheck:    return "seo"
+        case .factCheck:   return "factChecker"
+        case .finalReview: return "editor"
+        }
+    }
 }
