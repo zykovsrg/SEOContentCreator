@@ -6,7 +6,12 @@ struct SettingsView: View {
     @State private var savedMessage: String?
     @State private var hasKey = KeychainService.hasAPIKey()
 
-    private let models = ["gpt-4.1", "gpt-4o", "gpt-4o-mini"]
+    private let models = [
+        "gpt-5.5-pro", "gpt-5.5",
+        "gpt-5.4-pro", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
+        "gpt-5.3-chat-latest",
+        "gpt-4.1", "gpt-4o", "gpt-4o-mini"
+    ]
 
     var body: some View {
         Form {
