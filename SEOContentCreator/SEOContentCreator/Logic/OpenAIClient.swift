@@ -1,5 +1,10 @@
 import Foundation
 
+enum OpenAIStreamEvent: Equatable {
+    case token(String)
+    case finish(reason: String)
+}
+
 struct OpenAIClient {
     enum OpenAIError: Error, Equatable {
         case unauthorized
@@ -24,7 +29,7 @@ struct OpenAIClient {
         model: String,
         temperature: Double = 0.6,
         maxTokens: Int = 8000
-    ) -> AsyncThrowingStream<String, Error> {
+    ) -> AsyncThrowingStream<OpenAIStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -56,7 +61,8 @@ struct OpenAIClient {
 
                     for try await line in bytes.lines {
                         switch OpenAILineParser.parse(line: line) {
-                        case .token(let t): continuation.yield(t)
+                        case .token(let t): continuation.yield(.token(t))
+                        case .finish(let reason): continuation.yield(.finish(reason: reason))
                         case .done: continuation.finish(); return
                         case .ignore: continue
                         }

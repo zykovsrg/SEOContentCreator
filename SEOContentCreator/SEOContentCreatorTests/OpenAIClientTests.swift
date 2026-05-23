@@ -40,8 +40,8 @@ struct OpenAIClientTests {
         """
         let client = OpenAIClient(session: mockSession())
         var collected = ""
-        for try await token in client.streamCompletion(apiKey: "sk-x", system: "s", user: "u", model: "gpt-4.1") {
-            collected += token
+        for try await event in client.streamCompletion(apiKey: "sk-x", system: "s", user: "u", model: "gpt-4.1") {
+            if case .token(let t) = event { collected += t }
         }
         #expect(collected == "Привет, мир")
     }
@@ -53,5 +53,28 @@ struct OpenAIClientTests {
         await #expect(throws: OpenAIClient.OpenAIError.unauthorized) {
             for try await _ in client.streamCompletion(apiKey: "bad", system: "s", user: "u", model: "gpt-4.1") {}
         }
+    }
+
+    @Test func reportsLengthFinishReason() async throws {
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.stubBody = """
+        data: {"choices":[{"delta":{"content":"Часть"}}]}
+
+        data: {"choices":[{"delta":{},"finish_reason":"length"}]}
+
+        data: [DONE]
+
+        """
+        let client = OpenAIClient(session: mockSession())
+        var text = ""
+        var sawLength = false
+        for try await event in client.streamCompletion(apiKey: "k", system: "s", user: "u", model: "gpt-4.1") {
+            switch event {
+            case .token(let t): text += t
+            case .finish(let reason): if reason == "length" { sawLength = true }
+            }
+        }
+        #expect(text == "Часть")
+        #expect(sawLength)
     }
 }

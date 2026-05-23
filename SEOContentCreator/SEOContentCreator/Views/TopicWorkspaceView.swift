@@ -27,6 +27,17 @@ struct TopicWorkspaceView: View {
             StageBarView(selectedStage: $selectedStage, topic: topic)
                 .padding(.vertical, 8)
             Divider()
+            if let warning = executor?.lastWarningMessage {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Text(warning).font(.callout)
+                    Spacer()
+                    Button("Скрыть") { executor?.lastWarningMessage = nil }
+                }
+                .padding(8)
+                .background(Color.orange.opacity(0.12))
+                Divider()
+            }
             if isReviewing {
                 HStack(spacing: 0) {
                     ScrollView {

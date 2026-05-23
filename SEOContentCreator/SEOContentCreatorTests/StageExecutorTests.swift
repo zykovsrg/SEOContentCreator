@@ -18,7 +18,7 @@ struct StageExecutorTests {
     private func cannedStream(_ chunks: [String]) -> StageExecutor.StreamProvider {
         { _, _, _, _, _, _ in
             AsyncThrowingStream { continuation in
-                for c in chunks { continuation.yield(c) }
+                for c in chunks { continuation.yield(.token(c)) }
                 continuation.finish()
             }
         }
@@ -48,6 +48,7 @@ struct StageExecutorTests {
         #expect(created?.source == .generated)
         #expect(topic.jobs.first?.status == .success)
         #expect(executor.lastErrorMessage == nil)
+        #expect(executor.lastWarningMessage == nil)
     }
 
     @Test func missingKeyProducesErrorJobNoVersion() async throws {
@@ -85,6 +86,31 @@ struct StageExecutorTests {
         #expect(executor.remarks.first?.category == "Орфография")
         #expect(topic.currentVersion == nil)         // checking creates no version
         #expect(executor.lastResultVersionID == nil)
+        #expect(topic.jobs.first?.status == .success)
+    }
+
+    @Test func truncatedStreamSetsWarningAndCreatesVersion() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease,
+                          direction: KnowledgeNode(title: "ЛТ", type: .direction))
+        context.insert(topic)
+        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        context.insert(template)
+
+        let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _ in
+            AsyncThrowingStream { c in
+                c.yield(.token("Обрезанный текст"))
+                c.yield(.finish(reason: "length"))
+                c.finish()
+            }
+        }
+        let executor = StageExecutor(streamProvider: provider, keyProvider: { "k" })
+        await executor.execute(stage: .draft, topic: topic, template: template,
+                               currentText: nil, in: context)
+
+        #expect(executor.lastWarningMessage != nil)
+        let created = topic.versions.first { $0.uuid == executor.lastResultVersionID }
+        #expect(created?.text == "Обрезанный текст")
         #expect(topic.jobs.first?.status == .success)
     }
 }

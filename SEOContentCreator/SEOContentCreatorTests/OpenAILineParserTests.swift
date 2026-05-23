@@ -20,4 +20,14 @@ struct OpenAILineParserTests {
         let line = #"data: {"choices":[{"delta":{"role":"assistant"}}]}"#
         #expect(OpenAILineParser.parse(line: line) == .ignore)
     }
+
+    @Test func recognisesLengthFinishReason() {
+        let line = #"data: {"choices":[{"delta":{},"finish_reason":"length"}]}"#
+        #expect(OpenAILineParser.parse(line: line) == .finish(reason: "length"))
+    }
+
+    @Test func recognisesStopFinishReason() {
+        let line = #"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#
+        #expect(OpenAILineParser.parse(line: line) == .finish(reason: "stop"))
+    }
 }

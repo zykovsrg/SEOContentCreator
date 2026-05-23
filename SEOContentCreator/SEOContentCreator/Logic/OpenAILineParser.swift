@@ -2,6 +2,7 @@ import Foundation
 
 enum OpenAILineResult: Equatable {
     case token(String)
+    case finish(reason: String)
     case done
     case ignore
 }
@@ -16,9 +17,15 @@ enum OpenAILineParser {
         guard let data = payload.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
-              let delta = choices.first?["delta"] as? [String: Any],
-              let content = delta["content"] as? String
+              let first = choices.first
         else { return .ignore }
-        return .token(content)
+        if let delta = first["delta"] as? [String: Any],
+           let content = delta["content"] as? String {
+            return .token(content)
+        }
+        if let reason = first["finish_reason"] as? String {
+            return .finish(reason: reason)
+        }
+        return .ignore
     }
 }

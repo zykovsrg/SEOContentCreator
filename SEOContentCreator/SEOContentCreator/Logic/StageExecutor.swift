@@ -7,12 +7,14 @@ final class StageExecutor {
     typealias StreamProvider = (
         _ apiKey: String, _ system: String, _ user: String,
         _ model: String, _ temperature: Double, _ maxTokens: Int
-    ) -> AsyncThrowingStream<String, Error>
+    ) -> AsyncThrowingStream<OpenAIStreamEvent, Error>
     typealias KeyProvider = () throws -> String
 
     var streamingText: String = ""
     var isRunning: Bool = false
     var lastErrorMessage: String?
+    /// Transient warning from the most recent run (e.g., output truncated by token limit). Not persisted.
+    var lastWarningMessage: String?
     /// ID of the version created by the most recent successful run (awaiting accept/reject).
     var lastResultVersionID: UUID?
     /// Transient remarks from the most recent checking run (not persisted).
@@ -50,6 +52,7 @@ final class StageExecutor {
         isRunning = true
         streamingText = ""
         lastErrorMessage = nil
+        lastWarningMessage = nil
         lastResultVersionID = nil
         remarks = []
 
@@ -64,12 +67,21 @@ final class StageExecutor {
                 currentText: currentText, selectedBlocks: selectedBlocks
             )
             var collected = ""
-            for try await chunk in streamProvider(
+            var truncated = false
+            for try await event in streamProvider(
                 key, prompt.system, prompt.user,
                 template.modelName, template.temperature, template.maxTokens
             ) {
-                collected += chunk
-                streamingText = collected
+                switch event {
+                case .token(let t):
+                    collected += t
+                    streamingText = collected
+                case .finish(let reason):
+                    if reason == "length" { truncated = true }
+                }
+            }
+            if truncated {
+                lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
             }
 
             if stage.kind == .checking {
