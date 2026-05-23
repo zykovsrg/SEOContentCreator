@@ -77,4 +77,14 @@ struct OpenAIClientTests {
         #expect(text == "Часть")
         #expect(sawLength)
     }
+
+    @Test func newModelsUseCompletionTokensParam() {
+        #expect(OpenAIClient.usesMaxCompletionTokens(model: "gpt-5.4"))
+        #expect(OpenAIClient.usesMaxCompletionTokens(model: "gpt-5.3-chat-latest"))
+        #expect(OpenAIClient.usesMaxCompletionTokens(model: "gpt-5.5-pro"))
+        #expect(OpenAIClient.usesMaxCompletionTokens(model: "o3-mini"))
+        #expect(!OpenAIClient.usesMaxCompletionTokens(model: "gpt-4.1"))
+        #expect(!OpenAIClient.usesMaxCompletionTokens(model: "gpt-4o"))
+        #expect(!OpenAIClient.usesMaxCompletionTokens(model: "gpt-4o-mini"))
+    }
 }

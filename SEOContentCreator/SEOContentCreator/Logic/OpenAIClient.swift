@@ -22,6 +22,14 @@ struct OpenAIClient {
         self.endpoint = endpoint
     }
 
+    /// Newer model families (GPT-5.x, o-series) require `max_completion_tokens`
+    /// on the Chat Completions API; legacy models still use `max_tokens`.
+    static func usesMaxCompletionTokens(model: String) -> Bool {
+        let m = model.lowercased()
+        return m.hasPrefix("gpt-5") || m.hasPrefix("o1") || m.hasPrefix("o3")
+            || m.hasPrefix("o4") || m == "chat-latest"
+    }
+
     func streamCompletion(
         apiKey: String,
         system: String,
@@ -37,16 +45,18 @@ struct OpenAIClient {
                     request.httpMethod = "POST"
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    let body: [String: Any] = [
+                    var body: [String: Any] = [
                         "model": model,
                         "temperature": temperature,
-                        "max_tokens": maxTokens,
                         "stream": true,
                         "messages": [
                             ["role": "system", "content": system],
                             ["role": "user", "content": user]
                         ]
                     ]
+                    let tokenParam = Self.usesMaxCompletionTokens(model: model)
+                        ? "max_completion_tokens" : "max_tokens"
+                    body[tokenParam] = maxTokens
                     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
                     let (bytes, response) = try await session.bytes(for: request)
