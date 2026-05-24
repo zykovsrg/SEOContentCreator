@@ -1,16 +1,23 @@
 import SwiftUI
 import SwiftData
+import AppKit
+import UniformTypeIdentifiers
 
 private enum TemplateSelection: Hashable {
     case stage(UUID)
     case role(UUID)
     case block(UUID)
+    case imagePrompt(UUID)
+    case imagePreset(UUID)
 }
 
 struct TemplatesView: View {
+    @Environment(\.modelContext) private var context
     @Query private var templates: [StageTemplate]
     @Query private var roles: [AIRole]
     @Query private var blocks: [ContextBlock]
+    @Query private var imagePrompts: [ImagePromptTemplate]
+    @Query private var imagePresets: [ImageStylePreset]
     @State private var selection: TemplateSelection?
 
     private var sortedTemplates: [StageTemplate] {
@@ -31,6 +38,16 @@ struct TemplatesView: View {
         }
     }
 
+    private var sortedImagePrompts: [ImagePromptTemplate] {
+        imagePrompts.sorted { lhs, rhs in
+            imagePromptOrder(lhs.kindRaw) < imagePromptOrder(rhs.kindRaw)
+        }
+    }
+
+    private var sortedImagePresets: [ImageStylePreset] {
+        imagePresets.sorted { $0.createdAt < $1.createdAt }
+    }
+
     private func order(_ raw: String) -> Int {
         PipelineStage.allCases.firstIndex { $0.rawValue == raw } ?? Int.max
     }
@@ -41,6 +58,10 @@ struct TemplatesView: View {
 
     private func blockOrder(_ key: String) -> Int {
         ContextBlockDefaults.canonicalOrder.firstIndex(of: key) ?? Int.max
+    }
+
+    private func imagePromptOrder(_ raw: String) -> Int {
+        ImagePromptKind.allCases.firstIndex { $0.rawValue == raw } ?? Int.max
     }
 
     private var selectedTemplate: StageTemplate? {
@@ -56,6 +77,16 @@ struct TemplatesView: View {
     private var selectedBlock: ContextBlock? {
         guard case .block(let id) = selection else { return nil }
         return blocks.first { $0.uuid == id }
+    }
+
+    private var selectedImagePrompt: ImagePromptTemplate? {
+        guard case .imagePrompt(let id) = selection else { return nil }
+        return imagePrompts.first { $0.uuid == id }
+    }
+
+    private var selectedImagePreset: ImageStylePreset? {
+        guard case .imagePreset(let id) = selection else { return nil }
+        return imagePresets.first { $0.uuid == id }
     }
 
     var body: some View {
@@ -78,6 +109,24 @@ struct TemplatesView: View {
                         Text(block.title).tag(TemplateSelection.block(block.uuid))
                     }
                 }
+
+                Section("Изображения") {
+                    ForEach(sortedImagePrompts) { template in
+                        Text("Промт: \(template.kind?.title ?? template.kindRaw)")
+                            .tag(TemplateSelection.imagePrompt(template.uuid))
+                    }
+                    ForEach(sortedImagePresets) { preset in
+                        Text("Пресет: \(preset.name)")
+                            .tag(TemplateSelection.imagePreset(preset.uuid))
+                    }
+                    Button {
+                        let preset = ImageStylePreset(name: "Новый пресет", styleText: "")
+                        context.insert(preset)
+                        selection = .imagePreset(preset.uuid)
+                    } label: {
+                        Label("Добавить пресет", systemImage: "plus")
+                    }
+                }
             }
             .frame(width: 260)
             Divider()
@@ -88,6 +137,8 @@ struct TemplatesView: View {
         .onChange(of: templates.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: roles.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: blocks.map(\.uuid)) { _, _ in ensureSelection() }
+        .onChange(of: imagePrompts.map(\.uuid)) { _, _ in ensureSelection() }
+        .onChange(of: imagePresets.map(\.uuid)) { _, _ in ensureSelection() }
     }
 
     @ViewBuilder
@@ -98,6 +149,10 @@ struct TemplatesView: View {
             RoleEditorView(role: role, blocks: sortedBlocks).id(role.uuid)
         } else if let block = selectedBlock {
             ContextBlockEditorView(block: block, roles: sortedRoles).id(block.uuid)
+        } else if let prompt = selectedImagePrompt {
+            ImagePromptEditorView(template: prompt).id(prompt.uuid)
+        } else if let preset = selectedImagePreset {
+            ImageStylePresetEditorView(preset: preset) { selection = nil }.id(preset.uuid)
         } else {
             ContentUnavailableView("Выберите шаблон", systemImage: "doc.text")
         }
@@ -111,6 +166,10 @@ struct TemplatesView: View {
             selection = .role(first.uuid)
         } else if let first = sortedBlocks.first {
             selection = .block(first.uuid)
+        } else if let first = sortedImagePrompts.first {
+            selection = .imagePrompt(first.uuid)
+        } else if let first = sortedImagePresets.first {
+            selection = .imagePreset(first.uuid)
         }
     }
 }
@@ -375,5 +434,161 @@ private struct ContextBlockEditorView: View {
         text = defaults.text
         save()
         savedNote = "Сброшено к стандартному"
+    }
+}
+
+private struct ImagePromptEditorView: View {
+    @Bindable var template: ImagePromptTemplate
+    @State private var text = ""
+    @State private var showVariables = false
+    @State private var savedNote: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Промт изображения: \(template.kind?.title ?? template.kindRaw)").font(.title2).bold()
+                Text("Стиль (палитра, ограничения) задаётся в пресете и добавляется к промту автоматически.")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                Text("Шаблон сюжета (с переменными)").font(.headline)
+                TextEditor(text: $text).frame(minHeight: 200).border(.gray.opacity(0.3))
+
+                DisclosureGroup("Переменные {{…}}", isExpanded: $showVariables) {
+                    ForEach(TemplateVariables.all) { variable in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(variable.token).font(.system(.callout, design: .monospaced)).bold()
+                            Text("\(variable.description) · источник: \(variable.source)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                    }
+                }
+
+                HStack {
+                    Button("Сохранить") { save() }.buttonStyle(.borderedProminent)
+                    Button("Сбросить к стандартному") { resetToDefault() }
+                    Spacer()
+                    if let savedNote { Text(savedNote).font(.caption).foregroundStyle(.green) }
+                }
+                .padding(.top, 4)
+            }
+            .padding()
+        }
+        .onAppear { text = template.userPromptTemplate }
+    }
+
+    private func save() {
+        template.userPromptTemplate = text
+        template.updatedAt = .now
+        savedNote = "Сохранено"
+    }
+
+    private func resetToDefault() {
+        guard let kind = template.kind else { return }
+        text = ImagePromptDefaults.content(for: kind)
+        save()
+        savedNote = "Сброшено к стандартному"
+    }
+}
+
+private struct ImageStylePresetEditorView: View {
+    @Environment(\.modelContext) private var context
+    @Bindable var preset: ImageStylePreset
+    var onDelete: () -> Void
+
+    @State private var name = ""
+    @State private var styleText = ""
+    @State private var size = "1024x1024"
+    @State private var quality = "high"
+    @State private var savedNote: String?
+
+    private let sizes = ["1024x1024", "1536x1024", "1024x1536"]
+    private let qualities = ["high", "medium", "low"]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Пресет стиля").font(.title2).bold()
+
+                TextField("Имя", text: $name)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 420)
+
+                Text("Описание стиля (палитра, ограничения, аудитория)").font(.headline)
+                TextEditor(text: $styleText).frame(minHeight: 200).border(.gray.opacity(0.3))
+
+                Picker("Размер", selection: $size) {
+                    ForEach(sizes, id: \.self) { Text($0).tag($0) }
+                }
+                .frame(maxWidth: 280, alignment: .leading)
+                Picker("Качество", selection: $quality) {
+                    ForEach(qualities, id: \.self) { Text($0).tag($0) }
+                }
+                .frame(maxWidth: 280, alignment: .leading)
+
+                HStack(spacing: 8) {
+                    Text("Референс-картинка:")
+                    if preset.referenceImageData != nil {
+                        Text("есть").foregroundStyle(.green)
+                        Button("Удалить референс") { preset.referenceImageData = nil }
+                    } else {
+                        Text("нет").foregroundStyle(.secondary)
+                    }
+                    Button("Выбрать…") { pickReference() }
+                }
+                .font(.callout)
+
+                HStack {
+                    Button("Сохранить") { save() }.buttonStyle(.borderedProminent)
+                    if preset.name == ImageStylePresetDefaults.name {
+                        Button("Сбросить к стандартному") { resetToDefault() }
+                    }
+                    Spacer()
+                    Button("Удалить пресет", role: .destructive) { deletePreset() }
+                    if let savedNote { Text(savedNote).font(.caption).foregroundStyle(.green) }
+                }
+                .padding(.top, 4)
+            }
+            .padding()
+        }
+        .onAppear(perform: load)
+    }
+
+    private func load() {
+        name = preset.name
+        styleText = preset.styleText
+        size = preset.size
+        quality = preset.quality
+    }
+
+    private func save() {
+        preset.name = name
+        preset.styleText = styleText
+        preset.size = size
+        preset.quality = quality
+        preset.updatedAt = .now
+        savedNote = "Сохранено"
+    }
+
+    private func resetToDefault() {
+        styleText = ImageStylePresetDefaults.styleText
+        name = ImageStylePresetDefaults.name
+        save()
+        savedNote = "Сброшено к стандартному"
+    }
+
+    private func deletePreset() {
+        context.delete(preset)
+        onDelete()
+    }
+
+    private func pickReference() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg]
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) {
+            preset.referenceImageData = data
+        }
     }
 }
