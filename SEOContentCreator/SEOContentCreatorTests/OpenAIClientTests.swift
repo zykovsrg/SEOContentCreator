@@ -75,6 +75,13 @@ struct OpenAIClientTests {
         }
     }
 
+    @Test func http403MessagePointsToSettingsAndAccess() {
+        let message = OpenAIClient.OpenAIError.http(403).errorDescription ?? ""
+        #expect(message.contains("доступ"))
+        #expect(message.contains("Настройках"))
+        #expect(!message.contains("Шаблоны"))
+    }
+
     @Test func reportsLengthFinishReason() async throws {
         MockURLProtocol.statusCode = 200
         MockURLProtocol.stubBody = """
