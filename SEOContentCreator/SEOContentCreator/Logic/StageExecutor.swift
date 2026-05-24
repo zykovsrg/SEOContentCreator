@@ -88,7 +88,11 @@ final class StageExecutor {
                 lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
             }
 
-            if stage.kind == .checking {
+            if stage == .structure {
+                // Plan stays in streamingText; the caller persists it into Topic.structureText. No version is created.
+                job.status = .success
+                job.finishedAt = .now
+            } else if stage.kind == .checking {
                 remarks = RemarksParser.parse(rawText: collected)
                 job.status = .success
                 job.finishedAt = .now

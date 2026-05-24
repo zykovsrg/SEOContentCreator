@@ -44,6 +44,24 @@ struct PromptBuilderTests {
         #expect(result.user.contains("лучевая терапия цена"))
     }
 
+    @Test func substitutesStructure() {
+        let t = StageTemplate(stage: .draft, systemPrompt: "x",
+                              userPromptTemplate: "План:\n{{структура}}")
+        let topic = Topic(title: "T", articleType: .info)
+        topic.structureText = "# H1 Рак простаты\n## Введение\n- о чём раздел"
+        let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
+        #expect(result.user.contains("# H1 Рак простаты"))
+        #expect(result.user.contains("## Введение"))
+    }
+
+    @Test func emptyStructureLeavesPlaceholderEmpty() {
+        let t = StageTemplate(stage: .draft, systemPrompt: "x",
+                              userPromptTemplate: "План:[{{структура}}]")
+        let topic = Topic(title: "T", articleType: .info)
+        let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
+        #expect(result.user == "План:[]")
+    }
+
     @Test func selectedBlocksAppendedWhenPresent() {
         let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
                               userPromptTemplate: "Текст: {{текущий_текст}}")

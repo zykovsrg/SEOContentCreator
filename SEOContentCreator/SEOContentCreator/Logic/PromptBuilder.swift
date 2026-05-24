@@ -31,6 +31,7 @@ struct PromptBuilder {
             "{{источники_направления}}": sources,
             "{{семантика}}": semantics,
             "{{база_знаний}}": knowledge,
+            "{{структура}}": topic.structureText,
             "{{текущий_текст}}": currentText ?? ""
         ]
         for (key, value) in substitutions {

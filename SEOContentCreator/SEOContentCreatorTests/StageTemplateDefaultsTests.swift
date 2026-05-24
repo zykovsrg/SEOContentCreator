@@ -17,6 +17,18 @@ struct StageTemplateDefaultsTests {
         #expect(StageTemplateDefaults.content(for: .draft).userPromptTemplate.contains("{{тема}}"))
     }
 
+    @Test func draftUsesStructureVariable() {
+        #expect(StageTemplateDefaults.content(for: .draft).userPromptTemplate.contains("{{структура}}"))
+    }
+
+    @Test func structureStageIsPlanOnlyWithoutKeywords() {
+        let c = StageTemplateDefaults.content(for: .structure)
+        #expect(c.userPromptTemplate.contains("{{тема}}"))
+        #expect(c.userPromptTemplate.contains("H1"))
+        #expect(!c.userPromptTemplate.contains("{{семантика}}"))
+        #expect(!c.userPromptTemplate.contains("{{структура}}"))
+    }
+
     @Test func checkingStagesAskForRemarksJSON() {
         #expect(StageTemplateDefaults.content(for: .seoCheck).userPromptTemplate.contains("remarks"))
         #expect(StageTemplateDefaults.content(for: .factCheck).userPromptTemplate.contains("{{база_знаний}}"))

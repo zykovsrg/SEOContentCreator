@@ -19,6 +19,14 @@ struct PipelineStageTests {
         }
     }
 
+    @Test func structureIsFirstAuthorStage() {
+        #expect(PipelineStage.allCases.first == .structure)
+        #expect(PipelineStage.structure.title == "Структура")
+        #expect(PipelineStage.structure.kind == .author)
+        #expect(PipelineStage.structure.agentName == "ИИ-автор")
+        #expect(PipelineStage.structure.roleKey == "author")
+    }
+
     @Test func checkingStagesHaveOwnAgents() {
         #expect(PipelineStage.seoCheck.agentName == "ИИ-SEO")
         #expect(PipelineStage.factCheck.agentName == "ИИ-фактчекер")

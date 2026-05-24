@@ -6,6 +6,7 @@ enum StageKind {
 }
 
 enum PipelineStage: String, CaseIterable, Identifiable, Codable {
+    case structure
     case draft
     case productBlocks
     case semanticsInText
@@ -17,6 +18,7 @@ enum PipelineStage: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
+        case .structure:       return "Структура"
         case .draft:           return "Черновик"
         case .productBlocks:   return "Продуктовые блоки"
         case .semanticsInText: return "Семантика-в-текст"
@@ -28,14 +30,14 @@ enum PipelineStage: String, CaseIterable, Identifiable, Codable {
 
     var kind: StageKind {
         switch self {
-        case .draft, .productBlocks, .semanticsInText: return .author
+        case .structure, .draft, .productBlocks, .semanticsInText: return .author
         case .seoCheck, .factCheck, .finalReview:      return .checking
         }
     }
 
     var agentName: String {
         switch self {
-        case .draft, .productBlocks, .semanticsInText: return "ИИ-автор"
+        case .structure, .draft, .productBlocks, .semanticsInText: return "ИИ-автор"
         case .seoCheck:    return "ИИ-SEO"
         case .factCheck:   return "ИИ-фактчекер"
         case .finalReview: return "ИИ-редактор"
@@ -44,7 +46,7 @@ enum PipelineStage: String, CaseIterable, Identifiable, Codable {
 
     var roleKey: String {
         switch self {
-        case .draft, .productBlocks, .semanticsInText: return "author"
+        case .structure, .draft, .productBlocks, .semanticsInText: return "author"
         case .seoCheck:    return "seo"
         case .factCheck:   return "factChecker"
         case .finalReview: return "editor"

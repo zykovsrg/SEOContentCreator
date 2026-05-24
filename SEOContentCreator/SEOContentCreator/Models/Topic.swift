@@ -14,6 +14,7 @@ final class Topic {
     var publishedAt: Date?
     var currentVersionID: UUID?
     var semantics: [String]
+    var structureText: String = ""
 
     @Relationship var direction: KnowledgeNode?
     @Relationship var doctor: KnowledgeNode?
@@ -39,6 +40,7 @@ final class Topic {
         self.doctor = doctor
         self.attachedNodes = []
         self.semantics = []
+        self.structureText = ""
         self.versions = []
         self.jobs = []
         self.notes = notes

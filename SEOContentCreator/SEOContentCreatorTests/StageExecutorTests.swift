@@ -90,6 +90,29 @@ struct StageExecutorTests {
         #expect(topic.jobs.first?.status == .success)
     }
 
+    @Test func structureStageGeneratesNoVersion() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease,
+                          direction: KnowledgeNode(title: "ЛТ", type: .direction))
+        context.insert(topic)
+        let template = StageTemplate(stage: .structure, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        context.insert(template)
+
+        let executor = StageExecutor(
+            streamProvider: cannedStream(["# H1\n", "## Введение"]),
+            keyProvider: { "k" }
+        )
+        await executor.execute(stage: .structure, topic: topic, template: template,
+                               currentText: nil, in: context)
+
+        // Structure generation does not create a version — the plan is persisted into Topic.structureText by the UI.
+        #expect(topic.versions.isEmpty)
+        #expect(executor.lastResultVersionID == nil)
+        #expect(executor.streamingText == "# H1\n## Введение")
+        #expect(topic.jobs.first?.status == .success)
+        #expect(executor.lastErrorMessage == nil)
+    }
+
     @Test func truncatedStreamSetsWarningAndCreatesVersion() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease,

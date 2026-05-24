@@ -19,6 +19,7 @@ enum TemplateVariables {
         TemplateVariable(token: "{{источники_направления}}", description: "Приоритетные источники направления", source: "База знаний"),
         TemplateVariable(token: "{{семантика}}", description: "Список ключевых запросов", source: "Семантика"),
         TemplateVariable(token: "{{база_знаний}}", description: "Все прикреплённые узлы (для фактчекинга)", source: "База знаний"),
+        TemplateVariable(token: "{{структура}}", description: "Утверждённый план статьи", source: "Этап «Структура»"),
         TemplateVariable(token: "{{текущий_текст}}", description: "Текст текущей версии", source: "Предыдущая версия")
     ]
 }

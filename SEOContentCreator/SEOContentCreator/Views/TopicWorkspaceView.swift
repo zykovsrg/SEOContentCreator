@@ -7,7 +7,7 @@ struct TopicWorkspaceView: View {
     var onBack: () -> Void
 
     @AppStorage("openAIModel") private var model = "gpt-4.1"
-    @State private var selectedStage: PipelineStage = .draft
+    @State private var selectedStage: PipelineStage = .structure
     @State private var executor: StageExecutor?
     @State private var comparisonText: String?     // left column override (lane compare)
     @State private var pendingVersionID: UUID?     // just-generated version awaiting accept
@@ -18,6 +18,7 @@ struct TopicWorkspaceView: View {
     @State private var showLog = false
     @State private var showProductBlocks = false
     @State private var showSemantics = false
+    @State private var showStructure = false
     @State private var showPartialAccept = false
 
     var body: some View {
@@ -98,6 +99,7 @@ struct TopicWorkspaceView: View {
             ProductBlocksSheet(topic: topic) { runStage(.productBlocks, blocks: $0) }
         }
         .sheet(isPresented: $showSemantics) { SemanticsEditorSheet(topic: topic) }
+        .sheet(isPresented: $showStructure) { StructureEditorSheet(topic: topic) }
         .sheet(isPresented: $showPartialAccept) {
             if let pending = pendingVersion {
                 let base = topic.currentVersion?.text ?? ""
@@ -160,6 +162,7 @@ struct TopicWorkspaceView: View {
     }
 
     private func runSelectedStage() {
+        if selectedStage == .structure { showStructure = true; return }
         if selectedStage == .productBlocks { showProductBlocks = true; return }
         runStage(selectedStage, blocks: [])
     }
