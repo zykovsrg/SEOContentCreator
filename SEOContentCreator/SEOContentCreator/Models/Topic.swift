@@ -13,6 +13,7 @@ final class Topic {
     var externalDocURL: String?
     var publishedAt: Date?
     var currentVersionID: UUID?
+    var coverImageID: UUID?
     var semantics: [String]
     var structureText: String = ""
 
@@ -23,6 +24,8 @@ final class Topic {
     var versions: [ArticleVersion]
     @Relationship(deleteRule: .cascade, inverse: \GenerationJob.topic)
     var jobs: [GenerationJob]
+    @Relationship(deleteRule: .cascade, inverse: \GeneratedImage.topic)
+    var images: [GeneratedImage]
 
     init(
         title: String,
@@ -43,6 +46,7 @@ final class Topic {
         self.structureText = ""
         self.versions = []
         self.jobs = []
+        self.images = []
         self.notes = notes
         self.useStyle = useStyle
         self.createdAt = .now

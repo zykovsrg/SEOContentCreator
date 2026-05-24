@@ -8,7 +8,7 @@ struct TopicVersionsTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
             for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
-                 GenerationJob.self, StageTemplate.self,
+                 GenerationJob.self, StageTemplate.self, GeneratedImage.self,
             configurations: config
         )
         let context = ModelContext(container)
