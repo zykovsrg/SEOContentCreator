@@ -17,4 +17,11 @@ struct GenerationJobTests {
         #expect(job.status == .success)
         #expect(job.finishedAt != nil)
     }
+
+    @Test func labelInitProducesReadableImageTitle() {
+        let job = GenerationJob(stageLabel: "image", agentName: "Генератор изображений", modelName: "gpt-image-1")
+        #expect(job.status == .running)
+        #expect(job.stageTitle == "Изображение")
+        #expect(job.agentName == "Генератор изображений")
+    }
 }
