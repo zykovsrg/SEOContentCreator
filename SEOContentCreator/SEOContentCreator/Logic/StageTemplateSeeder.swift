@@ -10,6 +10,8 @@ enum StageTemplateSeeder {
         seedStageTemplatesIfNeeded(in: context)
         seedContextBlocksIfNeeded(in: context)
         seedRolesIfNeeded(in: context)
+        seedImagePromptTemplatesIfNeeded(in: context)
+        seedImageStylePresetIfNeeded(in: context)
         migrateStageTemplateSystemPromptsIfNeeded(in: context, defaults: defaults)
     }
 
@@ -47,6 +49,22 @@ enum StageTemplateSeeder {
                 blockKeys: item.blockKeys
             ))
         }
+    }
+
+    @MainActor
+    private static func seedImagePromptTemplatesIfNeeded(in context: ModelContext) {
+        let existing = (try? context.fetch(FetchDescriptor<ImagePromptTemplate>())) ?? []
+        let seeded = Set(existing.map { $0.kindRaw })
+        for kind in ImagePromptKind.allCases where !seeded.contains(kind.rawValue) {
+            context.insert(ImagePromptTemplate(kind: kind, userPromptTemplate: ImagePromptDefaults.content(for: kind)))
+        }
+    }
+
+    @MainActor
+    private static func seedImageStylePresetIfNeeded(in context: ModelContext) {
+        let existing = (try? context.fetch(FetchDescriptor<ImageStylePreset>())) ?? []
+        guard existing.isEmpty else { return }
+        context.insert(ImageStylePresetDefaults.makeDefault())
     }
 
     @MainActor
