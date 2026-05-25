@@ -40,7 +40,7 @@ struct ImageClient {
     private func makeGenerationsRequest(
         apiKey: String, prompt: String, model: String, size: String, quality: String
     ) throws -> URLRequest {
-        var request = URLRequest(url: generationsEndpoint)
+        var request = URLRequest(url: generationsEndpoint, timeoutInterval: 300)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -59,7 +59,7 @@ struct ImageClient {
         apiKey: String, prompt: String, model: String, size: String, quality: String, images: [Data]
     ) throws -> URLRequest {
         let boundary = "Boundary-\(UUID().uuidString)"
-        var request = URLRequest(url: editsEndpoint)
+        var request = URLRequest(url: editsEndpoint, timeoutInterval: 300)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
