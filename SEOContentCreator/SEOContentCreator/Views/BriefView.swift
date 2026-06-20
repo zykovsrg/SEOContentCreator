@@ -19,7 +19,6 @@ struct BriefView: View {
     @State private var direction: KnowledgeNode?
     @State private var doctor: KnowledgeNode?
     @State private var volume = ""
-    @State private var useStyle = false
     @State private var notes = ""
 
     var body: some View {
@@ -37,7 +36,6 @@ struct BriefView: View {
                 ForEach(doctors) { Text($0.title).tag(KnowledgeNode?.some($0)) }
             }
             TextField("Целевой объём (знаков)", text: $volume)
-            Toggle("Использовать Стиль/Главред", isOn: $useStyle)
             TextField("Заметки", text: $notes, axis: .vertical).lineLimit(3...6)
         }
         .formStyle(.grouped)
@@ -61,7 +59,6 @@ struct BriefView: View {
         direction = topic.direction
         doctor = topic.doctor
         volume = topic.targetVolume.map(String.init) ?? ""
-        useStyle = topic.useStyle
         notes = topic.notes
     }
 
@@ -73,13 +70,12 @@ struct BriefView: View {
             topic.direction = direction
             topic.doctor = doctor
             topic.targetVolume = vol
-            topic.useStyle = useStyle
             topic.notes = notes
             topic.updatedAt = .now
         } else {
             let new = Topic(
                 title: title, articleType: articleType, targetVolume: vol,
-                direction: direction, doctor: doctor, notes: notes, useStyle: useStyle
+                direction: direction, doctor: doctor, notes: notes
             )
             context.insert(new)
         }

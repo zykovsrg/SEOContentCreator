@@ -7,7 +7,6 @@ final class Topic {
     var articleTypeRaw: String
     var targetVolume: Int?
     var notes: String
-    var useStyle: Bool
     var createdAt: Date
     var updatedAt: Date
     var externalDocURL: String?
@@ -33,8 +32,7 @@ final class Topic {
         targetVolume: Int? = nil,
         direction: KnowledgeNode? = nil,
         doctor: KnowledgeNode? = nil,
-        notes: String = "",
-        useStyle: Bool = false
+        notes: String = ""
     ) {
         self.title = title
         self.articleTypeRaw = articleType.rawValue
@@ -48,7 +46,6 @@ final class Topic {
         self.jobs = []
         self.images = []
         self.notes = notes
-        self.useStyle = useStyle
         self.createdAt = .now
         self.updatedAt = .now
     }
