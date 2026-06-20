@@ -1,38 +1,72 @@
-# AI Development Entry Point
+# AI Development Entry Point — Claude Code
 
 This project uses a solo AI-development workflow.
 
-Use this file as the short entry point. Detailed rules live in `ai/architecture.md` and relevant `ai/skills/*/SKILL.md`. Do not load them by default. Use them only when the task needs those details or when a workflow rule is unclear.
+This is the entry file for Claude Code. The matching entry file for Codex is `AGENTS.md`. The two must stay equal in meaning; only the tool-specific notes below differ.
+
+Use this file as the short entry point. Detailed rules live in `ai/architecture.md` and relevant `ai/skills/*/SKILL.md`. Do not load them by default. Open them only when the task needs those details or when a workflow rule is unclear.
 
 ## Core rules
 
-- Communicate with the user in Russian. Use simple words and briefly explain technical terms.
+- Communicate with the user in Russian, assuming they are new to IT. Do not assume prior development knowledge. Explain every technical term in plain words the first time it appears, and explain the reasoning behind your actions in simple steps. Use short analogies when they help. See `ai/architecture.md` → "Language" for the full rule.
 - Keep persistent AI-facing instructions in English.
 - Prefer minimal diffs and clean architecture.
 - Do not expand user-confirmed scope. If a larger scope looks useful, stop and ask first.
+- Capture useful out-of-scope ideas as future task candidates instead of implementing them inside the current task.
 - Do not mix refactoring with bugfixes unless explicitly asked.
 - Explain the reason and risks before changing storage, data model, dependencies, or architecture.
 - For risky changes, add tests or explain why tests are not practical and provide manual checks.
-- Do not overwrite unfinished task memory or update architecture files without explicit user confirmation.
+- Do not overwrite unfinished task memory.
+- Do not update protected architecture files without `architecture-update` mode and explicit user confirmation.
+- In review mode, verify problems with read, grep, diff, logs, or tests before reporting them as facts. If not verified, label them as hypotheses.
+
+## File classes
+
+Protected architecture files define reusable workflow rules and may be changed only in `architecture-update` mode after explicit user confirmation:
+
+<!-- canon:protected-files -->
+- `AGENTS.md`
+- `CLAUDE.md`
+- `ai/architecture.md`
+- `ai/external-tools.md`
+- `ai/skills/*/SKILL.md`
+- `.claude/`
+- `.codex/`
+<!-- /canon:protected-files -->
+
+Controlled memory files store project and task memory. They may be edited only by the matching workflow described in `ai/architecture.md` and relevant skills:
+
+<!-- canon:controlled-memory -->
+- `ai/current-task.md`
+- `ai/paused-tasks.md`
+- `ai/future-tasks.md`
+- `ai/project-context.md`
+- `ai/decisions.md`
+- `ai/changelog.md`
+<!-- /canon:controlled-memory -->
+
+Before finishing any task, check `git diff --name-only`. If protected architecture files changed without approval, stop and ask the user. If controlled memory files changed, explain which workflow allowed it.
 
 ## Session start
 
-When entering an existing project, switching tools, or continuing in a new chat, run `environment-check` before suggesting next steps or starting implementation. Skip it only if the user explicitly says not to run it.
+When entering an existing project, switching tools, continuing in a new chat, or continuing from compressed/restored context, run `environment-check` before suggesting next steps or starting implementation. Skip it only if the user explicitly says not to run it.
+
+Compressed context, compacted context, restored summary, or conversation summary continuation counts as a new session.
 
 `environment-check` and `task-switch` are not work modes. After `environment-check`, continue in a work mode.
+
+A successful `environment-check` response must include a short snapshot of the current task and future tasks, then end with a short menu of available next commands and skills. This snapshot and menu are informational and must not automatically activate or promote any listed workflow or task.
 
 ## Work modes
 
 State the mode explicitly before task work as `Mode: ...`.
 
 - `review` — read, inspect, summarize, run checks, or suggest next steps. Do not edit files.
-- `implementation` — change application code, project files, tests, or task memory.
+- `implementation` — change application code, project files, tests, or allowed task memory.
 - `task-finish` — check whether the task can be closed; clean up only after explicit user confirmation.
 - `architecture-update` — propose architecture changes; edit only after explicit user confirmation.
 
-Use `review` when only reading, checking, or summarizing. Use `implementation` only when changing files.
-
-If implementation/review suggests the current task may be complete, do not declare it closed. Propose `task-finish` and wait for the user to confirm.
+If implementation or review suggests the current task may be complete, do not declare it closed. Propose `task-finish` and wait for the user to confirm.
 
 ## Context and skill routing
 
@@ -42,36 +76,40 @@ Default minimum:
 - this file
 - `ai/current-task.md`
 
-Use skills by trigger. Do not load all skills automatically. Open only the skill that matches the current task:
+Skills auto-activate by their description triggers via the Skill tool. Still open the current `ai/skills/*/SKILL.md` before applying that workflow — do not work from memory.
+
+Common triggers:
 - environment check: `ai/skills/environment-check/SKILL.md` and `ai/external-tools.md`
-- task switching: `ai/skills/task-switch/SKILL.md` and `ai/paused-tasks.md`
+- task switching: `ai/skills/task-switch/SKILL.md`, `ai/current-task.md`, and `ai/paused-tasks.md`
+- future task capture or promotion: `ai/future-tasks.md`; no separate skill is required
 - task finish: `ai/skills/task-finish/SKILL.md`
 - release or merge: `ai/skills/release-check/SKILL.md`
-- tests: `ai/skills/write-tests/SKILL.md`
-- UI: `ai/skills/ui-review/SKILL.md`
-- frontend design, if installed: `ai/skills/frontend-design/SKILL.md`
-- copy: `ai/skills/copy-review/SKILL.md`
-- security: `ai/skills/security-review/SKILL.md`
-- bugfix: `ai/skills/bugfix-workflow/SKILL.md`
+- tests or test decision: `ai/skills/write-tests/SKILL.md`
+- UI behavior, screen state, layout logic, or interaction: `ai/skills/ui-review/SKILL.md` and `ai/skills/write-tests/SKILL.md`
+- purely decorative visual UI change: `ai/skills/ui-review/SKILL.md`; use `write-tests` only if behavior, state, layout logic, or interaction can be affected
+- bugfix, regression, crash, flaky behavior, debug request, or performance investigation: `ai/skills/bugfix-workflow/SKILL.md`
 - architecture change: `ai/skills/architecture-update/SKILL.md`
 
 Read extra context only when relevant:
 - project behavior, storage, or UI: `ai/project-context.md`
-- architecture-sensitive work: `ai/decisions.md`
-- workflow ambiguity, architecture rules, or architecture update: `ai/architecture.md`
-- plan-driven or Superpowers execution: relevant `docs/superpowers/specs/*`, `docs/superpowers/plans/*`, and the plan-driven rules in `ai/architecture.md`
+- architecture-sensitive work or durable invariants: `ai/decisions.md`
+- future task review, capture, or promotion: `ai/future-tasks.md`
+- workflow ambiguity or architecture update: `ai/architecture.md`
+- plan-driven or Superpowers execution: relevant `docs/superpowers/specs/*`, `docs/superpowers/plans/*`, and plan-driven rules in `ai/architecture.md`
+
+For complex review or unclear blast radius, check whether `code-review-graph` is available. Use it when available for multi-module changes, new services, architecture-sensitive changes, complex bugs, or large pre-merge reviews.
 
 ## Skill precedence
 
 1. `AGENTS.md` / `CLAUDE.md`
 2. `ai/current-task.md`
 3. relevant base skill
-4. expected external skills/tools
+4. optional project skills and expected external skills/tools
 5. controlled external methodologies
 
-External skills/tools are helpers. They must not override work mode, confirmation rules, task memory rules, clean architecture, or project-specific rules.
+External skills/tools are helpers. They must not override work mode, confirmation rules, protected architecture file rules, controlled task memory rules, clean architecture, or project-specific rules.
 
-Superpowers is controlled. Do not activate it automatically. If the task is large, vague, architectural, migration-heavy, TDD-heavy, subagent-heavy, or has unclear blast radius, explain why Superpowers may help and ask: `Use Superpowers for this task?`
+Superpowers is controlled. Do not activate it automatically. If it may help, explain why and ask: `Use Superpowers for this task?`
 
 ## Output format
 
@@ -81,71 +119,10 @@ Before editing:
 - mention important risks only if they exist.
 
 After editing:
-- start with the work mode used, for example `Mode: implementation`;
+- start with the work mode used;
 - summarize changes;
 - list checks;
 - mention risks or unfinished parts;
 - explicitly say whether task memory changed;
+- if task memory changed, list exact controlled memory files changed;
 - if the task appears complete, propose `task-finish` instead of saying the task is closed.
-
-If task memory changed, list exact files changed:
-- `ai/current-task.md`
-- `ai/changelog.md`
-- `ai/decisions.md`
-- `ai/project-context.md`
-- `ai/paused-tasks.md`
-
-## Task intake reminder
-
-If the task is unclear, ask the user to structure it as:
-
-Mode:
-implementation / review / task-finish / architecture-update
-
-Goal:
-What should change.
-
-Relevant files:
-Known files or unknown.
-
-Done criteria:
-How to understand that the task is complete.
-
-<!-- code-review-graph MCP tools -->
-## MCP Tools: code-review-graph
-
-**IMPORTANT: This project has a knowledge graph. ALWAYS use the
-code-review-graph MCP tools BEFORE using Grep/Glob/Read to explore
-the codebase.** The graph is faster, cheaper (fewer tokens), and gives
-you structural context (callers, dependents, test coverage) that file
-scanning cannot.
-
-### When to use graph tools FIRST
-
-- **Exploring code**: `semantic_search_nodes` or `query_graph` instead of Grep
-- **Understanding impact**: `get_impact_radius` instead of manually tracing imports
-- **Code review**: `detect_changes` + `get_review_context` instead of reading entire files
-- **Finding relationships**: `query_graph` with callers_of/callees_of/imports_of/tests_for
-- **Architecture questions**: `get_architecture_overview` + `list_communities`
-
-Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
-
-### Key Tools
-
-| Tool | Use when |
-| ------ | ---------- |
-| `detect_changes` | Reviewing code changes — gives risk-scored analysis |
-| `get_review_context` | Need source snippets for review — token-efficient |
-| `get_impact_radius` | Understanding blast radius of a change |
-| `get_affected_flows` | Finding which execution paths are impacted |
-| `query_graph` | Tracing callers, callees, imports, tests, dependencies |
-| `semantic_search_nodes` | Finding functions/classes by name or keyword |
-| `get_architecture_overview` | Understanding high-level codebase structure |
-| `refactor_tool` | Planning renames, finding dead code |
-
-### Workflow
-
-1. The graph auto-updates on file changes (via hooks).
-2. Use `detect_changes` for code review.
-3. Use `get_affected_flows` to understand impact.
-4. Use `query_graph` pattern="tests_for" to check coverage.
