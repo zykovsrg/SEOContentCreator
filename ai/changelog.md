@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-06-21 — Под-проект «Публикация в Google Docs» (реализация на ветке)
+
+- Change: Реализован под-проект «Публикация» на ветке `feature/publishing-google-docs` (9 задач, TDD, subagent-driven). Новая SwiftData-модель `ExternalDocument` (история публикаций) + связь `Topic.publications`. Логика (всё на URLSession, без сторонних зависимостей): `GoogleCredentialStore`/`GoogleTokens` (ключи и токены в Keychain), `MarkdownDocParser` (markdown→блоки), `DocsRequestBuilder` (блоки→запросы `batchUpdate`, индексы UTF-16), `GoogleDocsClient` (REST Docs/Drive с retry/backoff), `GoogleAuthService` (свой OAuth desktop + PKCE + loopback на `127.0.0.1`, скоупы documents + drive.file), `ArticlePublisher` (оркестратор: новый документ / перезапись). UI: раздел «Google Docs» в Настройках (Client ID/Secret, вход/выход), кнопка «Опубликовать» в тулбаре `TopicWorkspaceView` + `PublishSheet` (превью, выбор режима, история, перезапись с подтверждением). Публикация реализована как действие/кнопка, НЕ как case в `PipelineStage`. Документы кладутся в папку Drive «SEO-статьи клиники».
+- Impact: Закрыт финальный этап пайплайна «от идеи до выпуска». Компиляция тестовой сборки зелёная (`build-for-testing`). Реальный прогон тестов (Cmd+U) и реальная публикация ещё не выполнены — нужна настройка OAuth-клиента в Google Cloud. Ветка ещё не влита в `main`.
+- Manual checks: PENDING (требуют Google Cloud Desktop OAuth-клиента): вход в Google; публикация (новый/перезапись/новый ещё раз); попадание в папку; формат документа (заголовки/списки/жирный); поведение при ошибке сети. Известный пункт на упрочнение: `LoopbackListener` слушает `NWListener(on: .any)` — стоит ограничить только loopback-интерфейсом.
+
 ### 2026-06-20 — Удаление этапа «Стиль/Главред»
 
 - Change: Убран запланированный, но не реализованный этап «Стиль/Главред». Удалено поле `Topic.useStyle` (SwiftData-модель) и галочка «Использовать Стиль/Главред» в `BriefView` (load/save/init). Из активных спек убраны все упоминания: основная спека обновлена до версии 8 (бывший Шаг 6 убран, шаги 7–10 перенумерованы в 6–9, счёт 9 обяз. + 2 опц. → 9 обяз. + 1 опц.); `frontend-design` и `checking-stages-design` почищены. Решение зафиксировано в `ai/decisions.md`.
