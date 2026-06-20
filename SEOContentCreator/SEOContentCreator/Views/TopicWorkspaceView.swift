@@ -20,6 +20,7 @@ struct TopicWorkspaceView: View {
     @State private var showSemantics = false
     @State private var showStructure = false
     @State private var showImages = false
+    @State private var showPublish = false
     @State private var showPartialAccept = false
 
     var body: some View {
@@ -102,6 +103,9 @@ struct TopicWorkspaceView: View {
         .sheet(isPresented: $showSemantics) { SemanticsEditorSheet(topic: topic) }
         .sheet(isPresented: $showStructure) { StructureEditorSheet(topic: topic) }
         .sheet(isPresented: $showImages) { ImagesView(topic: topic) }
+        .sheet(isPresented: $showPublish) {
+            PublishSheet(topic: topic)
+        }
         .sheet(isPresented: $showPartialAccept) {
             if let pending = pendingVersion {
                 let base = topic.currentVersion?.text ?? ""
@@ -162,6 +166,13 @@ struct TopicWorkspaceView: View {
         ToolbarItem { Button { showVersions = true } label: { Label("Версии", systemImage: "clock.arrow.circlepath") } }
         ToolbarItem { Button { showLog = true } label: { Label("Лог", systemImage: "doc.text") } }
         ToolbarItem { Button { showImages = true } label: { Label("Изображения", systemImage: "photo.on.rectangle") } }
+        ToolbarItem {
+            Button {
+                showPublish = true
+            } label: {
+                Label("Опубликовать", systemImage: "paperplane")
+            }
+        }
     }
 
     private func runSelectedStage() {
