@@ -11,7 +11,8 @@ struct SEOContentCreatorApp: App {
             Topic.self, KnowledgeNode.self,
             ArticleVersion.self, GenerationJob.self, StageTemplate.self,
             ContextBlock.self, AIRole.self,
-            GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self
+            GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,
+            ExternalDocument.self
         ])
 
         Settings {

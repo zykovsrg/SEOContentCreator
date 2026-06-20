@@ -25,6 +25,8 @@ final class Topic {
     var jobs: [GenerationJob]
     @Relationship(deleteRule: .cascade, inverse: \GeneratedImage.topic)
     var images: [GeneratedImage]
+    @Relationship(deleteRule: .cascade, inverse: \ExternalDocument.topic)
+    var publications: [ExternalDocument] = []
 
     init(
         title: String,
@@ -45,6 +47,7 @@ final class Topic {
         self.versions = []
         self.jobs = []
         self.images = []
+        self.publications = []
         self.notes = notes
         self.createdAt = .now
         self.updatedAt = .now
