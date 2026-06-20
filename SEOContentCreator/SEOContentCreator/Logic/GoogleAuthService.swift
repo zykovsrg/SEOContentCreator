@@ -151,7 +151,11 @@ final class LoopbackListener {
     private var continuation: CheckedContinuation<String, Error>?
 
     init() throws {
-        let l = try NWListener(using: .tcp, on: .any)
+        // Слушаем только loopback-интерфейс (127.0.0.1), а не все сетевые интерфейсы:
+        // OAuth-перехват одноразовый, но порт не должен быть доступен извне.
+        let parameters = NWParameters.tcp
+        parameters.requiredInterfaceType = .loopback
+        let l = try NWListener(using: parameters, on: .any)
         self.listener = l
         let sem = DispatchSemaphore(value: 0)
         var boundPort: UInt16 = 0
