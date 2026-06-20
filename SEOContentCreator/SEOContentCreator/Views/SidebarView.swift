@@ -1,14 +1,13 @@
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
-    case contentPlan, queue, templates, knowledgeBase
+    case contentPlan, templates, knowledgeBase
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .contentPlan:   return "Контент-план"
-        case .queue:         return "Очередь"
         case .templates:     return "Шаблоны"
         case .knowledgeBase: return "База знаний"
         }
@@ -17,7 +16,6 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     var symbol: String {
         switch self {
         case .contentPlan:   return "list.bullet.rectangle"
-        case .queue:         return "clock"
         case .templates:     return "puzzlepiece"
         case .knowledgeBase: return "books.vertical"
         }

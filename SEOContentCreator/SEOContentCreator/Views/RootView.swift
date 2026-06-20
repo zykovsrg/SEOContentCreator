@@ -16,13 +16,6 @@ struct RootView: View {
                 KnowledgeBaseView()
             case .templates:
                 TemplatesView()
-            case .queue:
-                let section = selection ?? .contentPlan
-                ContentUnavailableView(
-                    section.title,
-                    systemImage: section.symbol,
-                    description: Text("Раздел появится в следующем под-проекте.")
-                )
             }
         }
         .task {
