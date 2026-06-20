@@ -16,4 +16,8 @@ struct TemplateVariablesTests {
             #expect(!v.source.isEmpty)
         }
     }
+
+    @Test func includesIllustrationFragment() {
+        #expect(TemplateVariables.all.contains { $0.token == "{{выделенный_фрагмент}}" })
+    }
 }

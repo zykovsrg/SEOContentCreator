@@ -19,6 +19,9 @@ struct OpenAIClient {
             case .rateLimited:
                 return "Превышен лимит запросов (429). Подождите немного и попробуйте снова."
             case .http(let code):
+                if code == 403 {
+                    return "Ошибка OpenAI (HTTP 403): нет доступа к выбранной модели или проекту. Проверьте модель изображений, API-ключ, биллинг и доступ организации в Настройках OpenAI."
+                }
                 return "Ошибка OpenAI (HTTP \(code)). Попробуйте позже или смените модель в разделе «Шаблоны»."
             case .badResponse:
                 return "Не удалось разобрать ответ OpenAI."

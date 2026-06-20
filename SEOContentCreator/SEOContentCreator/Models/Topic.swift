@@ -7,12 +7,12 @@ final class Topic {
     var articleTypeRaw: String
     var targetVolume: Int?
     var notes: String
-    var useStyle: Bool
     var createdAt: Date
     var updatedAt: Date
     var externalDocURL: String?
     var publishedAt: Date?
     var currentVersionID: UUID?
+    var coverImageID: UUID?
     var semantics: [String]
     var structureText: String = ""
 
@@ -23,6 +23,8 @@ final class Topic {
     var versions: [ArticleVersion]
     @Relationship(deleteRule: .cascade, inverse: \GenerationJob.topic)
     var jobs: [GenerationJob]
+    @Relationship(deleteRule: .cascade, inverse: \GeneratedImage.topic)
+    var images: [GeneratedImage]
 
     init(
         title: String,
@@ -30,8 +32,7 @@ final class Topic {
         targetVolume: Int? = nil,
         direction: KnowledgeNode? = nil,
         doctor: KnowledgeNode? = nil,
-        notes: String = "",
-        useStyle: Bool = false
+        notes: String = ""
     ) {
         self.title = title
         self.articleTypeRaw = articleType.rawValue
@@ -43,8 +44,8 @@ final class Topic {
         self.structureText = ""
         self.versions = []
         self.jobs = []
+        self.images = []
         self.notes = notes
-        self.useStyle = useStyle
         self.createdAt = .now
         self.updatedAt = .now
     }

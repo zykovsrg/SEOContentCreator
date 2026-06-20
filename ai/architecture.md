@@ -1,8 +1,8 @@
 # Архитектура AI-разработки
 
-Version: 5.3
+Version: 6.8
 
-Этот файл — короткий индекс всей системы разработки. Его не нужно загружать для каждой задачи. `ai/architecture.md` — справочник по workflow и иерархии правил. Читай его только если задача касается архитектуры, workflow, конфликтов правил или если правило неясно.
+Этот файл — справочник по workflow и иерархии правил. Его не нужно загружать для каждой задачи. Читай его только если задача касается workflow, конфликтов правил, architecture-update или если правило неясно.
 
 ## Главная идея
 
@@ -11,18 +11,30 @@ Version: 5.3
 - Чат — временная рабочая память.
 - `AGENTS.md` и `CLAUDE.md` — короткие входные файлы для AI-агентов.
 - `ai/current-task.md` хранит текущую задачу.
+- `ai/paused-tasks.md` хранит незавершённые задачи, поставленные на паузу через `task-switch`.
+- `ai/future-tasks.md` хранит идеи и будущие задачи, которые не входят в текущий scope.
 - `ai/project-context.md` хранит проектный контекст.
+- `ai/decisions.md` хранит устойчивые решения и инварианты.
+- `ai/changelog.md` хранит последние заметные изменения.
 - `ai/skills/*/SKILL.md` хранит переиспользуемые процедуры.
 - Git хранит полную историю изменений.
+
+Главное правило для идей на потом:
+
+```text
+Future tasks are captured, not executed.
+```
+
+Если во время работы появляется полезная идея вне текущей задачи, агент должен защитить текущий scope: предложить записать идею в `ai/future-tasks.md`, но не реализовывать её без явного promotion.
 
 ## Режимы работы
 
 Before starting task work, the agent must explicitly state the mode as `Mode: ...`.
 
-- `implementation` — менять код, проектные файлы, тесты или рабочую память задачи.
+- `implementation` — менять код, проектные файлы, тесты или task memory.
 - `review` — читать файлы, проверять состояние проекта или diff, пересказывать контекст, сообщать о проблемах или предлагать следующий шаг; не редактировать файлы.
 - `task-finish` — проверять завершение задачи и чистить контекст только после подтверждения.
-- `architecture-update` — предлагать изменения архитектуры разработки, но не менять файлы без подтверждения.
+- `architecture-update` — предлагать изменения архитектуры разработки; менять файлы только после подтверждения.
 
 If the mode is unclear, the agent must ask or state the assumption before acting.
 
@@ -38,44 +50,36 @@ If implementation or review suggests the current task may be complete, the agent
 
 `task-switch` is also not a work mode. It is a safety workflow for switching between unfinished tasks.
 
-At the start of a new project session, use `environment-check` to check whether required base skills and expected external skills/tools are available.
+Run `environment-check` before suggesting next steps or starting implementation when:
 
-When entering an existing project, switching tools, or continuing in a new chat, run `environment-check` before suggesting next steps or starting implementation. Do not skip it unless the user explicitly says not to run it.
+- the architecture was just installed;
+- entering an existing project;
+- switching tools or agents;
+- continuing in a new chat;
+- continuing from compressed, compacted, restored, or summarized context.
+
+Compressed context, compacted context, restored summary, and conversation summary continuation count as a new session for this rule.
+
+Skip only if the user explicitly says not to run `environment-check`.
 
 This check is not a deep audit. It is a quick availability check.
 
-Required base skills:
+After a successful `environment-check`, before the menu, the agent must show a short snapshot of the current task (title, `Status`, `Stage`, next step or blocker) and a compact summary of future tasks. This snapshot is informational and must not edit task memory or activate any workflow.
 
-- `bugfix-workflow`
-- `ui-review`
-- `security-review`
-- `release-check`
-- `copy-review`
-- `write-tests`
-- `task-finish`
-- `task-switch`
-- `architecture-update`
-- `environment-check`
+Then the agent must show a short "Available next commands and skills" menu.
 
-Expected external skills/tools:
+The menu must include only available workflows/skills relevant to this architecture, for example:
 
-- `code-review-graph`
-- `agent-skills-for-context-engineering`
-- `claude-seo`
+```text
+- `environment-check` — re-run the installation and environment availability check.
+- `task-switch` — pause the current task, resume a paused task, or promote a confirmed future task.
+- `task-finish` — verify whether the current task is complete and run cleanup only after confirmation.
+- `architecture-update` — propose and apply approved architecture changes.
+- `bugfix-workflow` — diagnose bugs, regressions, flaky behavior, debug requests, crashes, and performance issues.
+- `future-tasks` — record useful ideas that should not expand the current task scope.
+```
 
-Controlled external methodologies:
-
-- `Superpowers`
-
-Rules:
-
-- Do not install missing tools automatically.
-- Do not fail the session if external tools are missing.
-- Clearly separate missing required files, missing expected external tools, and controlled methodologies.
-- If a required base skill is missing, tell the user which file is missing and suggest restoring it from the template.
-- If an external tool is missing, report it as a warning, not a blocker.
-- If an external tool cannot be verified, report it as `not confirmed`.
-- Do not load all skill contents during the check; verify file presence first.
+This menu is informational. The agent must not start any listed workflow automatically unless the user explicitly chooses it.
 
 After `environment-check`, continue in one of the work modes:
 
@@ -84,231 +88,546 @@ After `environment-check`, continue in one of the work modes:
 - `task-finish`
 - `architecture-update`
 
-## Основные файлы
+## Architecture files and task memory
+
+### Protected architecture files
+
+Protected architecture files define reusable agent rules, workflows, tools, and architecture. They may be changed only in `architecture-update` mode and only after explicit user confirmation.
+
+<!-- canon:protected-files -->
+- `AGENTS.md`
+- `CLAUDE.md`
+- `ai/architecture.md`
+- `ai/external-tools.md`
+- `ai/skills/*/SKILL.md`
+- `.claude/`
+- `.codex/`
+<!-- /canon:protected-files -->
+
+Do not edit protected architecture files during normal implementation, review, init, cleanup, task-finish, task-switch, or external skill/tool workflows.
+
+External skills, external tools, init workflows, setup commands, and generated recommendations may propose changes to protected architecture files, but must not apply them without confirmation.
+
+### Controlled memory files
+
+Controlled memory files store project and task memory. They are not protected architecture files, but they may be edited only by the matching workflow.
+
+<!-- canon:controlled-memory -->
+- `ai/current-task.md`
+- `ai/paused-tasks.md`
+- `ai/future-tasks.md`
+- `ai/project-context.md`
+- `ai/decisions.md`
+- `ai/changelog.md`
+<!-- /canon:controlled-memory -->
+
+Allowed edits:
+
+- `implementation`: may update `ai/current-task.md` when the current task itself changes, Stage changes, or needs handoff notes.
+- `implementation`: may update `ai/future-tasks.md` only when the user explicitly asks to save a future task or confirms a proposed future task candidate.
+- `task-switch`: may update `ai/current-task.md` and `ai/paused-tasks.md` only after explicit user confirmation.
+- `task-switch`: may promote an entry from `ai/future-tasks.md` into `ai/current-task.md` after explicit user confirmation.
+- `task-finish`: may update `ai/current-task.md`, `ai/changelog.md`, `ai/decisions.md`, and confirmed `ai/future-tasks.md` entries only after explicit user confirmation.
+- `architecture-update`: may update controlled memory files if the approved architecture change requires it.
+- `ai/project-context.md`: update only after confirmation when stack, commands, structure, data model, invariants, or fragile zones change.
+
+Before finishing any task, check the diff with:
+
+```bash
+git diff --name-only
+```
+
+If protected architecture files changed without explicit `architecture-update` confirmation, stop and ask the user before continuing.
+
+If controlled memory files changed, explain which workflow allowed the change and list the exact files in the final report.
+
+## Canonical lists and the consistency check
+
+The protected-files and controlled-memory lists are duplicated in a few "holder"
+files: `ai/architecture.md`, `CLAUDE.md`, `AGENTS.md`, `docs/file-roles.md`, and the
+`release-check` skill. Each copy is wrapped in invisible HTML-comment markers, for example
+`<!-- canon:NAME -->` … `<!-- /canon:NAME -->` where NAME is `protected-files` or `controlled-memory`.
+
+`scripts/check-consistency.sh` compares the file paths inside matching markers across
+all holders and fails if any copy drifts. Run it after editing any marked list. It is
+also run by `architecture-update` and `release-check`.
+
+This script lives in the architecture template repository and is NOT copied into
+installed projects. Inside a project the marker comments are harmless but inert, and
+the consistency check simply does not apply — `architecture-update` and `release-check`
+skip it when the script is absent.
+
+Human docs (`README.md`, other `docs/*`) do not repeat these lists; they link to
+`docs/file-roles.md`. When you add a new copy of a canonical list, wrap it in the same
+markers so the check covers it.
+
+## Current task status and stage
+
+`ai/current-task.md` must separate task state from work stage.
+
+Use `Status` for task state:
+
+```text
+empty / active / review / blocked / done / paused
+```
+
+Use `Stage` for work stage:
+
+```text
+intake / spec / planning / implementation / review / task-finish
+```
+
+Do not write free-form status like `spec done, planning next` into `Status`.
+
+When moving into implementation, update `Stage: implementation` if task memory is being maintained in this project.
+
+When task-finish cleanup leaves a blank task template, use:
+
+```text
+Status: empty
+Stage: intake
+```
+
+## Main files
 
 ### AGENTS.md
 
-Входной файл для Codex.
+Entry file for Codex.
 
-Должен быть коротким: только правила первого уровня, маршрутизация контекста, триггеры skills, режимы работы и формат ответа.
+Keep it short: first-level rules, context routing, skill triggers, work modes, and output format.
 
 ### CLAUDE.md
 
-Входной файл для Claude Code.
+Entry file for Claude Code.
 
-По смыслу должен совпадать с `AGENTS.md`.
+It should match `AGENTS.md` in meaning.
 
 ### ai/current-task.md
 
-Одна текущая задача.
+One current task.
 
-Должен быть коротким: примерно один экран.
+Keep it short: roughly one screen.
 
 ### ai/paused-tasks.md
 
-Короткий список задач, которые поставили на паузу через `task-switch`.
+Short list of tasks paused through `task-switch`.
 
-Это не backlog. Используй только для незавершённых задач, к которым нужно вернуться.
+This is not a backlog. Use it only for unfinished tasks that need to be resumed.
+
+### ai/future-tasks.md
+
+Backlog of ideas and future implementation tasks that are useful but outside the current task scope.
+
+This is not active work and not paused work.
+
+Use it for:
+
+- ideas discovered during implementation or review;
+- non-blocking follow-up investigations;
+- missing test seams that are useful but outside the current task;
+- larger refactors or improvements that should not expand the current scope;
+- user requests like `запиши на потом`, `добавь в будущие задачи`, `потом надо сделать`.
+
+Do not use it for:
+
+- unfinished active work — use `ai/paused-tasks.md` through `task-switch`;
+- completed change history — use `ai/changelog.md`;
+- durable decisions and invariants — use `ai/decisions.md`;
+- blocking cleanup needed before the current task can close — keep it in `ai/current-task.md` or handle it before `task-finish`.
+
+Allowed statuses:
+
+```text
+idea / ready / blocked / promoted / done / dropped
+```
+
+A future task can become active only after explicit user instruction or confirmation. When promoted, copy it into `ai/current-task.md` and mark the original entry as `promoted`.
 
 ### ai/project-context.md
 
-Проектный контекст:
+Project context:
 
-- что это за проект;
-- стек;
-- команды запуска, сборки и тестов;
-- важные папки и файлы;
-- главные экраны или модули;
-- модель данных или ключевые сущности;
-- инварианты проекта;
-- хрупкие зоны.
+- what the project is;
+- stack;
+- run, build, and test commands;
+- important folders and files;
+- main screens or modules;
+- data model or key entities;
+- project invariants;
+- fragile zones.
 
-Ориентир — до 150 строк.
+Target length: up to 150 lines.
+
+If project-context content becomes stale, do not only mention it in chat or changelog. Propose a project-context update and wait for confirmation.
 
 ### ai/decisions.md
 
-Только важные активные решения.
+Only important active decisions.
 
-Используй для архитектурных решений, продуктовых правил, ограничений модели данных и решений, которые будущие агенты не должны случайно сломать.
+Use it for durable architecture decisions, product rules, data model constraints, storage rules, signing/sandboxing requirements, undo/sync invariants, and decisions future agents must not accidentally break.
 
-Не используй для мелких багфиксов, цветов, отступов или обычной истории изменений.
+Do not use it for minor bugfixes, colors, spacing, or ordinary change history.
 
 ### ai/changelog.md
 
-Последние заметные изменения проекта.
+Recent notable project changes.
 
-Храни последние 2–4 недели. Старые записи переноси в `ai/archive/`.
+Keep the last 2–4 weeks. Move old entries to `ai/archive/`.
 
 ### ai/external-tools.md
 
-Список ожидаемых внешних skills, tools и controlled methodologies.
+Expected external skills, tools, and controlled methodologies, including source URLs for installation.
 
-Используется при `environment-check`.
+Used by `environment-check`.
 
-Отсутствие внешних tools — предупреждение, а не блокер.
+Missing optional skills and external tools are warnings, not blockers.
 
-## Язык общения и файлов
+## Changelog vs decisions vs future tasks
 
-Постоянные файлы инструкций для ИИ должны быть на английском:
+Use `ai/changelog.md` for what changed recently.
+
+Use `ai/decisions.md` for what future agents must not forget or break.
+
+Use `ai/future-tasks.md` for what may be useful later but is not part of the current task.
+
+Put long-term rules in `ai/decisions.md`, not only in `ai/changelog.md`, when they affect:
+
+- data model;
+- storage location or migration;
+- signing, sandboxing, entitlements, deployment, or local setup;
+- undo or redo behavior;
+- sync behavior;
+- recurrence, scheduling, or time logic;
+- external APIs;
+- architecture boundaries;
+- agent workflow that must persist across sessions.
+
+Do not write future plans into `ai/changelog.md` as if they were completed work.
+
+Do not write durable rules into `ai/future-tasks.md`; future tasks are work items, not decisions.
+
+## Language
+
+Persistent AI-facing instruction files should be in English:
 
 - `AGENTS.md`
 - `CLAUDE.md`
 - `ai/skills/*/SKILL.md`
 
-Рабочие файлы памяти проекта можно вести на русском или английском:
+Repository reference and memory files may be in Russian or English:
 
 - `ai/current-task.md`
 - `ai/project-context.md`
 - `ai/architecture.md`
 - `ai/decisions.md`
 - `ai/changelog.md`
+- `ai/paused-tasks.md`
+- `ai/future-tasks.md`
 
-Агент должен общаться с пользователем на русском и объяснять технические термины простыми словами.
+## Talking to the user (beginner-friendly)
+
+The user is not a developer. Write to someone who is just starting to learn IT.
+
+- Communicate in Russian.
+- Do not assume any prior development knowledge.
+- Explain every technical term in plain words the first time it appears in a reply. This includes everyday-for-developers words like commit, diff, merge, branch, rollback, dependency, environment, schema, cache.
+- Do not just say what you will do — explain why, in simple steps, so the user understands the logic, not only the action.
+- Prefer short, concrete analogies when they make an idea clearer.
+- Avoid unexplained jargon, English-only tech words without a gloss, and dense abbreviations.
+- If a concept is unavoidably complex, break it into small numbered steps.
+- It is better to over-explain than to leave the user guessing.
+
+This rule applies to all user-facing communication, including mode statements, risk notes, and final reports. It does not change the language of persistent AI-facing instruction files, which stay in English.
 
 ## Skills
 
-Базовые skills:
+Base skills:
 
-- `bugfix-workflow` — исправление багов и регрессий.
-- `ui-review` — проверка изменений интерфейса.
-- `security-review` — проверка рисков безопасности.
-- `release-check` — проверка перед коммитом, merge, сборкой или релизом.
-- `copy-review` — проверка интерфейсных текстов.
-- `write-tests` — решение, нужны ли автотесты, и создание тестов для рискованных изменений.
-- `task-finish` — закрытие задачи и чистка контекста после подтверждения.
-- `task-switch` — безопасное переключение между незавершёнными задачами без потери контекста.
-- `architecture-update` — обновление архитектуры разработки после одобрения пользователя.
-- `environment-check` — проверка установки архитектуры, базовых skills и внешних tools.
+- `bugfix-workflow` — bugs, regressions, crashes, flaky behavior, debug requests, performance investigations, and broken state; uses a diagnose-style loop.
+- `ui-review` — user-visible UI, layout, visual states, interaction feedback.
+- `security-review` — security risks.
+- `release-check` — pre-commit, pre-merge, build, or release review.
+- `copy-review` — user-facing text.
+- `write-tests` — test decision and tests for risky changes.
+- `task-finish` — closing a task and cleaning context after confirmation.
+- `task-switch` — switching between unfinished tasks without losing context; may promote confirmed future tasks into current work.
+- `architecture-update` — updating development architecture after user approval.
+- `environment-check` — checking architecture installation, tool availability, and printing the available next commands/skills menu.
 
-Use skills by trigger. Do not load all skills automatically. Open only the skill that matches the current task.
+Use skills by trigger. Do not apply skills from memory. Open the current `ai/skills/*/SKILL.md` before using that workflow.
+
+Open only the skill that matches the current task. Do not load all skills automatically.
+
+### UI changes and tests
+
+For UI behavior, screen state, layout logic, scrolling, rendering logic, or interaction changes, use `ui-review` and `write-tests`.
+
+For purely decorative visual changes, use `ui-review`. Use `write-tests` only if behavior, state, layout logic, accessibility, or interaction can be affected.
+
+If automated tests are not practical for a UI change, provide a manual UI checklist.
+
+### Bugfix and performance work
+
+For bugs, crashes, regressions, flaky behavior, debug requests, and performance investigations, use `bugfix-workflow`.
+
+There is no separate `Mode: bugfix`. Treat bug work as:
+
+```text
+Mode: implementation
+Skill: bugfix-workflow
+```
+
+`bugfix-workflow` adapts Matt Pocock's `diagnose` method to this architecture. It must use this repository's sources of truth:
+
+- `ai/current-task.md` for task scope and Done criteria;
+- `ai/decisions.md` for active invariants before architecture-sensitive changes;
+- `ai/future-tasks.md` for non-blocking follow-up work that must not expand the bugfix scope;
+- `task-finish` for completion checks and cleanup after user confirmation.
+
+It must not create `CONTEXT.md`, `docs/adr/`, or another parallel documentation system unless the project explicitly requires it.
+
+Use the diagnose-style loop:
+
+1. Build the fastest practical feedback loop.
+2. Reproduce the issue before changing code, or state why it cannot be reproduced.
+3. Minimize the reproduction to the smallest useful scenario.
+4. Generate 3–5 falsifiable hypotheses.
+5. Test hypotheses with targeted instrumentation.
+6. Apply the smallest clean fix.
+7. Add or update a regression test when a correct test seam exists.
+8. Re-run the original reproduction or measurement loop.
+9. Remove temporary diagnostics unless intentionally kept with a removal record.
+10. Propose `task-finish` if the task appears complete.
+
+Do not write a full spec or implementation plan based only on an unverified hypothesis.
+
+First try to reproduce or measure the issue. If root cause cannot be proven, mark the fix as mitigation:
+
+```text
+Root cause: unproven
+Fix status: mitigated
+```
+
+Record this in the final report and, when relevant, in `ai/changelog.md` during confirmed `task-finish` cleanup.
+
+### Future task capture
+
+Use future task capture when a useful idea appears but does not belong to the current confirmed scope.
+
+Typical triggers:
+
+- `запиши на потом`;
+- `добавь в будущие задачи`;
+- `потом надо сделать`;
+- `давай позже реализуем`;
+- a useful non-blocking improvement appears during implementation, review, bugfix, or task-finish.
+
+If the user explicitly asks to save it, append it to `ai/future-tasks.md`.
+
+If the idea appears implicitly, propose the future task first and wait for confirmation before editing.
+
+A future task entry should include:
+
+- short title;
+- status;
+- priority if clear;
+- source or context;
+- proposed task;
+- acceptance criteria;
+- promotion notes if needed.
+
+Do not implement a future task unless the user explicitly promotes it to the current task.
+
+### Active decision check
+
+Before committing a new service, resolver, storage path, undo path, sync behavior, data model change, or architecture-sensitive logic, read relevant active entries in `ai/decisions.md`.
+
+If the implementation contradicts an active decision, stop and propose `architecture-update`.
 
 ### Optional project skills
 
 Optional project skills may be installed only in projects where they are useful. They are not required base skills and must not make `environment-check` fail when absent.
 
-- `frontend-design` — optional project skill for UI composition, visual hierarchy, frontend component design, and UX improvements. Use only for UI/frontend/design tasks when `ai/skills/frontend-design/SKILL.md` is installed.
+- `frontend-design` — optional project skill for UI composition, visual hierarchy, frontend component design, and UX improvements. Use only for UI/frontend/design tasks when `ai/skills/frontend-design/SKILL.md` is installed. Source URL lives in `ai/external-tools.md`.
 
-Внешние skills и инструменты не заменяют базовые skills.
+External skills and tools do not replace base skills.
 
 Expected external skills/tools:
 
-- `code-review-graph` — основной инструмент для анализа связей в коде, code review и blast-radius analysis.
-- `agent-skills-for-context-engineering` — дополнительные skills для работы с контекстом.
-- `claude-seo` — SEO-набор skills.
+- `code-review-graph` — main tool for code review and blast-radius analysis when available. Source URL lives in `ai/external-tools.md`.
+- `agent-skills-for-context-engineering` — additional context-engineering skills.
+- `claude-seo` — SEO skill set.
 
 Controlled external methodologies:
 
-- `Superpowers` — усиленная методология разработки. Проверяется при первом запуске, но используется только после явного разрешения.
+- `Superpowers` — checked at startup, but activated only after explicit permission.
 
-## Приоритет скиллов
+## Skill precedence
 
-Иерархия управления процессом:
+Workflow priority:
 
 1. `AGENTS.md` / `CLAUDE.md`
 2. `ai/current-task.md`
-3. релевантный базовый skill
+3. relevant base skill
 4. optional project skills and expected external skills/tools
 5. controlled external methodologies
 
-Optional project skills, external skills and tools help the agent, but do not control the workflow. They must not override work mode, confirmation rules, `task-finish`, `architecture-update`, `environment-check`, clean architecture principle, or project-specific rules in `ai/project-context.md`.
+Optional project skills, external skills, and tools help the agent, but do not control the workflow. They must not override work mode, confirmation rules, `task-finish`, `architecture-update`, `environment-check`, clean architecture principle, or project-specific rules in `ai/project-context.md`.
 
-## Контекст и токены
+## code-review-graph priority
 
-Не читай всю папку `ai/` автоматически.
+For complex review or unclear blast radius, check whether `code-review-graph` is available.
 
-Минимальный контекст по умолчанию:
+Use `code-review-graph` when available for:
 
-- `AGENTS.md` или `CLAUDE.md`
+- multi-module changes;
+- new services, resolvers, adapters, or domain logic;
+- architecture-sensitive changes;
+- complex bugs;
+- large pre-merge reviews;
+- unclear affected files;
+- dependency analysis that is hard to trace manually.
+
+Do not require it for:
+
+- small copy changes;
+- simple visual tweaks;
+- narrow bugfixes with known relevant files.
+
+If it should be used but is not available, report this as a warning, not a blocker by default.
+
+## Context and tokens
+
+Do not read the whole `ai/` folder automatically.
+
+Default minimum context:
+
+- `AGENTS.md` or `CLAUDE.md`
 - `ai/current-task.md`
 
-Читай `ai/project-context.md` только если задача касается проектного поведения, архитектуры, storage, экранов или если это просит `current-task`.
+Read `ai/project-context.md` only if the task concerns project behavior, architecture, storage, screens, or if `current-task` asks for it.
 
-Читай `ai/decisions.md` только для архитектурно чувствительных задач.
+Read `ai/decisions.md` only for architecture-sensitive tasks, durable invariants, or release checks where relevant.
 
-Читай `ai/architecture.md` только если задача касается workflow, архитектуры разработки, конфликтов правил, architecture-update или если правило неясно.
+Read `ai/future-tasks.md` only when the user asks to capture, review, promote, search, or clean future tasks, or when a workflow explicitly needs it.
 
-Для plan-driven или Superpowers-задач читай только релевантные файлы:
+Read `ai/architecture.md` only if the task concerns workflow, development architecture, rule conflicts, architecture-update, or if a rule is unclear.
+
+For plan-driven or Superpowers tasks, read only relevant files:
 
 - `docs/superpowers/specs/<spec>.md`
 - `docs/superpowers/plans/<plan>.md`
-- при необходимости — этот раздел архитектуры про plan-driven работу.
+- when needed — this architecture section about plan-driven work.
 
-Используй skills только по триггеру. Не загружай все skills автоматически.
+Do not read `ai/archive/` without a concrete reason.
 
-Не читай `ai/archive/` без конкретной причины.
+## Output format before changes
 
-## Формат общения перед изменениями
+Before editing, the agent should:
 
-Перед редактированием агент должен:
+1. State the mode: `Mode: ...`.
+2. Briefly explain in simple words what it will do next.
+3. Name important risk only if there is one.
 
-1. Явно назвать режим: `Mode: ...`.
-2. Коротко объяснить простыми словами, что будет делать дальше.
-3. Назвать важный риск, только если он есть.
+Do not list technical files before editing unless it helps the user understand the change or the user asked for file names.
 
-Не перечисляй технические файлы перед редактированием, если это не помогает пользователю понять изменение или пользователь сам не попросил список файлов.
+## Scope control
 
-## Контроль scope
+Do not expand user-confirmed scope.
 
-Не расширяй scope, который подтвердил пользователь.
+If it becomes useful to do more, stop and ask before adding new scope.
 
-Если во время реализации становится полезно сделать больше, остановись и спроси пользователя перед добавлением нового объёма.
+If a useful idea is outside the current task, capture it as a future task candidate instead of implementing it.
 
-Пример: если пользователь подтвердил импорт одного CSV, не добавляй импорт трёх CSV без отдельного подтверждения.
+If a user request changes goal, work mode, relevant files, Done criteria, or creates a separate deliverable, decide whether `task-switch` is needed.
 
-## Формат отчёта после изменений
+Small UI iterations can stay inside one task if they clarify the same goal. If they create a new goal, use `task-switch`.
 
-После редактирования агент должен:
+## Review fact check
 
-1. Начать отчёт с использованного режима, например `Mode: implementation`.
-2. Кратко описать, что изменилось.
-3. Перечислить ручные проверки.
-4. Назвать риски или незавершённые части.
-5. Явно сказать, менялась ли task memory.
-6. Если задача выглядит завершённой, предложить `task-finish`, а не объявлять задачу закрытой.
+In `review` mode, do not report a problem as fact until it is verified with read, grep, diff, logs, tests, or another concrete check.
 
-Если task memory менялась, агент должен перечислить точные файлы:
+If not verified, label it as a hypothesis.
+
+Do not create work from stale assumptions. Re-check the file before saying that an issue still exists.
+
+## Output format after changes
+
+After editing, the agent should:
+
+1. Start the report with the used mode, for example `Mode: implementation`.
+2. Briefly describe what changed.
+3. List checks.
+4. Name risks or unfinished parts.
+5. Explicitly say whether task memory changed.
+6. If the task looks complete, propose `task-finish`, not declare the task closed.
+
+If task memory changed, list exact files:
 
 - `ai/current-task.md`
 - `ai/changelog.md`
 - `ai/decisions.md`
 - `ai/project-context.md`
 - `ai/paused-tasks.md`
+- `ai/future-tasks.md`
 
-## Принцип чистой архитектуры
+## Clean architecture principle
 
-Не копи технический долг и временные решения.
+Do not accumulate technical debt and temporary solutions.
 
-Временные решения допустимы только как исключение. Если workaround всё-таки используется:
+Temporary workarounds are allowed only as exceptions. If a workaround is used:
 
-1. Явно пометь его как temporary workaround.
-2. Объясни, почему он нужен сейчас.
-3. Объясни, какой риск он создаёт.
-4. Добавь follow-up: что заменить, где и когда.
-5. Реши, нужно ли записать это в `ai/changelog.md` или `ai/decisions.md`.
+1. Mark it as temporary workaround.
+2. Explain why it is needed now.
+3. Explain what risk it creates.
+4. Add a follow-up: what to replace, where, and when.
+5. Decide whether to record it in `ai/changelog.md`, `ai/decisions.md`, or `ai/future-tasks.md`.
 
-Не чини баг способом, который ухудшает модель данных, согласованность экранов или читаемость проекта.
+Do not fix bugs in a way that worsens data model, screen consistency, or project readability.
 
-Если чистое решение требует больше времени, предложи два варианта:
+If a clean solution takes more time, offer two options:
 
-- быстрый безопасный фикс;
-- правильное архитектурное решение.
+- quick safe fix;
+- proper architecture solution.
+
+## Temporary diagnostics lifecycle
+
+Temporary diagnostic code in main is allowed only if intentionally kept for the next step.
+
+If TEMP diagnostics remain in main, create an explicit removal record in one of:
+
+- `ai/paused-tasks.md` if the active task is being paused through `task-switch`;
+- Done criteria of `ai/current-task.md`;
+- `ai/changelog.md` during confirmed `task-finish` cleanup.
+
+The record must include:
+
+- diagnostic code location;
+- why it remains;
+- when to remove it;
+- removal criteria;
+- risk if it stays too long.
+
+A note buried inside an unrelated task is not enough for committed TEMP diagnostics.
+
+Do not use `ai/future-tasks.md` for required TEMP diagnostic cleanup if the current task cannot safely close without that cleanup.
 
 ## Plan-driven work with Superpowers
 
-Этот раздел применяется только к задачам, которые явно ведутся через Superpowers planning, writing-plans, subagent-driven-development или похожий plan-driven workflow.
+This section applies only to tasks explicitly done through Superpowers planning, writing-plans, subagent-driven-development, or similar plan-driven workflow.
 
-Обычные задачи не обязаны использовать эти правила.
+Ordinary tasks do not have to use these rules.
 
-### Источник правды по прогрессу
+### Source of truth for progress
 
-Для plan-driven работы `docs/superpowers/plans/<plan>.md` — источник правды по прогрессу выполнения плана.
+For plan-driven work, `docs/superpowers/plans/<plan>.md` is the source of truth for execution progress.
 
-- Не используй внутренний TodoWrite как единственный источник прогресса.
-- После завершения каждой задачи плана обновляй чекбокс в `docs/superpowers/plans/<plan>.md`.
-- Если задача плана частично выполнена, оставь чекбокс пустым и добавь короткую заметку под задачей.
-- Если задача отменена или перенесена, явно пометь это в плане короткой строкой `Note:`.
+- Do not use internal TodoWrite, harness task lists, TaskCreate, TaskUpdate, or chat history as the only progress source.
+- After completing each plan task, update the checkbox in `docs/superpowers/plans/<plan>.md`.
+- If a plan task is partially done, leave the checkbox empty and add a short `Note:` under the task.
+- If a task is cancelled or moved, mark it with a short `Note:`.
 
-Пример:
+Example:
 
 ```markdown
 - [x] Task 2 — Add app wrapper
@@ -317,29 +636,43 @@ Optional project skills, external skills and tools help the agent, but do not co
   - Note: blocked until .app bundle launches reliably.
 ```
 
-### Промежуточные решения
+The controller agent in subagent-driven work is responsible for keeping the plan file updated. It must not rely only on subagent status or harness task state.
 
-Мелкие judgment calls по ходу plan-driven работы фиксируй рядом с соответствующей задачей плана через короткую `Note:`.
+### Measurement before spec for bugs and performance
 
-Используй `ai/decisions.md` только для устойчивых архитектурных, продуктовых, workflow-решений или решений по модели данных.
+For bug and performance tasks, do a reproduction or measurement pass before writing a spec when practical.
 
-Не дублируй одно и то же решение одновременно в plan notes, `ai/decisions.md` и `ai/changelog.md`.
+If the spec is based on a hypothesis, mark it explicitly:
 
-Правило выбора места:
+```text
+Hypothesis: unproven
+Measurement needed before implementation: yes
+```
 
-- `docs/superpowers/plans/<plan>.md` — мелкие решения и локальные причины внутри конкретной задачи плана.
-- `ai/decisions.md` — решения, которые будущие агенты должны помнить вне текущего плана.
-- `ai/changelog.md` — заметные итоговые изменения, а не каждый микрошаг.
+### Local decisions
+
+Record small judgment calls inside the relevant plan task with `Note:`.
+
+Use `ai/decisions.md` only for durable architecture, product, workflow, or data model decisions.
+
+Do not duplicate the same decision in plan notes, `ai/decisions.md`, and `ai/changelog.md`.
+
+Choice rule:
+
+- `docs/superpowers/plans/<plan>.md` — local reasons inside one plan.
+- `ai/decisions.md` — decisions future agents must remember outside the current plan.
+- `ai/changelog.md` — notable final changes, not every micro-step.
+- `ai/future-tasks.md` — future work that should not expand the current plan unless promoted.
 
 ### Commit convention
 
-Для plan-driven коммитов используй проверяемую конвенцию:
+For plan-driven commits, use a verifiable convention:
 
 ```text
 Plan Task <N>: <short action>
 ```
 
-Примеры:
+Examples:
 
 ```text
 Plan Task 1: add app bundle wrapper
@@ -348,31 +681,24 @@ Plan Task 3: add UI smoke test target
 Plan Cleanup: update task handoff
 ```
 
-Проверка без специальных инструментов:
-
-```bash
-git log --oneline --grep="Plan Task"
-git log --oneline --grep="Plan Cleanup"
-```
-
-Если коммит закрывает несколько задач плана, в сообщении укажи диапазон:
+If a commit closes several plan tasks, use a range:
 
 ```text
 Plan Tasks 4-5: add bundle smoke checks
 ```
 
-Но по умолчанию предпочитай один логический plan task на один коммит.
+Prefer one logical plan task per commit by default.
 
-### Handoff между агентами
+### Handoff between agents
 
-Если агент останавливается посреди plan-driven выполнения, он должен оставить быстрый handoff в конце плана или в `ai/current-task.md`:
+If an agent stops in the middle of plan-driven execution, it should leave a quick handoff at the end of the plan or in `ai/current-task.md`:
 
-- последний завершённый plan task;
-- следующий plan task;
-- известные блокеры;
-- последние релевантные коммиты.
+- last completed plan task;
+- next plan task;
+- known blockers;
+- latest relevant commits.
 
-Не создавай отдельный progress-файл без явной причины. Прогресс плана живёт в самом `docs/superpowers/plans/<plan>.md`.
+Do not create a separate progress file without a clear reason. Plan progress lives in the plan file.
 
 ## Task switching
 
@@ -389,25 +715,26 @@ First show:
    - continue current task;
    - pause current task and start a new one;
    - finish current task through `task-finish`;
-   - discard current task and replace it.
+   - discard current task and replace it;
+   - promote a future task into `ai/current-task.md`.
 
 Only update `ai/current-task.md` after explicit user confirmation.
 
-### Как понять, что задача другая
+### How to detect a different task
 
-Новый запрос считается другой задачей, если:
+A new request is a different task if:
 
-1. Меняется цель.
-2. Меняется work mode.
-3. Меняются основные файлы или область проекта.
-4. Меняются Done criteria.
-5. Новый запрос не помогает завершить текущую задачу.
-6. Новый запрос создаёт отдельный результат.
-7. Текущая задача останется незавершённой после нового запроса.
+1. Goal changes.
+2. Work mode changes.
+3. Main files or project area change.
+4. Done criteria change.
+5. New request does not help complete the current task.
+6. New request creates a separate deliverable.
+7. Current task would remain unfinished after the new request.
 
-Новый запрос считается продолжением текущей задачи, если он уточняет, сужает, тестирует, ревьюит или завершает текущую цель.
+A new request is the same task if it clarifies, narrows, tests, reviews, or completes the current goal.
 
-Если агент не уверен, он не должен угадывать. Нужно спросить пользователя:
+If unsure, ask:
 
 ```text
 Похоже, это новая задача, а текущая ещё не закрыта. Переключаемся или продолжаем текущую?
@@ -415,58 +742,54 @@ Only update `ai/current-task.md` after explicit user confirmation.
 
 If the current task is paused, write a short entry to `ai/paused-tasks.md`.
 
-Do not use `ai/paused-tasks.md` as a backlog.
+Do not use `ai/paused-tasks.md` as a backlog. Use `ai/future-tasks.md` for future ideas and tasks.
 
-## Обновление архитектуры
+## Architecture update
 
-Если нужно изменить переиспользуемое правило, workflow, ограничение проекта, skill или архитектурный принцип, используй `architecture-update`.
+Use `architecture-update` when a reusable rule, workflow, project constraint, skill, or architecture principle needs to change.
 
-Перед изменением файлов покажи:
+Before changing files, show:
 
-1. Что меняем.
-2. На что меняем.
-3. Точные файлы.
-4. Точную формулировку.
-5. Влияние на токены.
-6. Почему это должно храниться именно там.
+1. What changes.
+2. What it changes to.
+3. Exact files.
+4. Exact wording.
+5. Token impact.
+6. Why it belongs there.
 
-Затем спроси: `Replace this?`
+Then ask: `Replace this?`
 
-Не обновляй файлы архитектуры без явного подтверждения пользователя.
+Do not update architecture files without explicit user confirmation.
 
-## Ритм ревизии
+If stale architecture or project memory is discovered during a task, do not only mention it as a warning. Propose an `architecture-update` task or project-context update and wait for confirmation.
 
-После каждой задачи:
+## Revision rhythm
 
-- обнови `ai/changelog.md`, если было заметное изменение;
-- обнови `ai/decisions.md`, если появилось важное решение;
-- очищай `ai/current-task.md` только после подтверждения пользователя.
+After each task:
 
-Раз в неделю:
+- update `ai/changelog.md` if there was a notable change;
+- update `ai/decisions.md` if an important durable decision appeared;
+- add confirmed out-of-scope follow-up work to `ai/future-tasks.md`;
+- clean `ai/current-task.md` only after user confirmation.
 
-- сократи `ai/changelog.md`;
-- старые записи перенеси в `ai/archive/`.
+Weekly:
 
-Раз в месяц:
+- shorten `ai/changelog.md`;
+- move old entries to `ai/archive/`;
+- review `ai/future-tasks.md` and mark stale tasks as `dropped` after confirmation.
 
-- пересмотри `AGENTS.md` и `CLAUDE.md`;
-- для каждой строки спроси: «Если удалить эту строку, агент начнёт ошибаться?»;
-- если ответ «нет», удали строку;
-- пересмотри skills и убери устаревшие или дублирующие правила.
+Monthly:
+
+- review `AGENTS.md` and `CLAUDE.md`;
+- for each line ask: “If this line is deleted, will the agent start making mistakes?”;
+- if the answer is no, delete it;
+- review skills and remove stale or duplicate rules.
 
 ## Superpowers gated use
 
 Superpowers may be installed and checked, but it is a controlled external methodology.
 
-Use Superpowers only when:
-
-- the user explicitly asks to use it;
-- `ai/current-task.md` says `Use Superpowers: yes`;
-- the task is large, vague, risky, or requires design, TDD, or subagent-driven development.
-
-If a task matches Superpowers triggers, do not activate Superpowers automatically. First explain why it may help and ask the user: `Use Superpowers for this task?`
-
-Superpowers triggers include:
+Superpowers may be proposed for:
 
 - large or vague tasks;
 - architecture design;
@@ -477,6 +800,14 @@ Superpowers triggers include:
 - subagents;
 - major refactoring;
 - unclear blast radius.
+
+Superpowers may be activated only when:
+
+- the user explicitly asks to use it;
+- the user explicitly confirms the agent's proposal to use it;
+- `ai/current-task.md` says `Use Superpowers: yes`.
+
+Do not activate Superpowers automatically only because a task matches a trigger. First explain why it may help and ask: `Use Superpowers for this task?`
 
 Do not use Superpowers for:
 

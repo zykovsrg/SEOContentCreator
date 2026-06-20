@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("openAIModel") private var model = "gpt-4.1"
+    @AppStorage("imageModel") private var imageModel = "gpt-image-1"
     @State private var apiKey = ""
     @State private var savedMessage: String?
     @State private var hasKey = KeychainService.hasAPIKey()
@@ -35,9 +36,15 @@ struct SettingsView: View {
                     Text(savedMessage).font(.caption).foregroundStyle(.secondary)
                 }
             }
+
+            Section("Изображения") {
+                TextField("Модель изображений", text: $imageModel)
+                Text("Например: gpt-image-1 или gpt-image-2. Используется тот же API-ключ OpenAI.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 240)
+        .frame(width: 460, height: 320)
         .navigationTitle("Настройки")
     }
 
