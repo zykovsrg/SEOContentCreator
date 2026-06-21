@@ -12,6 +12,7 @@ struct StageTemplateSeederTests {
                  GenerationJob.self, StageTemplate.self,
                  ContextBlock.self, AIRole.self,
                  GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,
+                 ExternalDocument.self,
             configurations: config
         )
         return ModelContext(container)

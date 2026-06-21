@@ -20,8 +20,14 @@ final class FakeDocsClient: DocsPublishing {
 @MainActor
 struct ArticlePublisherTests {
     private func ctx() throws -> ModelContext {
-        try ModelContainer(for: Topic.self, ExternalDocument.self, ArticleVersion.self,
-                           configurations: ModelConfiguration(isStoredInMemoryOnly: true)).mainContext
+        let container = try ModelContainer(
+            for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
+                 GenerationJob.self, StageTemplate.self,
+                 ContextBlock.self, AIRole.self,
+                 GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,
+                 ExternalDocument.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        return ModelContext(container)
     }
     private func topicWithText(_ ctx: ModelContext, _ text: String) -> Topic {
         let t = Topic(title: "Тема", articleType: .info)

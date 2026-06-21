@@ -10,7 +10,7 @@ struct GeneratedImageTests {
         let container = try ModelContainer(
             for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
                  GenerationJob.self, StageTemplate.self,
-                 ContextBlock.self, AIRole.self, GeneratedImage.self,
+                 ContextBlock.self, AIRole.self, GeneratedImage.self, ExternalDocument.self,
             configurations: config
         )
         return ModelContext(container)

@@ -5,15 +5,19 @@ import SwiftData
 
 @MainActor
 struct ExternalDocumentTests {
-    private func container() throws -> ModelContainer {
-        try ModelContainer(
-            for: Topic.self, ExternalDocument.self, ArticleVersion.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
+    private func ctx() throws -> ModelContext {
+        let container = try ModelContainer(
+            for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
+                 GenerationJob.self, StageTemplate.self,
+                 ContextBlock.self, AIRole.self,
+                 GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,
+                 ExternalDocument.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        return ModelContext(container)
     }
 
     @Test func storesPublicationAndLinksToTopic() throws {
-        let ctx = try container().mainContext
+        let ctx = try ctx()
         let topic = Topic(title: "Тема", articleType: .info)
         ctx.insert(topic)
         let doc = ExternalDocument(docID: "doc123", docURL: "https://docs.google.com/document/d/doc123/edit", mode: .newDocument)
