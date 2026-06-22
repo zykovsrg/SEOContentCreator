@@ -12,12 +12,14 @@ final class GoogleAuthService {
         case notSignedIn
         case cancelled
         case tokenExchangeFailed
+        case listenerFailed(String)
         var errorDescription: String? {
             switch self {
             case .noClientCredentials: return "Укажите Client ID и Client Secret Google в Настройках."
             case .notSignedIn: return "Войдите в Google в Настройках."
             case .cancelled: return "Вход в Google отменён."
             case .tokenExchangeFailed: return "Не удалось получить токен Google."
+            case .listenerFailed(let reason): return "Не удалось открыть локальный порт для входа: \(reason)"
             }
         }
     }
@@ -115,11 +117,11 @@ final class GoogleAuthService {
     // MARK: Interactive sign-in (manual-tested; browser + loopback)
 
     func signIn() async throws {
-        guard GoogleCredentialStore.loadClientID() != nil else { throw AuthError.noClientCredentials }
-        let id = GoogleCredentialStore.loadClientID()!
+        guard let id = GoogleCredentialStore.loadClientID() else { throw AuthError.noClientCredentials }
         let verifier = Self.makeVerifier()
         let challenge = Self.codeChallenge(for: verifier)
         let listener = try LoopbackListener()
+        try await listener.start()
         let redirect = "http://127.0.0.1:\(listener.port)"
         let authURL = Self.buildAuthURL(clientID: id, redirectURI: redirect, codeChallenge: challenge)
         NSWorkspace.shared.open(authURL)
@@ -146,45 +148,81 @@ extension CharacterSet {
 }
 
 final class LoopbackListener {
-    let port: UInt16
+    private(set) var port: UInt16 = 0
     private let listener: NWListener
-    private var continuation: CheckedContinuation<String, Error>?
+    // Все колбэки слушателя и соединений приходят на этот последовательный queue,
+    // поэтому доступ к continuation сериализован (без гонок).
+    private let queue = DispatchQueue(label: "google.loopback.listener")
+    private var startContinuation: CheckedContinuation<Void, Error>?
+    private var codeContinuation: CheckedContinuation<String, Error>?
 
     init() throws {
-        // Слушаем только loopback-интерфейс (127.0.0.1), а не все сетевые интерфейсы:
-        // OAuth-перехват одноразовый, но порт не должен быть доступен извне.
+        // Эфемерный порт. Ограничение привязки к loopback через параметры
+        // (requiredInterfaceType/.requiredLocalEndpoint с портом .any) даёт EINVAL
+        // (POSIX 22) на NWListener, поэтому слушаем обычным способом.
         let parameters = NWParameters.tcp
-        parameters.requiredInterfaceType = .loopback
-        let l = try NWListener(using: parameters, on: .any)
-        self.listener = l
-        let sem = DispatchSemaphore(value: 0)
-        var boundPort: UInt16 = 0
-        l.stateUpdateHandler = { state in
-            if case .ready = state, let p = l.port?.rawValue { boundPort = p; sem.signal() }
+        self.listener = try NWListener(using: parameters, on: .any)
+    }
+
+    /// Запускает слушатель и ждёт привязки порта.
+    /// Бросает понятную ошибку при сбое или по тайм-ауту, чтобы интерфейс не зависал.
+    func start(timeout: TimeInterval = 10) async throws {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            self.startContinuation = cont
+            listener.stateUpdateHandler = { [weak self] state in
+                guard let self else { return }
+                switch state {
+                case .ready:
+                    self.port = self.listener.port?.rawValue ?? 0
+                    self.resumeStart(with: .success(()))
+                case .failed(let error):
+                    self.resumeStart(with: .failure(
+                        GoogleAuthService.AuthError.listenerFailed(String(describing: error))))
+                case .waiting(let error):
+                    self.listener.cancel()
+                    self.resumeStart(with: .failure(
+                        GoogleAuthService.AuthError.listenerFailed(String(describing: error))))
+                default:
+                    break
+                }
+            }
+            listener.start(queue: queue)
+            queue.asyncAfter(deadline: .now() + timeout) { [weak self] in
+                self?.resumeStart(with: .failure(
+                    GoogleAuthService.AuthError.listenerFailed("превышено время ожидания запуска")))
+            }
         }
-        l.start(queue: .global())
-        sem.wait()
-        self.port = boundPort
+    }
+
+    // Безопасно завершает start-continuation ровно один раз (вызывается только с serial queue).
+    private func resumeStart(with result: Result<Void, Error>) {
+        guard let cont = startContinuation else { return }
+        startContinuation = nil
+        cont.resume(with: result)
     }
 
     func waitForCode() async throws -> String {
         try await withCheckedThrowingContinuation { cont in
-            self.continuation = cont
+            self.codeContinuation = cont
             listener.newConnectionHandler = { [weak self] conn in
-                conn.start(queue: .global())
-                conn.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, _, _ in
-                    guard let data, let request = String(data: data, encoding: .utf8) else { return }
+                guard let self else { return }
+                conn.start(queue: self.queue)
+                conn.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, _, _ in
+                    guard let self, let data, let request = String(data: data, encoding: .utf8) else { return }
                     let code = Self.extractCode(from: request)
                     let html = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><h3>Готово. Можно закрыть это окно и вернуться в приложение.</h3></body></html>"
                     conn.send(content: Data(html.utf8), completion: .contentProcessed { _ in conn.cancel() })
-                    self?.listener.cancel()
-                    if let code { self?.continuation?.resume(returning: code) }
-                    else { self?.continuation?.resume(throwing: GoogleAuthService.AuthError.cancelled) }
-                    self?.continuation = nil
+                    self.listener.cancel()
+                    guard let cont = self.codeContinuation else { return }
+                    self.codeContinuation = nil
+                    if let code { cont.resume(returning: code) }
+                    else { cont.resume(throwing: GoogleAuthService.AuthError.cancelled) }
                 }
             }
         }
     }
+
+    deinit { listener.cancel() }
 
     static func extractCode(from httpRequest: String) -> String? {
         guard let firstLine = httpRequest.components(separatedBy: "\r\n").first,
