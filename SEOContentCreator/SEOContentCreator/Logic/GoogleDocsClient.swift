@@ -74,9 +74,21 @@ struct GoogleDocsClient {
     }
 
     func moveToFolder(fileID: String, folderID: String) async throws {
+        // Сначала узнаём текущих родителей файла, чтобы убрать его именно
+        // оттуда (жёсткий алиас "root" срабатывает не всегда — документ,
+        // созданный через Docs API, остаётся в корне «Мой диск»).
+        var getComps = URLComponents(string: "https://www.googleapis.com/drive/v3/files/\(fileID)")!
+        getComps.queryItems = [URLQueryItem(name: "fields", value: "parents")]
+        let data = try await send(url: getComps.url!, method: "GET", json: nil)
+        let parents = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["parents"] as? [String] ?? []
+
         var comps = URLComponents(string: "https://www.googleapis.com/drive/v3/files/\(fileID)")!
-        comps.queryItems = [URLQueryItem(name: "addParents", value: folderID),
-                            URLQueryItem(name: "removeParents", value: "root")]
+        var items = [URLQueryItem(name: "addParents", value: folderID)]
+        let toRemove = parents.filter { $0 != folderID }
+        if !toRemove.isEmpty {
+            items.append(URLQueryItem(name: "removeParents", value: toRemove.joined(separator: ",")))
+        }
+        comps.queryItems = items
         _ = try await send(url: comps.url!, method: "PATCH", json: [:])
     }
 
