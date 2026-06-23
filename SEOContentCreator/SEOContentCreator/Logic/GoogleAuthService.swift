@@ -1,7 +1,6 @@
 import Foundation
 import CryptoKit
 import AppKit
-import Network
 import Security
 
 @MainActor
@@ -121,7 +120,6 @@ final class GoogleAuthService {
         let verifier = Self.makeVerifier()
         let challenge = Self.codeChallenge(for: verifier)
         let listener = try LoopbackListener()
-        try await listener.start()
         let redirect = "http://127.0.0.1:\(listener.port)"
         let authURL = Self.buildAuthURL(clientID: id, redirectURI: redirect, codeChallenge: challenge)
         NSWorkspace.shared.open(authURL)
@@ -147,82 +145,83 @@ extension CharacterSet {
     }()
 }
 
+/// Локальный одноразовый слушатель для перехвата OAuth-redirect от Google.
+///
+/// Использует обычный POSIX-сокет, а не `NWListener`: на macOS 26.x
+/// `NWListener` падает с EINVAL (POSIX 22) на любой конфигурации, тогда как
+/// BSD-сокет работает штатно. Привязка строго к 127.0.0.1 гарантирует, что
+/// порт доступен только с этого компьютера (loopback), а не из сети.
 final class LoopbackListener {
     private(set) var port: UInt16 = 0
-    private let listener: NWListener
-    // Все колбэки слушателя и соединений приходят на этот последовательный queue,
-    // поэтому доступ к continuation сериализован (без гонок).
+    private let fd: Int32
     private let queue = DispatchQueue(label: "google.loopback.listener")
-    private var startContinuation: CheckedContinuation<Void, Error>?
-    private var codeContinuation: CheckedContinuation<String, Error>?
 
     init() throws {
-        // Эфемерный порт. Ограничение привязки к loopback через параметры
-        // (requiredInterfaceType/.requiredLocalEndpoint с портом .any) даёт EINVAL
-        // (POSIX 22) на NWListener, поэтому слушаем обычным способом.
-        let parameters = NWParameters.tcp
-        self.listener = try NWListener(using: parameters, on: .any)
-    }
+        let s = socket(AF_INET, SOCK_STREAM, 0)
+        guard s >= 0 else { throw GoogleAuthService.AuthError.listenerFailed("socket: \(Self.errnoText())") }
 
-    /// Запускает слушатель и ждёт привязки порта.
-    /// Бросает понятную ошибку при сбое или по тайм-ауту, чтобы интерфейс не зависал.
-    func start(timeout: TimeInterval = 10) async throws {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            self.startContinuation = cont
-            listener.stateUpdateHandler = { [weak self] state in
-                guard let self else { return }
-                switch state {
-                case .ready:
-                    self.port = self.listener.port?.rawValue ?? 0
-                    self.resumeStart(with: .success(()))
-                case .failed(let error):
-                    self.resumeStart(with: .failure(
-                        GoogleAuthService.AuthError.listenerFailed(String(describing: error))))
-                case .waiting(let error):
-                    self.listener.cancel()
-                    self.resumeStart(with: .failure(
-                        GoogleAuthService.AuthError.listenerFailed(String(describing: error))))
-                default:
-                    break
-                }
-            }
-            listener.start(queue: queue)
-            queue.asyncAfter(deadline: .now() + timeout) { [weak self] in
-                self?.resumeStart(with: .failure(
-                    GoogleAuthService.AuthError.listenerFailed("превышено время ожидания запуска")))
+        var yes: Int32 = 1
+        setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, socklen_t(MemoryLayout<Int32>.size))
+
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = 0                              // эфемерный порт
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")  // только loopback
+
+        let bindResult = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(s, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
             }
         }
+        guard bindResult == 0 else {
+            close(s); throw GoogleAuthService.AuthError.listenerFailed("bind: \(Self.errnoText())")
+        }
+        guard listen(s, 1) == 0 else {
+            close(s); throw GoogleAuthService.AuthError.listenerFailed("listen: \(Self.errnoText())")
+        }
+
+        var bound = sockaddr_in()
+        var len = socklen_t(MemoryLayout<sockaddr_in>.size)
+        _ = withUnsafeMutablePointer(to: &bound) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(s, $0, &len) }
+        }
+        self.fd = s
+        self.port = UInt16(bigEndian: bound.sin_port)
     }
 
-    // Безопасно завершает start-continuation ровно один раз (вызывается только с serial queue).
-    private func resumeStart(with result: Result<Void, Error>) {
-        guard let cont = startContinuation else { return }
-        startContinuation = nil
-        cont.resume(with: result)
-    }
-
+    /// Ждёт одно входящее соединение (redirect из браузера), читает запрос,
+    /// извлекает параметр `code`, отвечает короткой страницей и закрывает сокет.
     func waitForCode() async throws -> String {
-        try await withCheckedThrowingContinuation { cont in
-            self.codeContinuation = cont
-            listener.newConnectionHandler = { [weak self] conn in
-                guard let self else { return }
-                conn.start(queue: self.queue)
-                conn.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, _, _ in
-                    guard let self, let data, let request = String(data: data, encoding: .utf8) else { return }
-                    let code = Self.extractCode(from: request)
-                    let html = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><h3>Готово. Можно закрыть это окно и вернуться в приложение.</h3></body></html>"
-                    conn.send(content: Data(html.utf8), completion: .contentProcessed { _ in conn.cancel() })
-                    self.listener.cancel()
-                    guard let cont = self.codeContinuation else { return }
-                    self.codeContinuation = nil
-                    if let code { cont.resume(returning: code) }
-                    else { cont.resume(throwing: GoogleAuthService.AuthError.cancelled) }
+        let fd = self.fd
+        return try await withCheckedThrowingContinuation { cont in
+            queue.async {
+                let client = accept(fd, nil, nil)
+                guard client >= 0 else {
+                    cont.resume(throwing: GoogleAuthService.AuthError.listenerFailed("accept: \(Self.errnoText())"))
+                    return
                 }
+                defer { close(client) }
+
+                var buffer = [UInt8](repeating: 0, count: 8192)
+                let n = recv(client, &buffer, buffer.count, 0)
+                let request = n > 0 ? String(decoding: buffer[0..<n], as: UTF8.self) : ""
+                let code = Self.extractCode(from: request)
+
+                let html = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n<html><body><h3>Готово. Можно закрыть это окно и вернуться в приложение.</h3></body></html>"
+                let responseBytes = Array(html.utf8)
+                _ = responseBytes.withUnsafeBytes { send(client, $0.baseAddress, $0.count, 0) }
+
+                if let code { cont.resume(returning: code) }
+                else { cont.resume(throwing: GoogleAuthService.AuthError.cancelled) }
             }
         }
     }
 
-    deinit { listener.cancel() }
+    deinit { close(fd) }
+
+    private static func errnoText() -> String {
+        "errno \(errno) (\(String(cString: strerror(errno))))"
+    }
 
     static func extractCode(from httpRequest: String) -> String? {
         guard let firstLine = httpRequest.components(separatedBy: "\r\n").first,
