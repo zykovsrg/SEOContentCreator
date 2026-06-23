@@ -2,7 +2,16 @@ import Foundation
 import Security
 
 enum GoogleCredentialStore {
-    static let serviceName = "SEOContentCreator.Google"
+    /// Имя «ящика» в Keychain. Во время unit-тестов (Cmd+U) Xcode выставляет
+    /// переменную окружения `XCTestConfigurationFilePath` — тогда используем
+    /// отдельное тестовое хранилище, чтобы тесты не стирали реальные ключи и
+    /// токен входа пользователя в приложении.
+    static let serviceName: String = {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return "SEOContentCreator.Google.Tests"
+        }
+        return "SEOContentCreator.Google"
+    }()
 
     private static func save(_ value: String, account: String) throws {
         let query: [String: Any] = [

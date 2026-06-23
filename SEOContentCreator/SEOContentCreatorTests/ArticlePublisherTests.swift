@@ -47,7 +47,7 @@ struct ArticlePublisherTests {
         await publisher.publish(topic: topic, mode: .newDocument, in: context)
 
         #expect(publisher.lastErrorMessage == nil)
-        #expect(fake.created == ["Тема"])
+        #expect(fake.created == ["Тема — Контент для страницы"])
         #expect(fake.moved.first?.1 == "folder-1")
         #expect(topic.publications.count == 1)
         #expect(topic.externalDocURL?.contains("doc-new") == true)
