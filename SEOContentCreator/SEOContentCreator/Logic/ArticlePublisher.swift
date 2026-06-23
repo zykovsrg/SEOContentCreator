@@ -47,14 +47,15 @@ final class ArticlePublisher {
             let blocks = MarkdownDocParser.parse(version.text)
             let requests = DocsRequestBuilder.build(blocks: blocks)
 
+            let docTitle = PublishTitleBuilder.title(externalID: topic.externalID, topicTitle: topic.title)
             let docID: String
             switch mode {
             case .newDocument:
-                docID = try await docs.createDocument(title: topic.title)
+                docID = try await docs.createDocument(title: docTitle)
             case .overwrite:
                 guard let existing = topic.publications.sorted(by: { $0.publishedAt > $1.publishedAt }).first?.docID
                         ?? topic.externalDocURL.flatMap(Self.docID(fromURL:)) else {
-                    let id = try await docs.createDocument(title: topic.title)
+                    let id = try await docs.createDocument(title: docTitle)
                     try await fill(docID: id, requests: requests)
                     try await place(docID: id)
                     record(topic: topic, docID: id, mode: .newDocument, in: context)
