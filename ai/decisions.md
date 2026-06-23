@@ -52,6 +52,22 @@ Impact:
 
 
 
+### 2026-06-23 — OAuth loopback: POSIX BSD-socket вместо NWListener
+
+Status: active
+
+Decision:
+
+Для локального OAuth loopback-сервера (перехват redirect от Google) использовать обычный POSIX BSD-сокет (`socket/bind/listen/accept`) вместо `NWListener` из фреймворка Network. Привязка строго к `127.0.0.1`.
+
+Why:
+
+`NWListener` падает с EINVAL (POSIX 22) на macOS 26.x при любой конфигурации (`.any`, `.loopback`, явный порт, эфемерный порт). Корень проблемы в самом фреймворке, не в коде. POSIX-сокет работает штатно и даёт ту же loopback-only гарантию через `sin_addr = inet_addr("127.0.0.1")`.
+
+Impact:
+
+Файл `GoogleAuthService.swift` (класс `LoopbackListener`). Зависимость `import Network` убрана. Если на будущей macOS `NWListener` починят — можно вернуть, но тест будет не CLI-автоматизируемым (интерактивный браузер). Решение актуально для любых компонентов проекта, которым нужен локальный TCP-слушатель.
+
 ### 2026-06-20 — Галерея изображений отдельно от ленты версий; render-then-save split
 
 Status: active
