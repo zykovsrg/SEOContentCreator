@@ -4,7 +4,7 @@ Status: active
 
 Allowed statuses: empty / active / review / blocked / done / paused
 
-Stage: spec
+Stage: planning
 
 Allowed stages: intake / spec / planning / implementation / review / task-finish
 
