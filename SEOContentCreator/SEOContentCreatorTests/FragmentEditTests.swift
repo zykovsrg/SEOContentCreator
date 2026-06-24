@@ -76,6 +76,36 @@ struct FragmentSplicerTests {
     }
 }
 
+struct FragmentPromptBuilderTests {
+    @Test func systemComesFromRoleContext() {
+        let prompt = FragmentPromptBuilder().build(
+            roleContext: "Ты — ИИ-редактор.",
+            instruction: "Упрости.",
+            fragment: "Сложный фрагмент."
+        )
+        #expect(prompt.system == "Ты — ИИ-редактор.")
+    }
+
+    @Test func userContainsInstructionAndFragment() {
+        let prompt = FragmentPromptBuilder().build(
+            roleContext: "роль",
+            instruction: "Упрости фрагмент.",
+            fragment: "Сложный фрагмент."
+        )
+        #expect(prompt.user.contains("Упрости фрагмент."))
+        #expect(prompt.user.contains("Сложный фрагмент."))
+    }
+
+    @Test func userAsksForFragmentOnly() {
+        let prompt = FragmentPromptBuilder().build(
+            roleContext: "роль",
+            instruction: "Упрости.",
+            fragment: "Текст."
+        )
+        #expect(prompt.user.contains("только переписанный фрагмент"))
+    }
+}
+
 @MainActor
 struct SkillPresetSeederTests {
     private func makeContext() throws -> ModelContext {
