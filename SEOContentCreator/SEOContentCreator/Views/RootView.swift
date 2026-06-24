@@ -20,6 +20,7 @@ struct RootView: View {
         }
         .task {
             StageTemplateSeeder.seedIfNeeded(in: context)
+            EditorDictionarySeeder.seedIfNeeded(in: context)
         }
     }
 }
