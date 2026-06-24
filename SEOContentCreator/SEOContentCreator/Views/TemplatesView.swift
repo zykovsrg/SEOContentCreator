@@ -9,6 +9,7 @@ private enum TemplateSelection: Hashable {
     case block(UUID)
     case imagePrompt(UUID)
     case imagePreset(UUID)
+    case editorDictionary(UUID)
 }
 
 struct TemplatesView: View {
@@ -18,6 +19,7 @@ struct TemplatesView: View {
     @Query private var blocks: [ContextBlock]
     @Query private var imagePrompts: [ImagePromptTemplate]
     @Query private var imagePresets: [ImageStylePreset]
+    @Query private var editorDictionaries: [EditorDictionary]
     @State private var selection: TemplateSelection?
 
     private var sortedTemplates: [StageTemplate] {
@@ -89,6 +91,11 @@ struct TemplatesView: View {
         return imagePresets.first { $0.uuid == id }
     }
 
+    private var selectedEditorDictionary: EditorDictionary? {
+        guard case .editorDictionary(let id) = selection else { return nil }
+        return editorDictionaries.first { $0.uuid == id }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             List(selection: $selection) {
@@ -127,6 +134,12 @@ struct TemplatesView: View {
                         Label("Добавить пресет", systemImage: "plus")
                     }
                 }
+
+                Section("Подсказки") {
+                    ForEach(editorDictionaries) { dict in
+                        Text("Словарь правок").tag(TemplateSelection.editorDictionary(dict.uuid))
+                    }
+                }
             }
             .frame(width: 260)
             Divider()
@@ -139,6 +152,7 @@ struct TemplatesView: View {
         .onChange(of: blocks.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: imagePrompts.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: imagePresets.map(\.uuid)) { _, _ in ensureSelection() }
+        .onChange(of: editorDictionaries.map(\.uuid)) { _, _ in ensureSelection() }
     }
 
     @ViewBuilder
@@ -153,6 +167,8 @@ struct TemplatesView: View {
             ImagePromptEditorView(template: prompt).id(prompt.uuid)
         } else if let preset = selectedImagePreset {
             ImageStylePresetEditorView(preset: preset) { selection = nil }.id(preset.uuid)
+        } else if let dict = selectedEditorDictionary {
+            EditorDictionaryEditorView(dictionary: dict).id(dict.uuid)
         } else {
             ContentUnavailableView("Выберите шаблон", systemImage: "doc.text")
         }
@@ -170,6 +186,8 @@ struct TemplatesView: View {
             selection = .imagePrompt(first.uuid)
         } else if let first = sortedImagePresets.first {
             selection = .imagePreset(first.uuid)
+        } else if let first = editorDictionaries.first {
+            selection = .editorDictionary(first.uuid)
         }
     }
 }
@@ -609,5 +627,70 @@ private struct ImageStylePresetEditorView: View {
         if panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) {
             preset.referenceImageData = data
         }
+    }
+}
+
+private struct EditorDictionaryEditorView: View {
+    @Bindable var dictionary: EditorDictionary
+
+    @State private var clichesText = ""
+    @State private var longLimit = EditorDictionaryDefaults.longSentenceWordLimit
+    @State private var window = EditorDictionaryDefaults.repeatWindowWords
+    @State private var savedNote: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Словарь правок").font(.title2).bold()
+                Text("Версия: \(dictionary.version)")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("Используется в окне «Подсказки». Только грубая алгоритмическая проверка, без ИИ.")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                Text("Штампы (по одному на строку)").font(.headline)
+                TextEditor(text: $clichesText).frame(minHeight: 220).border(.gray.opacity(0.3))
+
+                Text("Пороги").font(.headline)
+                Stepper("Длинное предложение: от \(longLimit) слов",
+                        value: $longLimit, in: 10...80, step: 1)
+                    .frame(maxWidth: 360, alignment: .leading)
+                Stepper("Окно повторов: \(window) слов",
+                        value: $window, in: 5...80, step: 1)
+                    .frame(maxWidth: 360, alignment: .leading)
+
+                HStack {
+                    Button("Сохранить") { save() }.buttonStyle(.borderedProminent)
+                    Button("Сбросить к стандартному") { resetToDefault() }
+                    Spacer()
+                    if let savedNote { Text(savedNote).font(.caption).foregroundStyle(.green) }
+                }
+                .padding(.top, 4)
+            }
+            .padding()
+        }
+        .onAppear(perform: load)
+    }
+
+    private func load() {
+        clichesText = dictionary.clichesText
+        longLimit = dictionary.longSentenceWordLimit
+        window = dictionary.repeatWindowWords
+    }
+
+    private func save() {
+        dictionary.clichesText = clichesText
+        dictionary.longSentenceWordLimit = longLimit
+        dictionary.repeatWindowWords = window
+        dictionary.version += 1
+        dictionary.updatedAt = .now
+        savedNote = "Сохранено (версия \(dictionary.version))"
+    }
+
+    private func resetToDefault() {
+        clichesText = EditorDictionaryDefaults.clichesText
+        longLimit = EditorDictionaryDefaults.longSentenceWordLimit
+        window = EditorDictionaryDefaults.repeatWindowWords
+        save()
+        savedNote = "Сброшено к стандартному"
     }
 }
