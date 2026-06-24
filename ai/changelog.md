@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-06-24 — Мягкие алгоритмические подсказки (FT-20260623-003 п.3)
+
+- Change: Реализованы мягкие подсказки правки без ИИ (раздел 7 спеки, только п.3). Новый анализатор `Logic/SoftHints.swift` находит на тексте версии: длинные предложения (по порогу), повторы однокоренных слов рядом (грубый префиксный детектор), штампы по редактируемому словарю. Новая SwiftData-модель `Models/EditorDictionary.swift` (пороги + словарь штампов) со стартовым набором (`Logic/EditorDictionarySeeder.swift`), зарегистрирована в схеме (`SEOContentCreatorApp.swift`) и засевается при старте (`RootView.swift`). UI: `Views/MultiHighlightedText.swift` (подсветка по типам), `Views/SoftHintsSheet.swift` (текст + список подсказок), кнопка «Подсказки» в тулбаре `TopicWorkspaceView`, редактор «Словарь правок» в `TemplatesView` (правка порогов и словаря, сброс к стандартному). Тесты: `Tests/SoftHintsTests.swift` (14 шт). 8 коммитов d685887..3230089.
+- Impact: Редактор видит грубые стилевые проблемы мгновенно, без вызова ИИ и без расхода токенов. Подсказки ничего не сохраняют, не создают версию и не блокируют работу — отдельный sheet поверх текущей версии. Не дублируют «Финальную вычитку» (та — через ИИ-редактора). Новая модель — без миграции существующих данных (контейнер без явного MigrationPlan; добавляется новая сущность). Код уже в `main` (origin/main == HEAD).
+- Manual checks: `xcodebuild build-for-testing` — SUCCEEDED. Cmd+U: 172/172 тестов зелёных (2 таргета), 0 падений — пользователь подтвердил скриншотом.
+
 ### 2026-06-24 — reasoning_effort для моделей GPT-5 / o-серии
 
 - Change: Добавлена «интенсивность мышления» (`reasoning_effort`: low/medium/high) на уровне шаблона этапа (FT-20260621-001, TDD). Новое опциональное поле `StageTemplate.reasoningEffort: String?` (изменение схемы SwiftData). `OpenAIClient.streamCompletion` получил параметр `reasoningEffort`; параметр уходит в тело запроса только для моделей под `usesMaxCompletionTokens` (GPT-5.x / o1 / o3 / o4 / chat-latest) и только при не-nil. `StageExecutor.StreamProvider` расширен 7-м аргументом; `live` и место вызова пробрасывают `template.reasoningEffort`. UI: Picker «Интенсивность мышления» (По умолчанию/Низкая/Средняя/Высокая) в `TemplatesView`, виден только для GPT-5/o-серии. Тесты: +4 в `OpenAIClientTests` (в теле для GPT-5; нет для legacy; нет при nil), +1 в `StageExecutorTests` (проброс из шаблона).
