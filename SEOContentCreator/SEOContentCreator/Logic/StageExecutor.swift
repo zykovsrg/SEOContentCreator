@@ -6,7 +6,8 @@ import SwiftData
 final class StageExecutor {
     typealias StreamProvider = (
         _ apiKey: String, _ system: String, _ user: String,
-        _ model: String, _ temperature: Double, _ maxTokens: Int
+        _ model: String, _ temperature: Double, _ maxTokens: Int,
+        _ reasoningEffort: String?
     ) -> AsyncThrowingStream<OpenAIStreamEvent, Error>
     typealias KeyProvider = () throws -> String
 
@@ -31,10 +32,11 @@ final class StageExecutor {
     /// Production convenience: wire to KeychainService + OpenAIClient.
     static func live(model: String) -> StageExecutor {
         StageExecutor(
-            streamProvider: { apiKey, system, user, model, temperature, maxTokens in
+            streamProvider: { apiKey, system, user, model, temperature, maxTokens, reasoningEffort in
                 OpenAIClient().streamCompletion(
                     apiKey: apiKey, system: system, user: user,
-                    model: model, temperature: temperature, maxTokens: maxTokens
+                    model: model, temperature: temperature, maxTokens: maxTokens,
+                    reasoningEffort: reasoningEffort
                 )
             },
             keyProvider: { try KeychainService.loadAPIKey() }
@@ -74,7 +76,8 @@ final class StageExecutor {
             var truncated = false
             for try await event in streamProvider(
                 key, prompt.system, prompt.user,
-                template.modelName, template.temperature, template.maxTokens
+                template.modelName, template.temperature, template.maxTokens,
+                template.reasoningEffort
             ) {
                 switch event {
                 case .token(let t):

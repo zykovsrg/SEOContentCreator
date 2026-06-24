@@ -18,6 +18,22 @@ Impact:
 
 ## Текущие решения
 
+### 2026-06-24 — reasoning_effort: поле шаблона, отправка только для новых моделей
+
+Status: active
+
+Decision:
+
+«Интенсивность мышления» (`reasoning_effort`) хранится в опциональном поле `StageTemplate.reasoningEffort: String?` ("low"/"medium"/"high"; `nil` = не передавать параметр). В тело запроса OpenAI параметр `reasoning_effort` добавляется только когда модель попадает под `OpenAIClient.usesMaxCompletionTokens(model:)` (GPT-5.x / o1 / o3 / o4 / chat-latest) И значение не `nil`. Для legacy-моделей (gpt-4.x и т.п.) параметр не отправляется никогда. Имя модели не хардкодится — гейтинг всегда через `usesMaxCompletionTokens`.
+
+Why:
+
+`reasoning_effort` поддерживают только рассуждающие модели (GPT-5/o-серия); отправка legacy-моделям вызвала бы ошибку API. Привязка гейтинга к уже существующей функции `usesMaxCompletionTokens` (которая уже различает эти семейства для `max_completion_tokens`) исключает дублирование списка моделей и расхождения. Опциональное поле с `nil`-по-умолчанию даёт лёгкую миграцию и обратную совместимость старых шаблонов.
+
+Impact:
+
+Любой код, вызывающий `OpenAIClient.streamCompletion`, может передать `reasoningEffort`. `StageExecutor.StreamProvider` теперь 7-аргументный (добавлен `reasoningEffort: String?`) — все провайдеры (в т.ч. тестовые) должны соответствовать. Добавление поля в `@Model StageTemplate` — лёгкая миграция SwiftData (контейнер без явного MigrationPlan; старые шаблоны получают `nil`). UI-гейтинг Picker'а в `TemplatesView` использует ту же `usesMaxCompletionTokens`.
+
 ### 2026-06-20 — Отказ от очереди и фоновой automation
 
 Status: active

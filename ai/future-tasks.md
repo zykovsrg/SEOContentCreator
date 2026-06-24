@@ -310,7 +310,7 @@ Promotion notes:
 
 ### FT-20260621-001 — Выбор «интенсивности мышления» (reasoning_effort) для моделей GPT-5 / o-серии
 
-Status: ready
+Status: promoted (→ ai/current-task.md, 2026-06-23)
 
 Priority: medium
 

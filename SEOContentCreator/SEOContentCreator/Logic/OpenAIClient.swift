@@ -52,7 +52,8 @@ struct OpenAIClient {
         user: String,
         model: String,
         temperature: Double = 0.6,
-        maxTokens: Int = 8000
+        maxTokens: Int = 8000,
+        reasoningEffort: String? = nil
     ) -> AsyncThrowingStream<OpenAIStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -73,6 +74,10 @@ struct OpenAIClient {
                         // GPT-5.x / o-series use max_completion_tokens and reject a
                         // custom temperature (only the default is allowed), so omit it.
                         body["max_completion_tokens"] = maxTokens
+                        // reasoning_effort is supported only by these newer families.
+                        if let reasoningEffort {
+                            body["reasoning_effort"] = reasoningEffort
+                        }
                     } else {
                         body["temperature"] = temperature
                         body["max_tokens"] = maxTokens

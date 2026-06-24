@@ -182,6 +182,8 @@ private struct TemplateEditorView: View {
     @State private var model = "gpt-4.1"
     @State private var temperature = 0.6
     @State private var maxTokens = 8000
+    /// Empty string = "по умолчанию" (nil, parameter omitted).
+    @State private var reasoningEffort = ""
     @State private var showVariables = false
     @State private var savedNote: String?
 
@@ -218,6 +220,18 @@ private struct TemplateEditorView: View {
                 Stepper("Max tokens: \(maxTokens)", value: $maxTokens, in: 1000...16000, step: 1000)
                     .frame(maxWidth: 360, alignment: .leading)
 
+                if OpenAIClient.usesMaxCompletionTokens(model: model) {
+                    Picker("Интенсивность мышления", selection: $reasoningEffort) {
+                        Text("По умолчанию").tag("")
+                        Text("Низкая").tag("low")
+                        Text("Средняя").tag("medium")
+                        Text("Высокая").tag("high")
+                    }
+                    .frame(maxWidth: 360, alignment: .leading)
+                    Text("Влияет только на модели GPT-5 / o-серии: чем выше, тем дольше и тщательнее модель «обдумывает» ответ.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+
                 DisclosureGroup("Переменные {{…}}", isExpanded: $showVariables) {
                     ForEach(TemplateVariables.all) { v in
                         VStack(alignment: .leading, spacing: 2) {
@@ -249,6 +263,7 @@ private struct TemplateEditorView: View {
         model = template.modelName
         temperature = template.temperature
         maxTokens = template.maxTokens
+        reasoningEffort = template.reasoningEffort ?? ""
     }
 
     private func save() {
@@ -257,6 +272,9 @@ private struct TemplateEditorView: View {
         template.modelName = model
         template.temperature = temperature
         template.maxTokens = maxTokens
+        // Persist only when the model supports it and a level is chosen; otherwise clear it.
+        template.reasoningEffort = (OpenAIClient.usesMaxCompletionTokens(model: model) && !reasoningEffort.isEmpty)
+            ? reasoningEffort : nil
         template.templateVersion += 1
         template.updatedAt = .now
         savedNote = "Сохранено (версия \(template.templateVersion))"
@@ -269,6 +287,7 @@ private struct TemplateEditorView: View {
         model = c.modelName
         temperature = c.temperature
         maxTokens = c.maxTokens
+        reasoningEffort = ""
         save()
         savedNote = "Сброшено к стандартному"
     }
