@@ -11,6 +11,9 @@ final class StageTemplate {
     var modelName: String
     var temperature: Double
     var maxTokens: Int
+    /// Reasoning intensity for GPT-5.x / o-series models ("low"/"medium"/"high").
+    /// nil = do not send the parameter (model default). Ignored for legacy models.
+    var reasoningEffort: String?
     var templateVersion: Int
     var createdAt: Date
     var updatedAt: Date
@@ -23,6 +26,7 @@ final class StageTemplate {
         modelName: String = "gpt-4.1",
         temperature: Double = 0.6,
         maxTokens: Int = 8000,
+        reasoningEffort: String? = nil,
         templateVersion: Int = 1
     ) {
         self.uuid = UUID()
@@ -33,6 +37,7 @@ final class StageTemplate {
         self.modelName = modelName
         self.temperature = temperature
         self.maxTokens = maxTokens
+        self.reasoningEffort = reasoningEffort
         self.templateVersion = templateVersion
         self.createdAt = .now
         self.updatedAt = .now

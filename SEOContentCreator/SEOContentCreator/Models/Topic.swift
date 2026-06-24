@@ -4,6 +4,9 @@ import SwiftData
 @Model
 final class Topic {
     var title: String
+    /// Внешний ID темы из пользовательской таблицы (вписывается вручную).
+    /// Используется в заголовке публикуемого документа: «№[ID] [Тема] — …».
+    var externalID: String = ""
     var articleTypeRaw: String
     var targetVolume: Int?
     var notes: String
@@ -25,16 +28,20 @@ final class Topic {
     var jobs: [GenerationJob]
     @Relationship(deleteRule: .cascade, inverse: \GeneratedImage.topic)
     var images: [GeneratedImage]
+    @Relationship(deleteRule: .cascade, inverse: \ExternalDocument.topic)
+    var publications: [ExternalDocument] = []
 
     init(
         title: String,
         articleType: ArticleType,
+        externalID: String = "",
         targetVolume: Int? = nil,
         direction: KnowledgeNode? = nil,
         doctor: KnowledgeNode? = nil,
         notes: String = ""
     ) {
         self.title = title
+        self.externalID = externalID
         self.articleTypeRaw = articleType.rawValue
         self.targetVolume = targetVolume
         self.direction = direction
@@ -45,6 +52,7 @@ final class Topic {
         self.versions = []
         self.jobs = []
         self.images = []
+        self.publications = []
         self.notes = notes
         self.createdAt = .now
         self.updatedAt = .now

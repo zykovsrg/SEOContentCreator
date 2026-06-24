@@ -10,14 +10,14 @@ struct StageExecutorTests {
         let container = try ModelContainer(
             for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
                  GenerationJob.self, StageTemplate.self,
-                 ContextBlock.self, AIRole.self, GeneratedImage.self,
+                 ContextBlock.self, AIRole.self, GeneratedImage.self, ExternalDocument.self,
             configurations: config
         )
         return ModelContext(container)
     }
 
     private func cannedStream(_ chunks: [String]) -> StageExecutor.StreamProvider {
-        { _, _, _, _, _, _ in
+        { _, _, _, _, _, _, _ in
             AsyncThrowingStream { continuation in
                 for c in chunks { continuation.yield(.token(c)) }
                 continuation.finish()
@@ -121,7 +121,7 @@ struct StageExecutorTests {
         let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
         context.insert(template)
 
-        let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _ in
+        let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _, _ in
             AsyncThrowingStream { c in
                 c.yield(.token("Обрезанный текст"))
                 c.yield(.finish(reason: "length"))
@@ -138,6 +138,30 @@ struct StageExecutorTests {
         #expect(topic.jobs.first?.status == .success)
     }
 
+    @Test func forwardsReasoningEffortFromTemplate() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease,
+                          direction: KnowledgeNode(title: "ЛТ", type: .direction))
+        context.insert(topic)
+        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        template.reasoningEffort = "high"
+        context.insert(template)
+
+        var captured: String?
+        let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _, reasoningEffort in
+            captured = reasoningEffort
+            return AsyncThrowingStream { c in
+                c.yield(.token("Текст"))
+                c.finish()
+            }
+        }
+        let executor = StageExecutor(streamProvider: provider, keyProvider: { "k" })
+        await executor.execute(stage: .draft, topic: topic, template: template,
+                               currentText: nil, in: context)
+
+        #expect(captured == "high")
+    }
+
     @Test func passesRoleContextIntoPromptBuilder() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)
@@ -148,7 +172,7 @@ struct StageExecutorTests {
         context.insert(template)
 
         var capturedSystem = ""
-        let provider: StageExecutor.StreamProvider = { _, system, _, _, _, _ in
+        let provider: StageExecutor.StreamProvider = { _, system, _, _, _, _, _ in
             capturedSystem = system
             return AsyncThrowingStream { c in
                 c.yield(.token("Текст"))

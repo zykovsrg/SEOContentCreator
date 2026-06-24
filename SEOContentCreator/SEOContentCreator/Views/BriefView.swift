@@ -15,6 +15,7 @@ struct BriefView: View {
     var topic: Topic?
 
     @State private var title = ""
+    @State private var externalID = ""
     @State private var articleType: ArticleType = .disease
     @State private var direction: KnowledgeNode?
     @State private var doctor: KnowledgeNode?
@@ -24,6 +25,7 @@ struct BriefView: View {
     var body: some View {
         Form {
             TextField("Название *", text: $title)
+            TextField("ID темы (из таблицы)", text: $externalID)
             Picker("Тип статьи *", selection: $articleType) {
                 ForEach(ArticleType.allCases) { Text($0.title).tag($0) }
             }
@@ -55,6 +57,7 @@ struct BriefView: View {
     private func load() {
         guard let topic else { return }
         title = topic.title
+        externalID = topic.externalID
         articleType = topic.articleType
         direction = topic.direction
         doctor = topic.doctor
@@ -66,6 +69,7 @@ struct BriefView: View {
         let vol = Int(volume.trimmingCharacters(in: .whitespaces))
         if let topic {
             topic.title = title
+            topic.externalID = externalID.trimmingCharacters(in: .whitespaces)
             topic.articleType = articleType
             topic.direction = direction
             topic.doctor = doctor
@@ -74,7 +78,9 @@ struct BriefView: View {
             topic.updatedAt = .now
         } else {
             let new = Topic(
-                title: title, articleType: articleType, targetVolume: vol,
+                title: title, articleType: articleType,
+                externalID: externalID.trimmingCharacters(in: .whitespaces),
+                targetVolume: vol,
                 direction: direction, doctor: doctor, notes: notes
             )
             context.insert(new)

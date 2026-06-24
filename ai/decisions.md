@@ -18,6 +18,22 @@ Impact:
 
 ## Текущие решения
 
+### 2026-06-24 — reasoning_effort: поле шаблона, отправка только для новых моделей
+
+Status: active
+
+Decision:
+
+«Интенсивность мышления» (`reasoning_effort`) хранится в опциональном поле `StageTemplate.reasoningEffort: String?` ("low"/"medium"/"high"; `nil` = не передавать параметр). В тело запроса OpenAI параметр `reasoning_effort` добавляется только когда модель попадает под `OpenAIClient.usesMaxCompletionTokens(model:)` (GPT-5.x / o1 / o3 / o4 / chat-latest) И значение не `nil`. Для legacy-моделей (gpt-4.x и т.п.) параметр не отправляется никогда. Имя модели не хардкодится — гейтинг всегда через `usesMaxCompletionTokens`.
+
+Why:
+
+`reasoning_effort` поддерживают только рассуждающие модели (GPT-5/o-серия); отправка legacy-моделям вызвала бы ошибку API. Привязка гейтинга к уже существующей функции `usesMaxCompletionTokens` (которая уже различает эти семейства для `max_completion_tokens`) исключает дублирование списка моделей и расхождения. Опциональное поле с `nil`-по-умолчанию даёт лёгкую миграцию и обратную совместимость старых шаблонов.
+
+Impact:
+
+Любой код, вызывающий `OpenAIClient.streamCompletion`, может передать `reasoningEffort`. `StageExecutor.StreamProvider` теперь 7-аргументный (добавлен `reasoningEffort: String?`) — все провайдеры (в т.ч. тестовые) должны соответствовать. Добавление поля в `@Model StageTemplate` — лёгкая миграция SwiftData (контейнер без явного MigrationPlan; старые шаблоны получают `nil`). UI-гейтинг Picker'а в `TemplatesView` использует ту же `usesMaxCompletionTokens`.
+
 ### 2026-06-20 — Отказ от очереди и фоновой automation
 
 Status: active
@@ -51,6 +67,22 @@ Impact:
 Спека обновлена до версии 8 (`docs/superpowers/specs/2026-05-19-content-system-redesign-design.md`), затронуты также frontend-design и checking-stages-design спеки. Удаление свойства `useStyle` из `@Model Topic` — лёгкая миграция SwiftData (поле просто исчезает у существующих тем). Исторические планы (`docs/superpowers/plans/*`) намеренно не переписаны — это записи уже выполненных под-проектов.
 
 
+
+### 2026-06-23 — OAuth loopback: POSIX BSD-socket вместо NWListener
+
+Status: active
+
+Decision:
+
+Для локального OAuth loopback-сервера (перехват redirect от Google) использовать обычный POSIX BSD-сокет (`socket/bind/listen/accept`) вместо `NWListener` из фреймворка Network. Привязка строго к `127.0.0.1`.
+
+Why:
+
+`NWListener` падает с EINVAL (POSIX 22) на macOS 26.x при любой конфигурации (`.any`, `.loopback`, явный порт, эфемерный порт). Корень проблемы в самом фреймворке, не в коде. POSIX-сокет работает штатно и даёт ту же loopback-only гарантию через `sin_addr = inet_addr("127.0.0.1")`.
+
+Impact:
+
+Файл `GoogleAuthService.swift` (класс `LoopbackListener`). Зависимость `import Network` убрана. Если на будущей macOS `NWListener` починят — можно вернуть, но тест будет не CLI-автоматизируемым (интерактивный браузер). Решение актуально для любых компонентов проекта, которым нужен локальный TCP-слушатель.
 
 ### 2026-06-20 — Галерея изображений отдельно от ленты версий; render-then-save split
 

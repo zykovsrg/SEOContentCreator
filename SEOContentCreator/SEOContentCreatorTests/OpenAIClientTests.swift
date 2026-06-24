@@ -146,4 +146,49 @@ struct OpenAIClientTests {
         #expect(json["max_tokens"] as? Int == 5000)
         #expect(json["max_completion_tokens"] == nil)
     }
+
+    @Test func sendsReasoningEffortForNewModels() async throws {
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.stubBody = "data: [DONE]\n\n"
+        MockURLProtocol.lastRequestBody = nil
+        let client = OpenAIClient(session: mockSession())
+        for try await _ in client.streamCompletion(
+            apiKey: "k", system: "s", user: "u",
+            model: "gpt-5.4", temperature: 0.6, maxTokens: 5000,
+            reasoningEffort: "high"
+        ) {}
+        let body = try #require(MockURLProtocol.lastRequestBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] as? String == "high")
+        #expect(json["max_completion_tokens"] as? Int == 5000)
+    }
+
+    @Test func omitsReasoningEffortForLegacyModels() async throws {
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.stubBody = "data: [DONE]\n\n"
+        MockURLProtocol.lastRequestBody = nil
+        let client = OpenAIClient(session: mockSession())
+        for try await _ in client.streamCompletion(
+            apiKey: "k", system: "s", user: "u",
+            model: "gpt-4.1", temperature: 0.6, maxTokens: 5000,
+            reasoningEffort: "high"
+        ) {}
+        let body = try #require(MockURLProtocol.lastRequestBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] == nil)
+    }
+
+    @Test func omitsReasoningEffortWhenNil() async throws {
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.stubBody = "data: [DONE]\n\n"
+        MockURLProtocol.lastRequestBody = nil
+        let client = OpenAIClient(session: mockSession())
+        for try await _ in client.streamCompletion(
+            apiKey: "k", system: "s", user: "u",
+            model: "gpt-5.4", temperature: 0.6, maxTokens: 5000
+        ) {}
+        let body = try #require(MockURLProtocol.lastRequestBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] == nil)
+    }
 }
