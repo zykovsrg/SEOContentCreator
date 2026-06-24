@@ -1,10 +1,10 @@
 # Current Task
 
-Status: active
+Status: empty
 
 Allowed statuses: empty / active / review / blocked / done / paused
 
-Stage: planning
+Stage: task-finish
 
 Allowed stages: intake / spec / planning / implementation / review / task-finish
 
@@ -50,8 +50,8 @@ docs/superpowers/specs/2026-06-24-soft-editing-hints-design.md (согласов
 
 Last agent: Claude (opus-4-8)
 
-What changed: ветка feature/reasoning-effort смержена в main (уже была на origin/main как a6cb396), отведена feature/soft-editing-hints. Spec написан и согласован. Кода ещё нет.
+What changed: вся фича реализована по плану через subagent-driven dev (8 коммитов d685887..6a75efd). SoftHints-анализатор + 14 тестов, модель EditorDictionary + сидер, MultiHighlightedText, SoftHintsSheet, кнопка «Подсказки» в рабочем пространстве, редактор «Словарь правок» в «Шаблонах». Независимая сборка `xcodebuild build-for-testing` — BUILD SUCCEEDED.
 
-Open risks: новая SwiftData-модель EditorDictionary — изменение схемы (низкий риск, аддитивно). Префиксный детектор однокоренных — грубый, возможны ложные срабатывания (приемлемо по спеке).
+Open risks: тесты SoftHints НЕ прогнаны headless (CLI test зависает) — пользователь должен запустить Cmd+U. Префиксный детектор однокоренных — грубый (приемлемо по спеке).
 
-Next agent should check: перейти к writing-plans (план реализации по spec), затем TDD на SoftHints.analyze.
+Next agent should check: после зелёного Cmd+U — task-finish (changelog, push ветки, опц. PR). Ничего не запушено.
