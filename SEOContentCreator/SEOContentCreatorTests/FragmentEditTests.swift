@@ -1,5 +1,6 @@
 import Testing
 import SwiftData
+import Foundation
 @testable import SEOContentCreator
 
 struct VersionSourceFragmentTests {
@@ -103,6 +104,115 @@ struct FragmentPromptBuilderTests {
             fragment: "Текст."
         )
         #expect(prompt.user.contains("только переписанный фрагмент"))
+    }
+}
+
+@MainActor
+struct FragmentEditorTests {
+    private func makeContainer() throws -> ModelContainer {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        return try ModelContainer(
+            for: Topic.self, ArticleVersion.self, GenerationJob.self,
+            AIRole.self, ContextBlock.self, SkillPreset.self,
+            configurations: config
+        )
+    }
+
+    private func tokenStream(_ text: String) -> StageExecutor.StreamProvider {
+        { _, _, _, _, _, _, _ in
+            AsyncThrowingStream { continuation in
+                continuation.yield(.token(text))
+                continuation.yield(.finish(reason: "stop"))
+                continuation.finish()
+            }
+        }
+    }
+
+    private func errorStream() -> StageExecutor.StreamProvider {
+        { _, _, _, _, _, _, _ in
+            AsyncThrowingStream { continuation in
+                continuation.finish(throwing: NSError(domain: "test", code: 1))
+            }
+        }
+    }
+
+    @Test func successProducesProposedTextAndAcceptCreatesVersion() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let topic = Topic(title: "Тема", articleType: .info)
+        context.insert(topic)
+
+        let editor = FragmentEditor(streamProvider: tokenStream("Новый кусок."), keyProvider: { "key" })
+        await editor.run(
+            fullText: "Начало. Старый кусок. Конец.",
+            fragment: "Старый кусок.",
+            instruction: "Упрости.",
+            source: .skillApplied,
+            roleKey: "editor",
+            model: "gpt-4.1",
+            temperature: 0.6,
+            maxTokens: 4000,
+            topic: topic,
+            in: context
+        )
+
+        #expect(editor.proposedText == "Начало. Новый кусок. Конец.")
+        #expect(editor.lastErrorMessage == nil)
+
+        editor.accept(topic: topic, in: context)
+        let versions = try context.fetch(FetchDescriptor<ArticleVersion>())
+        #expect(versions.count == 1)
+        #expect(versions.first?.text == "Начало. Новый кусок. Конец.")
+        #expect(versions.first?.source == .skillApplied)
+        #expect(topic.currentVersionID == versions.first?.uuid)
+    }
+
+    @Test func ambiguousFragmentSetsErrorAndNoProposedText() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let topic = Topic(title: "Тема", articleType: .info)
+        context.insert(topic)
+
+        let editor = FragmentEditor(streamProvider: tokenStream("X"), keyProvider: { "key" })
+        await editor.run(
+            fullText: "Повтор. Повтор.",
+            fragment: "Повтор.",
+            instruction: "Упрости.",
+            source: .skillApplied,
+            roleKey: "editor",
+            model: "gpt-4.1",
+            temperature: 0.6,
+            maxTokens: 4000,
+            topic: topic,
+            in: context
+        )
+
+        #expect(editor.proposedText == nil)
+        #expect(editor.lastErrorMessage?.contains("2 раз") == true)
+    }
+
+    @Test func errorPathSurfacesMessage() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let topic = Topic(title: "Тема", articleType: .info)
+        context.insert(topic)
+
+        let editor = FragmentEditor(streamProvider: errorStream(), keyProvider: { "key" })
+        await editor.run(
+            fullText: "Текст. Кусок. Конец.",
+            fragment: "Кусок.",
+            instruction: "Упрости.",
+            source: .fragmentRegenerated,
+            roleKey: "author",
+            model: "gpt-4.1",
+            temperature: 0.6,
+            maxTokens: 4000,
+            topic: topic,
+            in: context
+        )
+
+        #expect(editor.proposedText == nil)
+        #expect(editor.lastErrorMessage != nil)
     }
 }
 
