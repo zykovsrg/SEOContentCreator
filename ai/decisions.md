@@ -18,6 +18,22 @@ Impact:
 
 ## Текущие решения
 
+### 2026-06-25 — SkillPreset: отдельная @Model сущность, стандартные скиллы через Seeder
+
+Status: active
+
+Decision:
+
+Пресеты скиллов хранятся в `@Model SkillPreset` (uuid/name/prompt/roleKey/order) — отдельная SwiftData-сущность, не встроенная в `StageTemplate`. Стартовые 4 скилла создаются через `SkillPresetSeeder.seedIfNeeded(in:)` при запуске (как `EditorDictionarySeeder`), идемпотентно — проверяет по count > 0. Пресеты редактируются в разделе «Скиллы» в «Шаблонах» (load/save/reset/delete), сброс к стандартному работает по совпадению имени с `SkillPresetDefaults`. Замена фрагмента по строке — через `FragmentSplicer` с проверкой уникальности: ровно 1 совпадение → `.replaced`, иначе `.notFound`/`.ambiguous(N)`.
+
+Why:
+
+Пресеты скиллов семантически независимы от этапов пайплайна и не должны лежать в `StageTemplate`. Отдельная модель даёт отдельный CRUD, отдельный раздел в «Шаблонах» и изолированные тесты. Seeder-паттерн уже есть (`EditorDictionarySeeder`) — повторное использование снижает когнитивную нагрузку.
+
+Impact:
+
+Любой `ModelContainer` (включая тестовые) должен регистрировать `SkillPreset` — иначе runtime-ошибка. Добавление `SkillPreset` в схему — лёгкая миграция SwiftData (новая сущность, без явного MigrationPlan; существующие данные не затрагиваются). `FragmentEditor` использует тот же `StreamProvider`, что и `StageExecutor` — типовой псевдоним, не наследование.
+
 ### 2026-06-24 — Мягкие подсказки правки: алгоритмические, не через ИИ, не блокируют
 
 Status: active
