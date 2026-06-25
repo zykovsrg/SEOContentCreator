@@ -22,6 +22,7 @@ struct RootView: View {
             StageTemplateSeeder.seedIfNeeded(in: context)
             EditorDictionarySeeder.seedIfNeeded(in: context)
             SkillPresetSeeder.seedIfNeeded(in: context)
+            ProductBlockSeeder.seedIfNeeded(in: context)
         }
     }
 }
