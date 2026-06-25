@@ -34,12 +34,26 @@ struct PromptBuilder {
             "{{структура}}": topic.structureText,
             "{{текущий_текст}}": currentText ?? ""
         ]
-        for (key, value) in substitutions {
-            user = user.replacingOccurrences(of: key, with: value)
+        func substitute(_ text: String) -> String {
+            var result = text
+            for (key, value) in substitutions {
+                result = result.replacingOccurrences(of: key, with: value)
+            }
+            return result
         }
 
-        if !selectedBlocks.isEmpty {
-            user += "\n\nВключить продуктовые блоки: " + selectedBlocks.joined(separator: ", ")
+        user = substitute(user)
+
+        let renderedBlocks = selectedBlocks
+            .map { substitute($0) }
+            .joined(separator: "\n\n")
+
+        if renderedBlocks.isEmpty {
+            user = user.replacingOccurrences(of: "{{продуктовые_блоки}}", with: "")
+        } else if user.contains("{{продуктовые_блоки}}") {
+            user = user.replacingOccurrences(of: "{{продуктовые_блоки}}", with: renderedBlocks)
+        } else {
+            user += "\n\nПродуктовые блоки для встраивания:\n" + renderedBlocks
         }
 
         let system = [roleContext, template.systemPrompt]

@@ -113,4 +113,50 @@ struct PromptBuilderTests {
         #expect(result.system == "Промт этапа")
         #expect(result.user == "T")
     }
+
+    @Test func selectedBlockPromptsInjectedViaPlaceholder() {
+        let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
+                              userPromptTemplate: "Текст: {{текущий_текст}}\nБлоки:\n{{продуктовые_блоки}}")
+        let topic = Topic(title: "T", articleType: .info)
+        let result = PromptBuilder().build(
+            template: t, topic: topic, currentText: "тело",
+            selectedBlocks: ["Промт А", "Промт Б"]
+        )
+        #expect(result.user.contains("Промт А"))
+        #expect(result.user.contains("Промт Б"))
+        #expect(!result.user.contains("{{продуктовые_блоки}}"))
+    }
+
+    @Test func knowledgeVariablesInsideBlockPromptSubstituted() {
+        let doctor = KnowledgeNode(title: "Врач", type: .doctor, content: "Иванов И.И., онколог")
+        let topic = Topic(title: "T", articleType: .info)
+        topic.doctor = doctor
+        let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
+                              userPromptTemplate: "{{продуктовые_блоки}}")
+        let result = PromptBuilder().build(
+            template: t, topic: topic, currentText: nil,
+            selectedBlocks: ["Данные врача: {{врач_данные}}"]
+        )
+        #expect(result.user.contains("Данные врача: Иванов И.И., онколог"))
+    }
+
+    @Test func blocksAppendedWhenNoPlaceholder() {
+        let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
+                              userPromptTemplate: "Текст: {{текущий_текст}}")
+        let topic = Topic(title: "T", articleType: .info)
+        let result = PromptBuilder().build(
+            template: t, topic: topic, currentText: "тело",
+            selectedBlocks: ["Блок CTA"]
+        )
+        #expect(result.user.contains("Блок CTA"))
+        #expect(result.user.contains("Текст: тело"))
+    }
+
+    @Test func emptyPlaceholderRemovedWhenNoBlocks() {
+        let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
+                              userPromptTemplate: "A {{продуктовые_блоки}} B")
+        let topic = Topic(title: "T", articleType: .info)
+        let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
+        #expect(!result.user.contains("{{продуктовые_блоки}}"))
+    }
 }
