@@ -53,12 +53,24 @@ struct FragmentEditSheet: View {
 
         if mode == .skill {
             Text("Скилл").font(.caption).foregroundStyle(.secondary)
-            List(selection: $selectedSkillID) {
-                ForEach(skills) { skill in
-                    Text(skill.name).tag(Optional(skill.uuid))
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(skills) { skill in
+                        HStack {
+                            Text(skill.name)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(selectedSkillID == skill.uuid ? Color.accentColor.opacity(0.2) : Color.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture { selectedSkillID = skill.uuid }
+                        Divider()
+                    }
                 }
             }
             .frame(minHeight: 140)
+            .border(Color.secondary.opacity(0.3))
         } else {
             Text("Что не нравится").font(.caption).foregroundStyle(.secondary)
             TextEditor(text: $comment)
