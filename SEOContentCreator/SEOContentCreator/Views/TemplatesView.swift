@@ -11,6 +11,7 @@ private enum TemplateSelection: Hashable {
     case imagePreset(UUID)
     case editorDictionary(UUID)
     case skill(UUID)
+    case productBlock(UUID)
 }
 
 struct TemplatesView: View {
@@ -22,6 +23,7 @@ struct TemplatesView: View {
     @Query private var imagePresets: [ImageStylePreset]
     @Query private var editorDictionaries: [EditorDictionary]
     @Query private var skills: [SkillPreset]
+    @Query private var productBlocks: [ProductBlock]
     @State private var selection: TemplateSelection?
 
     private var sortedTemplates: [StageTemplate] {
@@ -54,6 +56,10 @@ struct TemplatesView: View {
 
     private var sortedSkills: [SkillPreset] {
         skills.sorted { $0.order < $1.order }
+    }
+
+    private var sortedProductBlocks: [ProductBlock] {
+        productBlocks.sorted { $0.order < $1.order }
     }
 
     private func order(_ raw: String) -> Int {
@@ -105,6 +111,11 @@ struct TemplatesView: View {
     private var selectedSkill: SkillPreset? {
         guard case .skill(let id) = selection else { return nil }
         return skills.first { $0.uuid == id }
+    }
+
+    private var selectedProductBlock: ProductBlock? {
+        guard case .productBlock(let id) = selection else { return nil }
+        return productBlocks.first { $0.uuid == id }
     }
 
     var body: some View {
@@ -165,6 +176,20 @@ struct TemplatesView: View {
                         Label("Добавить скилл", systemImage: "plus")
                     }
                 }
+
+                Section("Продуктовые блоки") {
+                    ForEach(sortedProductBlocks) { block in
+                        Text(block.name).tag(TemplateSelection.productBlock(block.uuid))
+                    }
+                    Button {
+                        let next = (productBlocks.map(\.order).max() ?? -1) + 1
+                        let block = ProductBlock(name: "Новый блок", prompt: "", order: next)
+                        context.insert(block)
+                        selection = .productBlock(block.uuid)
+                    } label: {
+                        Label("Добавить блок", systemImage: "plus")
+                    }
+                }
             }
             .frame(width: 260)
             Divider()
@@ -179,6 +204,7 @@ struct TemplatesView: View {
         .onChange(of: imagePresets.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: editorDictionaries.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: skills.map(\.uuid)) { _, _ in ensureSelection() }
+        .onChange(of: productBlocks.map(\.uuid)) { _, _ in ensureSelection() }
     }
 
     @ViewBuilder
@@ -197,6 +223,8 @@ struct TemplatesView: View {
             EditorDictionaryEditorView(dictionary: dict).id(dict.uuid)
         } else if let skill = selectedSkill {
             SkillEditorView(skill: skill) { selection = nil }.id(skill.uuid)
+        } else if let block = selectedProductBlock {
+            ProductBlockEditorView(block: block) { selection = nil }.id(block.uuid)
         } else {
             ContentUnavailableView("Выберите шаблон", systemImage: "doc.text")
         }
@@ -218,6 +246,8 @@ struct TemplatesView: View {
             selection = .editorDictionary(first.uuid)
         } else if let first = sortedSkills.first {
             selection = .skill(first.uuid)
+        } else if let first = sortedProductBlocks.first {
+            selection = .productBlock(first.uuid)
         }
     }
 }
@@ -802,6 +832,74 @@ private struct SkillEditorView: View {
 
     private func deleteSkill() {
         context.delete(skill)
+        onDelete()
+    }
+}
+
+private struct ProductBlockEditorView: View {
+    @Environment(\.modelContext) private var context
+    @Bindable var block: ProductBlock
+    var onDelete: () -> Void
+
+    @State private var name = ""
+    @State private var prompt = ""
+    @State private var savedNote: String?
+
+    private var defaultForBlock: ProductBlockDefault? {
+        ProductBlockDefaults.all.first { $0.name == block.name }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Продуктовый блок").font(.title2).bold()
+
+                TextField("Название", text: $name)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 420)
+
+                Text("Промт (что встроить в текст)").font(.headline)
+                Text("Доступные переменные: {{преимущества}}, {{врач_данные}}, {{направление}}, {{тема}}")
+                    .font(.caption).foregroundStyle(.secondary)
+                TextEditor(text: $prompt).frame(minHeight: 180).border(.gray.opacity(0.3))
+
+                HStack {
+                    Button("Сохранить") { save() }.buttonStyle(.borderedProminent)
+                    if defaultForBlock != nil {
+                        Button("Сбросить к стандартному") { resetToDefault() }
+                    }
+                    Spacer()
+                    Button("Удалить блок", role: .destructive) { deleteBlock() }
+                    if let savedNote { Text(savedNote).font(.caption).foregroundStyle(.green) }
+                }
+                .padding(.top, 4)
+            }
+            .padding()
+        }
+        .onAppear(perform: load)
+    }
+
+    private func load() {
+        name = block.name
+        prompt = block.prompt
+    }
+
+    private func save() {
+        block.name = name
+        block.prompt = prompt
+        block.updatedAt = .now
+        savedNote = "Сохранено"
+    }
+
+    private func resetToDefault() {
+        guard let def = defaultForBlock else { return }
+        prompt = def.prompt
+        save()
+        savedNote = "Сброшено к стандартному"
+    }
+
+    private func deleteBlock() {
+        context.delete(block)
         onDelete()
     }
 }
