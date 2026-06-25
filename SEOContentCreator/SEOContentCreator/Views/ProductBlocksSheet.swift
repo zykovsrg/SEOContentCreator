@@ -4,8 +4,7 @@ import SwiftData
 struct ProductBlocksSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \ProductBlock.order) private var blocks: [ProductBlock]
-    @Bindable var topic: Topic
-    /// Передаёт промты выбранных блоков (а не имена).
+    /// Passes the prompts of the selected blocks (not their names).
     var onGenerate: ([String]) -> Void
 
     @State private var selected: Set<UUID> = []
@@ -45,5 +44,6 @@ struct ProductBlocksSheet: View {
         }
         .padding()
         .frame(width: 460, height: 360)
+        .onAppear { selected = [] }
     }
 }
