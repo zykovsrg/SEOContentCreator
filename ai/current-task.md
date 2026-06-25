@@ -4,7 +4,7 @@ Status: empty
 
 Allowed statuses: empty / active / review / blocked / done / paused
 
-Stage: intake
+Stage: 
 
 Allowed stages: intake / spec / planning / implementation / review / task-finish
 
@@ -21,11 +21,3 @@ Allowed stages: intake / spec / planning / implementation / review / task-finish
 ## Done criteria
 
 ## Agent handoff
-
-Last agent:
-
-What changed:
-
-Open risks:
-
-Next agent should check:

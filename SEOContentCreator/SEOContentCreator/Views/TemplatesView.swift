@@ -10,6 +10,7 @@ private enum TemplateSelection: Hashable {
     case imagePrompt(UUID)
     case imagePreset(UUID)
     case editorDictionary(UUID)
+    case skill(UUID)
 }
 
 struct TemplatesView: View {
@@ -20,6 +21,7 @@ struct TemplatesView: View {
     @Query private var imagePrompts: [ImagePromptTemplate]
     @Query private var imagePresets: [ImageStylePreset]
     @Query private var editorDictionaries: [EditorDictionary]
+    @Query private var skills: [SkillPreset]
     @State private var selection: TemplateSelection?
 
     private var sortedTemplates: [StageTemplate] {
@@ -48,6 +50,10 @@ struct TemplatesView: View {
 
     private var sortedImagePresets: [ImageStylePreset] {
         imagePresets.sorted { $0.createdAt < $1.createdAt }
+    }
+
+    private var sortedSkills: [SkillPreset] {
+        skills.sorted { $0.order < $1.order }
     }
 
     private func order(_ raw: String) -> Int {
@@ -96,6 +102,11 @@ struct TemplatesView: View {
         return editorDictionaries.first { $0.uuid == id }
     }
 
+    private var selectedSkill: SkillPreset? {
+        guard case .skill(let id) = selection else { return nil }
+        return skills.first { $0.uuid == id }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             List(selection: $selection) {
@@ -140,6 +151,20 @@ struct TemplatesView: View {
                         Text("Словарь правок").tag(TemplateSelection.editorDictionary(dict.uuid))
                     }
                 }
+
+                Section("Скиллы") {
+                    ForEach(sortedSkills) { skill in
+                        Text(skill.name).tag(TemplateSelection.skill(skill.uuid))
+                    }
+                    Button {
+                        let next = (skills.map(\.order).max() ?? -1) + 1
+                        let preset = SkillPreset(name: "Новый скилл", prompt: "", roleKey: "editor", order: next)
+                        context.insert(preset)
+                        selection = .skill(preset.uuid)
+                    } label: {
+                        Label("Добавить скилл", systemImage: "plus")
+                    }
+                }
             }
             .frame(width: 260)
             Divider()
@@ -153,6 +178,7 @@ struct TemplatesView: View {
         .onChange(of: imagePrompts.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: imagePresets.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: editorDictionaries.map(\.uuid)) { _, _ in ensureSelection() }
+        .onChange(of: skills.map(\.uuid)) { _, _ in ensureSelection() }
     }
 
     @ViewBuilder
@@ -169,6 +195,8 @@ struct TemplatesView: View {
             ImageStylePresetEditorView(preset: preset) { selection = nil }.id(preset.uuid)
         } else if let dict = selectedEditorDictionary {
             EditorDictionaryEditorView(dictionary: dict).id(dict.uuid)
+        } else if let skill = selectedSkill {
+            SkillEditorView(skill: skill) { selection = nil }.id(skill.uuid)
         } else {
             ContentUnavailableView("Выберите шаблон", systemImage: "doc.text")
         }
@@ -188,6 +216,8 @@ struct TemplatesView: View {
             selection = .imagePreset(first.uuid)
         } else if let first = editorDictionaries.first {
             selection = .editorDictionary(first.uuid)
+        } else if let first = sortedSkills.first {
+            selection = .skill(first.uuid)
         }
     }
 }
@@ -692,5 +722,86 @@ private struct EditorDictionaryEditorView: View {
         window = EditorDictionaryDefaults.repeatWindowWords
         save()
         savedNote = "Сброшено к стандартному"
+    }
+}
+
+private struct SkillEditorView: View {
+    @Environment(\.modelContext) private var context
+    @Bindable var skill: SkillPreset
+    var onDelete: () -> Void
+
+    @State private var name = ""
+    @State private var prompt = ""
+    @State private var roleKey = "editor"
+    @State private var savedNote: String?
+
+    private let roleOptions: [(key: String, name: String)] = [
+        ("editor", "ИИ-редактор"),
+        ("author", "ИИ-автор"),
+        ("seo", "ИИ-SEO")
+    ]
+
+    private var defaultForSkill: SkillPresetDefault? {
+        SkillPresetDefaults.all.first { $0.name == skill.name }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Скилл").font(.title2).bold()
+
+                TextField("Название", text: $name)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 420)
+
+                Picker("Роль", selection: $roleKey) {
+                    ForEach(roleOptions, id: \.key) { Text($0.name).tag($0.key) }
+                }
+                .frame(maxWidth: 280, alignment: .leading)
+
+                Text("Промт (что сделать с фрагментом)").font(.headline)
+                TextEditor(text: $prompt).frame(minHeight: 180).border(.gray.opacity(0.3))
+
+                HStack {
+                    Button("Сохранить") { save() }.buttonStyle(.borderedProminent)
+                    if defaultForSkill != nil {
+                        Button("Сбросить к стандартному") { resetToDefault() }
+                    }
+                    Spacer()
+                    Button("Удалить скилл", role: .destructive) { deleteSkill() }
+                    if let savedNote { Text(savedNote).font(.caption).foregroundStyle(.green) }
+                }
+                .padding(.top, 4)
+            }
+            .padding()
+        }
+        .onAppear(perform: load)
+    }
+
+    private func load() {
+        name = skill.name
+        prompt = skill.prompt
+        roleKey = skill.roleKey
+    }
+
+    private func save() {
+        skill.name = name
+        skill.prompt = prompt
+        skill.roleKey = roleKey
+        skill.updatedAt = .now
+        savedNote = "Сохранено"
+    }
+
+    private func resetToDefault() {
+        guard let def = defaultForSkill else { return }
+        prompt = def.prompt
+        roleKey = def.roleKey
+        save()
+        savedNote = "Сброшено к стандартному"
+    }
+
+    private func deleteSkill() {
+        context.delete(skill)
+        onDelete()
     }
 }

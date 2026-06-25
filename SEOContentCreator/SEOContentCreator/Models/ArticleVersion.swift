@@ -62,7 +62,9 @@ final class ArticleVersion {
         switch stageRaw {
         case "manualEdit":     return "Ручная правка"
         case "rollback":       return "Откат"
-        case "importFromDocs": return "Импорт из Docs"
+        case "importFromDocs":       return "Импорт из Docs"
+        case "skillApplied":        return "Правка скиллом"
+        case "fragmentRegenerated": return "Регенерация фрагмента"
         default:               return stageRaw
         }
     }

@@ -1,0 +1,241 @@
+import Testing
+import SwiftData
+import Foundation
+@testable import SEOContentCreator
+
+struct VersionSourceFragmentTests {
+    @Test func skillAppliedTitle() {
+        #expect(VersionSource.skillApplied.title == "Правка скиллом")
+    }
+
+    @Test func fragmentRegeneratedTitle() {
+        #expect(VersionSource.fragmentRegenerated.title == "Регенерация фрагмента")
+    }
+}
+
+struct SkillPresetDefaultsTests {
+    @Test func providesFourStarterSkills() {
+        #expect(SkillPresetDefaults.all.count == 4)
+    }
+
+    @Test func everyDefaultHasNamePromptAndKnownRole() {
+        let knownRoles: Set<String> = ["author", "seo", "factChecker", "editor"]
+        for preset in SkillPresetDefaults.all {
+            #expect(!preset.name.isEmpty)
+            #expect(!preset.prompt.isEmpty)
+            #expect(knownRoles.contains(preset.roleKey))
+        }
+    }
+
+    @Test func makeAllAssignsIncreasingOrder() {
+        let presets = SkillPresetDefaults.makeAll()
+        #expect(presets.map(\.order) == Array(0..<presets.count))
+    }
+}
+
+struct FragmentSplicerTests {
+    @Test func replacesUniqueFragment() {
+        let result = FragmentSplicer.splice(
+            fullText: "Начало. Старый кусок. Конец.",
+            fragment: "Старый кусок.",
+            replacement: "Новый кусок."
+        )
+        #expect(result == .replaced("Начало. Новый кусок. Конец."))
+    }
+
+    @Test func notFoundWhenMissing() {
+        let result = FragmentSplicer.splice(
+            fullText: "Текст без фрагмента.",
+            fragment: "чего тут нет",
+            replacement: "X"
+        )
+        #expect(result == .notFound)
+    }
+
+    @Test func notFoundWhenFragmentEmpty() {
+        let result = FragmentSplicer.splice(fullText: "Любой текст.", fragment: "", replacement: "X")
+        #expect(result == .notFound)
+    }
+
+    @Test func ambiguousWhenMultipleMatches() {
+        let result = FragmentSplicer.splice(
+            fullText: "Повтор. Повтор.",
+            fragment: "Повтор.",
+            replacement: "X"
+        )
+        #expect(result == .ambiguous(2))
+    }
+
+    @Test func whitespaceSensitiveMatch() {
+        // Лишний пробел в искомом фрагменте → совпадения нет.
+        let result = FragmentSplicer.splice(
+            fullText: "Раз два три.",
+            fragment: "Раз  два",
+            replacement: "X"
+        )
+        #expect(result == .notFound)
+    }
+}
+
+struct FragmentPromptBuilderTests {
+    @Test func systemComesFromRoleContext() {
+        let prompt = FragmentPromptBuilder().build(
+            roleContext: "Ты — ИИ-редактор.",
+            instruction: "Упрости.",
+            fragment: "Сложный фрагмент."
+        )
+        #expect(prompt.system == "Ты — ИИ-редактор.")
+    }
+
+    @Test func userContainsInstructionAndFragment() {
+        let prompt = FragmentPromptBuilder().build(
+            roleContext: "роль",
+            instruction: "Упрости фрагмент.",
+            fragment: "Сложный фрагмент."
+        )
+        #expect(prompt.user.contains("Упрости фрагмент."))
+        #expect(prompt.user.contains("Сложный фрагмент."))
+    }
+
+    @Test func userAsksForFragmentOnly() {
+        let prompt = FragmentPromptBuilder().build(
+            roleContext: "роль",
+            instruction: "Упрости.",
+            fragment: "Текст."
+        )
+        #expect(prompt.user.contains("только переписанный фрагмент"))
+    }
+}
+
+@MainActor
+struct FragmentEditorTests {
+    private func makeContainer() throws -> ModelContainer {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        return try ModelContainer(
+            for: Topic.self, ArticleVersion.self, GenerationJob.self,
+            AIRole.self, ContextBlock.self, SkillPreset.self,
+            configurations: config
+        )
+    }
+
+    private func tokenStream(_ text: String) -> StageExecutor.StreamProvider {
+        { _, _, _, _, _, _, _ in
+            AsyncThrowingStream { continuation in
+                continuation.yield(.token(text))
+                continuation.yield(.finish(reason: "stop"))
+                continuation.finish()
+            }
+        }
+    }
+
+    private func errorStream() -> StageExecutor.StreamProvider {
+        { _, _, _, _, _, _, _ in
+            AsyncThrowingStream { continuation in
+                continuation.finish(throwing: NSError(domain: "test", code: 1))
+            }
+        }
+    }
+
+    @Test func successProducesProposedTextAndAcceptCreatesVersion() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let topic = Topic(title: "Тема", articleType: .info)
+        context.insert(topic)
+
+        let editor = FragmentEditor(streamProvider: tokenStream("Новый кусок."), keyProvider: { "key" })
+        await editor.run(
+            fullText: "Начало. Старый кусок. Конец.",
+            fragment: "Старый кусок.",
+            instruction: "Упрости.",
+            source: .skillApplied,
+            roleKey: "editor",
+            model: "gpt-4.1",
+            temperature: 0.6,
+            maxTokens: 4000,
+            topic: topic,
+            in: context
+        )
+
+        #expect(editor.proposedText == "Начало. Новый кусок. Конец.")
+        #expect(editor.lastErrorMessage == nil)
+
+        editor.accept(topic: topic, in: context)
+        let versions = try context.fetch(FetchDescriptor<ArticleVersion>())
+        #expect(versions.count == 1)
+        #expect(versions.first?.text == "Начало. Новый кусок. Конец.")
+        #expect(versions.first?.source == .skillApplied)
+        #expect(topic.currentVersionID == versions.first?.uuid)
+    }
+
+    @Test func ambiguousFragmentSetsErrorAndNoProposedText() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let topic = Topic(title: "Тема", articleType: .info)
+        context.insert(topic)
+
+        let editor = FragmentEditor(streamProvider: tokenStream("X"), keyProvider: { "key" })
+        await editor.run(
+            fullText: "Повтор. Повтор.",
+            fragment: "Повтор.",
+            instruction: "Упрости.",
+            source: .skillApplied,
+            roleKey: "editor",
+            model: "gpt-4.1",
+            temperature: 0.6,
+            maxTokens: 4000,
+            topic: topic,
+            in: context
+        )
+
+        #expect(editor.proposedText == nil)
+        #expect(editor.lastErrorMessage?.contains("2 раз") == true)
+    }
+
+    @Test func errorPathSurfacesMessage() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let topic = Topic(title: "Тема", articleType: .info)
+        context.insert(topic)
+
+        let editor = FragmentEditor(streamProvider: errorStream(), keyProvider: { "key" })
+        await editor.run(
+            fullText: "Текст. Кусок. Конец.",
+            fragment: "Кусок.",
+            instruction: "Упрости.",
+            source: .fragmentRegenerated,
+            roleKey: "author",
+            model: "gpt-4.1",
+            temperature: 0.6,
+            maxTokens: 4000,
+            topic: topic,
+            in: context
+        )
+
+        #expect(editor.proposedText == nil)
+        #expect(editor.lastErrorMessage != nil)
+    }
+}
+
+@MainActor
+struct SkillPresetSeederTests {
+    private func makeContext() throws -> ModelContext {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: SkillPreset.self, configurations: config)
+        return ModelContext(container)
+    }
+
+    @Test func seedsDefaultsIntoEmptyStore() throws {
+        let context = try makeContext()
+        SkillPresetSeeder.seedIfNeeded(in: context)
+        let presets = try context.fetch(FetchDescriptor<SkillPreset>())
+        #expect(presets.count == SkillPresetDefaults.all.count)
+    }
+
+    @Test func isIdempotent() throws {
+        let context = try makeContext()
+        SkillPresetSeeder.seedIfNeeded(in: context)
+        SkillPresetSeeder.seedIfNeeded(in: context)
+        let presets = try context.fetch(FetchDescriptor<SkillPreset>())
+        #expect(presets.count == SkillPresetDefaults.all.count)
+    }
+}

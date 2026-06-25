@@ -21,6 +21,7 @@ struct RootView: View {
         .task {
             StageTemplateSeeder.seedIfNeeded(in: context)
             EditorDictionarySeeder.seedIfNeeded(in: context)
+            SkillPresetSeeder.seedIfNeeded(in: context)
         }
     }
 }
