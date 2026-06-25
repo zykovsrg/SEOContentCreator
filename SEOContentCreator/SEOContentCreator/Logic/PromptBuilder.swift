@@ -48,7 +48,7 @@ struct PromptBuilder {
             .map { substitute($0) }
             .joined(separator: "\n\n")
 
-        if renderedBlocks.isEmpty {
+        if selectedBlocks.isEmpty {
             user = user.replacingOccurrences(of: "{{продуктовые_блоки}}", with: "")
         } else if user.contains("{{продуктовые_блоки}}") {
             user = user.replacingOccurrences(of: "{{продуктовые_блоки}}", with: renderedBlocks)

@@ -125,6 +125,7 @@ struct PromptBuilderTests {
         #expect(result.user.contains("Промт А"))
         #expect(result.user.contains("Промт Б"))
         #expect(!result.user.contains("{{продуктовые_блоки}}"))
+        #expect(result.user.contains("Промт А\n\nПромт Б"))
     }
 
     @Test func knowledgeVariablesInsideBlockPromptSubstituted() {
@@ -150,6 +151,7 @@ struct PromptBuilderTests {
         )
         #expect(result.user.contains("Блок CTA"))
         #expect(result.user.contains("Текст: тело"))
+        #expect(result.user.contains("Продуктовые блоки для встраивания:\nБлок CTA"))
     }
 
     @Test func emptyPlaceholderRemovedWhenNoBlocks() {
