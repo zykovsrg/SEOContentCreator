@@ -47,6 +47,11 @@ enum ParagraphDiff {
         diff(old: old, new: new).filter { $0.kind != .removed }
     }
 
+    /// Left-column view: only `.unchanged` and `.removed` lines (the old version).
+    static func oldSide(old: String, new: String) -> [ParagraphDiffLine] {
+        diff(old: old, new: new).filter { $0.kind != .added }
+    }
+
     private static func lcsTable(_ a: [String], _ b: [String]) -> [[Int]] {
         var table = Array(repeating: Array(repeating: 0, count: b.count + 1), count: a.count + 1)
         if a.isEmpty || b.isEmpty { return table }
