@@ -238,4 +238,40 @@ struct SkillPresetSeederTests {
         let presets = try context.fetch(FetchDescriptor<SkillPreset>())
         #expect(presets.count == SkillPresetDefaults.all.count)
     }
+
+    @Test func seedsAssignDefaultKeys() throws {
+        let context = try makeContext()
+        SkillPresetSeeder.seedIfNeeded(in: context)
+        let presets = try context.fetch(FetchDescriptor<SkillPreset>())
+        let keys = Set(presets.compactMap { $0.defaultKey })
+        #expect(keys == Set(SkillPresetDefaults.all.map { $0.key }))
+    }
+
+    @Test func backfillAssignsKeyToLegacyPresetByName() throws {
+        let context = try makeContext()
+        // Simulate an install seeded before defaultKey existed.
+        let def = SkillPresetDefaults.all[0]
+        let legacy = SkillPreset(name: def.name, prompt: def.prompt, roleKey: def.roleKey, order: 0)
+        legacy.defaultKey = nil
+        context.insert(legacy)
+
+        SkillPresetSeeder.seedIfNeeded(in: context)
+
+        #expect(legacy.defaultKey == def.key)
+    }
+
+    @Test func resetMatchesByKeyAfterRename() throws {
+        let context = try makeContext()
+        SkillPresetSeeder.seedIfNeeded(in: context)
+        let presets = try context.fetch(FetchDescriptor<SkillPreset>())
+        guard let preset = presets.first else { #expect(Bool(false)); return }
+
+        let originalKey = preset.defaultKey
+        preset.name = "Переименовал как угодно"
+
+        // The editor matches the factory default by key, not name.
+        let matched = SkillPresetDefaults.all.first { $0.key == preset.defaultKey }
+        #expect(matched != nil)
+        #expect(matched?.key == originalKey)
+    }
 }

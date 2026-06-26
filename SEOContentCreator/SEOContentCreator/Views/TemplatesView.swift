@@ -772,7 +772,10 @@ private struct SkillEditorView: View {
     ]
 
     private var defaultForSkill: SkillPresetDefault? {
-        SkillPresetDefaults.all.first { $0.name == skill.name }
+        if let key = skill.defaultKey {
+            return SkillPresetDefaults.all.first { $0.key == key }
+        }
+        return SkillPresetDefaults.all.first { $0.name == skill.name }
     }
 
     var body: some View {
@@ -846,7 +849,10 @@ private struct ProductBlockEditorView: View {
     @State private var savedNote: String?
 
     private var defaultForBlock: ProductBlockDefault? {
-        ProductBlockDefaults.all.first { $0.name == block.name }
+        if let key = block.defaultKey {
+            return ProductBlockDefaults.all.first { $0.key == key }
+        }
+        return ProductBlockDefaults.all.first { $0.name == block.name }
     }
 
     var body: some View {
