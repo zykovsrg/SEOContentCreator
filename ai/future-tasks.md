@@ -351,7 +351,7 @@ Promotion notes:
 
 ### FT-20260626-001 — Надёжный «Сбросить к стандартному» (не по имени)
 
-Status: idea
+Status: done (2026-06-26, ветка feature/reset-by-key; `defaultKey` + backfill, changelog + decisions)
 
 Priority: low
 
