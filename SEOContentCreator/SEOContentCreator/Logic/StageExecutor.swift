@@ -147,6 +147,7 @@ final class StageExecutor {
         streamingText = ""
         lastErrorMessage = nil
         lastWarningMessage = nil
+        lastResultVersionID = nil
         remarks = []
 
         let role = fetchRole(for: stage, in: context)
