@@ -185,7 +185,7 @@ Promotion notes:
 
 ### FT-20260623-005 — Сравнение двух версий из ленты (side-by-side diff)
 
-Status: idea
+Status: done (2026-06-26, влито в main; spec+plan: docs/superpowers/{specs,plans}/2026-06-26-compare-two-versions*)
 
 Priority: medium
 
@@ -310,7 +310,7 @@ Promotion notes:
 
 ### FT-20260621-001 — Выбор «интенсивности мышления» (reasoning_effort) для моделей GPT-5 / o-серии
 
-Status: promoted (→ ai/current-task.md, 2026-06-23)
+Status: done (2026-06-24, влито в main; коммит 7a6dc36)
 
 Priority: medium
 
