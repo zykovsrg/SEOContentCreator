@@ -405,3 +405,35 @@ Promotion notes:
 
 - Чистый рефакторинг — не смешивать с функциональными задачами.
 - Xcode 16 file-system-sync: новые файлы попадают в таргет автоматически.
+
+---
+
+### FT-20260626-003 — Стабильная подпись приложения, чтобы Keychain не спрашивал пароль каждый раз
+
+Status: idea
+
+Priority: medium
+
+Source: вопрос пользователя 2026-06-26 (промпт Keychain при каждом запуске/тестах)
+
+Created: 2026-06-26
+
+Context:
+
+При каждой пересборке Xcode подписывает приложение заново (ad-hoc подпись со свежим хешем), поэтому macOS считает бинарник «новым» и снова просит пароль login-keychain для доступа к записи `SEOContentCreator.OpenAI` (см. `Logic/KeychainService.swift`). Кнопка «Always Allow» помогает только до следующей сборки. На тестах хуже: каждый прогон — новый бинарник. Продакшн-код уже изолирован от Keychain через `keyProvider`-замыкание (`StageExecutor`/`ImageGenerator`/`FragmentEditor`); реально в системный Keychain ходят только `KeychainServiceTests` (3 теста, тестируют саму обёртку) и само приложение.
+
+Proposed task:
+
+1. **Шаг 1 (основной, настройка в Xcode, делает пользователь):** target `SEOContentCreator` → Signing & Capabilities → выбрать Team (личный Apple ID / Personal Team) + Automatically manage signing. Стабильная подпись → ACL в Keychain не сбрасывается → одного «Always Allow» хватает надолго и для приложения, и для тестового раннера.
+2. **Шаг 2 (опционально, правка кода):** добавить capability Keychain Sharing и читать/писать ключ с флагом `kSecUseDataProtectionKeychain` в `KeychainService` — доступ привязывается к Team ID, а не к бинарнику, промпт уходит совсем. Требует Team из шага 1. Изменение в работе с хранилищем — объяснить риски заранее.
+3. **Шаг 3 (опционально, тесты):** гейт для `KeychainServiceTests` по переменной окружения (например `RUN_KEYCHAIN_TESTS=1`), чтобы в обычном Cmd+U эти 3 теста пропускались и не всплывал пароль.
+
+Acceptance criteria:
+
+- После шага 1 приложение и тесты перестают спрашивать пароль login-keychain при каждой сборке (после однократного «Always Allow»).
+
+Promotion notes:
+
+- Шаг 1 — это настройка в окне Xcode, не правка кода; код менять не нужно.
+- НЕ открывать запись «для всех приложений» (`SecAccessCreate` с пустым списком доверия) — снижает безопасность ключа OpenAI; правильный путь — data-protection keychain (шаг 2).
+- Шаги 2 и 3 — отдельные scope, не смешивать.
