@@ -100,7 +100,7 @@ struct TopicWorkspaceView: View {
         }
         .sheet(isPresented: $showLog) { JobLogView(topic: topic) }
         .sheet(isPresented: $showProductBlocks) {
-            ProductBlocksSheet(topic: topic) { runStage(.productBlocks, blocks: $0) }
+            ProductBlocksSheet { runStage(.productBlocks, blocks: $0) }
         }
         .sheet(isPresented: $showSemantics) { SemanticsEditorSheet(topic: topic) }
         .sheet(isPresented: $showStructure) { StructureEditorSheet(topic: topic) }
