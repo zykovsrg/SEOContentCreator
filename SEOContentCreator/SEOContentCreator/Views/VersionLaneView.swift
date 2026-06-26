@@ -69,6 +69,8 @@ struct VersionLaneView: View {
               let a = versions.first(where: { $0.uuid == selection[0] }),
               let b = versions.first(where: { $0.uuid == selection[1] }) else { return }
         comparePair = ComparePair(a: a, b: b)
+        selecting = false
+        selection = []
     }
 
     private var stageGroups: [(String, [ArticleVersion])] {
@@ -82,8 +84,9 @@ struct VersionLaneView: View {
             if selecting {
                 // Tap is handled by the row-level gesture below — no separate
                 // gesture here, otherwise a tap on the box toggles twice.
-                Image(systemName: selection.contains(v.uuid) ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(selection.contains(v.uuid) ? Color.accentColor : .secondary)
+                let isSelected = selection.contains(v.uuid)
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
             }
             VStack(alignment: .leading) {
                 Text(v.stageTitle).font(.subheadline)
