@@ -97,12 +97,15 @@ struct QuickCheckSheet: View {
         copiedNote = false
         acceptedRemarkIDs = []
         rejectedRemarkIDs = []
+        didRun = false
         let template = fetchTemplate(for: selectedStage)
         let exec = StageExecutor.live(model: template.modelName)
         executor = exec
-        didRun = true
         Task {
             await exec.executeQuickCheck(stage: selectedStage, pastedText: inputText, template: template, in: context)
+            // Show the remarks panel only on a successful run; on error the red
+            // message in the run row is shown instead of an empty panel.
+            didRun = exec.lastErrorMessage == nil
         }
     }
 
