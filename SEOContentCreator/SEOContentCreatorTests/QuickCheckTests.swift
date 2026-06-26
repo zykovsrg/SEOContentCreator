@@ -8,7 +8,8 @@ struct QuickCheckExecutorTests {
     private func makeContext() throws -> ModelContext {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
-            for: AIRole.self, ContextBlock.self, GenerationJob.self, ArticleVersion.self,
+            for: Topic.self, ArticleVersion.self, GenerationJob.self,
+            AIRole.self, ContextBlock.self,
             configurations: config
         )
         return ModelContext(container)

@@ -54,6 +54,10 @@ struct QuickCheckSheet: View {
                 }
             }
 
+            if let warning = executor?.lastWarningMessage {
+                Text(warning).font(.caption).foregroundStyle(.orange)
+            }
+
             if didRun && !isRunning {
                 Divider()
                 RemarksPanelView(
