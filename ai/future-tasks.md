@@ -86,7 +86,7 @@ Promotion notes:
 
 ### FT-20260623-002 — Продуктовые блоки из Базы знаний
 
-Status: idea
+Status: done (2026-06-26, влито в main; spec+plan: docs/superpowers/{specs,plans}/2026-06-25-product-blocks-from-knowledge-base*)
 
 Priority: low
 
@@ -346,3 +346,62 @@ Promotion notes:
 - Имя модели не хардкодить (например, «gpt-5.5») — модель выбирает пользователь, `reasoningEffort` отдельное поле.
 - Минимальные диффы, не смешивать с другими изменениями, не расширять scope.
 - Проверка сборки: `xcodebuild build-for-testing` (CLI `xcodebuild test` зависает — тесты через Cmd+U).
+
+---
+
+### FT-20260626-001 — Надёжный «Сбросить к стандартному» (не по имени)
+
+Status: idea
+
+Priority: low
+
+Source: code review FT-20260623-002, 2026-06-26
+
+Created: 2026-06-26
+
+Context:
+
+Кнопка «Сбросить к стандартному» в редакторах `ProductBlockEditorView` и `SkillEditorView` (`Views/TemplatesView.swift`) ищет дефолт по совпадению имени (`$0.name == block.name` / `skill.name`). Если пользователь переименовал дефолтный блок/скилл — кнопка исчезает, сброс недоступен. То же случится, если переименовать дефолт в `*Defaults`.
+
+Proposed task:
+
+1. Завязать сопоставление с дефолтом на стабильный ключ, а не на имя: например, добавить опциональное поле `defaultKey: String?` в `ProductBlock` и `SkillPreset`, заполняемое сидером.
+2. Редакторы ищут дефолт по `defaultKey`, а не по имени.
+
+Acceptance criteria:
+
+- Переименованный дефолтный блок/скилл сохраняет кнопку «Сбросить к стандартному».
+
+Promotion notes:
+
+- Изменение схемы SwiftData (новые опциональные поля) — согласовать миграцию.
+- Затрагивает обе сущности — можно сделать в одном проходе.
+
+---
+
+### FT-20260626-002 — Разбить TemplatesView.swift на файлы
+
+Status: idea
+
+Priority: low
+
+Source: code review FT-20260623-002, 2026-06-26
+
+Created: 2026-06-26
+
+Context:
+
+`Views/TemplatesView.swift` вырос до ~905 строк и содержит основной view плюс множество приватных editor-views (`TemplateEditorView`, `RoleEditorView`, `ContextBlockEditorView`, `ImagePromptEditorView`, `ImageStylePresetEditorView`, `EditorDictionaryEditorView`, `SkillEditorView`, `ProductBlockEditorView`). Чисто организационный рефакторинг.
+
+Proposed task:
+
+1. Вынести editor-views в отдельные файлы (например, `Views/Templates/*EditorView.swift` или `TemplatesView+Editors.swift`), оставив в `TemplatesView.swift` только основной view, enum выбора и sidebar.
+
+Acceptance criteria:
+
+- Поведение не меняется; сборка и тесты зелёные.
+
+Promotion notes:
+
+- Чистый рефакторинг — не смешивать с функциональными задачами.
+- Xcode 16 file-system-sync: новые файлы попадают в таргет автоматически.
