@@ -134,6 +134,64 @@ final class StageExecutor {
         isRunning = false
     }
 
+    /// Runs a single checking stage on arbitrary pasted text, without persisting
+    /// anything (no GenerationJob, no ArticleVersion, no Topic). Fills `remarks`.
+    /// Intended for the topic-less "Быстрая проверка" sheet.
+    func executeQuickCheck(
+        stage: PipelineStage,
+        pastedText: String,
+        template: StageTemplate,
+        in context: ModelContext
+    ) async {
+        isRunning = true
+        streamingText = ""
+        lastErrorMessage = nil
+        lastWarningMessage = nil
+        remarks = []
+
+        let role = fetchRole(for: stage, in: context)
+        do {
+            let key = try keyProvider()
+            let roleContext = buildRoleContext(for: role, in: context)
+            // Transient, NOT inserted into the context: only carries the pasted text.
+            let scratch = Topic(title: "", articleType: .info)
+            let prompt = PromptBuilder().build(
+                template: template, topic: scratch,
+                currentText: pastedText, selectedBlocks: [],
+                roleContext: roleContext
+            )
+            var collected = ""
+            var truncated = false
+            for try await event in streamProvider(
+                key, prompt.system, prompt.user,
+                template.modelName, template.temperature, template.maxTokens,
+                template.reasoningEffort
+            ) {
+                switch event {
+                case .token(let t):
+                    collected += t
+                    streamingText = collected
+                case .finish(let reason):
+                    if reason == "length" { truncated = true }
+                }
+            }
+            if truncated {
+                lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
+            }
+            remarks = RemarksParser.parse(rawText: collected)
+        } catch {
+            let message: String
+            if let keyError = error as? KeychainService.KeychainError, keyError == .notFound {
+                message = "Укажите API-ключ в Настройках"
+            } else {
+                message = error.localizedDescription
+            }
+            lastErrorMessage = message
+        }
+
+        isRunning = false
+    }
+
     private func fetchRole(for stage: PipelineStage, in context: ModelContext) -> AIRole? {
         let roleKey = stage.roleKey
         let roleDescriptor = FetchDescriptor<AIRole>(
