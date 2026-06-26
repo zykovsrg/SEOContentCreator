@@ -8,6 +8,7 @@ struct ContentPlanView: View {
     @State private var filter = ContentPlanFilter()
     @State private var selection: Topic.ID?
     @State private var showingBrief = false
+    @State private var showingQuickCheck = false
     @State private var editingTopic: Topic?
     @State private var opened: Topic?
 
@@ -52,11 +53,17 @@ struct ContentPlanView: View {
                 }
             }
             ToolbarItem {
+                Button { showingQuickCheck = true } label: {
+                    Label("Быстрая проверка", systemImage: "checkmark.circle")
+                }
+            }
+            ToolbarItem {
                 Button { showingBrief = true } label: { Label("Новая тема", systemImage: "plus") }
             }
         }
         .navigationTitle("Контент-план")
         .sheet(isPresented: $showingBrief) { BriefView(topic: nil) }
         .sheet(item: $editingTopic) { BriefView(topic: $0) }
+        .sheet(isPresented: $showingQuickCheck) { QuickCheckSheet() }
     }
 }
