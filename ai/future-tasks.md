@@ -152,7 +152,7 @@ Promotion notes:
 
 ### FT-20260623-004 — Режим «Быстрая проверка»
 
-Status: idea
+Status: done (2026-06-27, ветка feature/quick-check; 7 коммитов cdc1fbe..1bc8e92)
 
 Priority: low
 

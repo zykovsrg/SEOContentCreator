@@ -18,6 +18,22 @@ Impact:
 
 ## Текущие решения
 
+### 2026-06-27 — executeQuickCheck: транзитный Topic не вставляется в контекст
+
+Status: active
+
+Decision:
+
+В `StageExecutor.executeQuickCheck` объект `Topic(title: "", articleType: .info)` создаётся транзитно — только как аргумент `PromptBuilder.build(template:topic:currentText:...)` — и **не** передаётся в `context.insert(...)`. SwiftData не отслеживает не вставленные объекты. Никаких GenerationJob, ArticleVersion или Topic в базе не появляется.
+
+Why:
+
+«Быстрая проверка» работает с произвольным текстом без привязки к теме; любой `context.insert(scratch)` создал бы «призрачную» тему. Транзитный объект — минимальная совместимость с сигнатурой PromptBuilder без изменения его интерфейса.
+
+Impact:
+
+Нельзя добавлять `context.insert(scratch)` в `executeQuickCheck` — это нарушит инвариант «быстрая проверка ничего не сохраняет». Если PromptBuilder в будущем потребует `persistentModelID` — потребуется рефакторинг интерфейса.
+
 ### 2026-06-26 — Сопоставление с заводскими дефолтами по стабильному `defaultKey`, не по имени
 
 Status: active
