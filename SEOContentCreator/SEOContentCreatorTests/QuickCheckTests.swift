@@ -53,3 +53,18 @@ struct QuickCheckExecutorTests {
         #expect(versions.isEmpty)
     }
 }
+
+struct QuickCheckTitleTests {
+    @Test func usesFirstNonEmptyLine() {
+        #expect(QuickCheckTitle.suggest(from: "\n  \nЗаголовок статьи\nостальное") == "Заголовок статьи")
+    }
+
+    @Test func trimsAndCapsLength() {
+        let long = String(repeating: "а", count: 200)
+        #expect(QuickCheckTitle.suggest(from: long).count == 80)
+    }
+
+    @Test func fallbackForEmptyText() {
+        #expect(QuickCheckTitle.suggest(from: "   \n  ") == "Быстрая проверка")
+    }
+}
