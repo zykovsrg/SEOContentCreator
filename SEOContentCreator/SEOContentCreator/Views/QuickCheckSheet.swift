@@ -1,0 +1,128 @@
+import SwiftUI
+import SwiftData
+
+struct QuickCheckSheet: View {
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+
+    // Только проверки (kind == .checking).
+    private let checkStages: [PipelineStage] = [.seoCheck, .factCheck, .finalReview]
+
+    @State private var inputText = ""
+    @State private var selectedStage: PipelineStage = .seoCheck
+    @State private var executor: StageExecutor?
+    @State private var acceptedRemarkIDs: Set<UUID> = []
+    @State private var rejectedRemarkIDs: Set<UUID> = []
+    @State private var didRun = false
+
+    // Сохранение как тему.
+    @State private var showingSaveDialog = false
+    @State private var newTopicTitle = ""
+    @State private var copiedNote = false
+
+    private var remarks: [Remark] { executor?.remarks ?? [] }
+    private var isRunning: Bool { executor?.isRunning ?? false }
+
+    private var correctedText: String {
+        let accepted = remarks.filter { acceptedRemarkIDs.contains($0.id) }
+        return RemarkApplier.apply(base: inputText, accepted: accepted)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Быстрая проверка").font(.title2).bold()
+                Spacer()
+                Button("Закрыть") { dismiss() }
+            }
+
+            Picker("Проверка", selection: $selectedStage) {
+                ForEach(checkStages) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+
+            Text("Вставьте текст для проверки").font(.headline)
+            TextEditor(text: $inputText).frame(minHeight: 140).border(.gray.opacity(0.3))
+
+            HStack {
+                Button("Проверить") { run() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isRunning)
+                if isRunning { ProgressView().controlSize(.small) }
+                if let msg = executor?.lastErrorMessage {
+                    Text(msg).font(.caption).foregroundStyle(.red)
+                }
+            }
+
+            if didRun && !isRunning {
+                Divider()
+                RemarksPanelView(
+                    remarks: remarks,
+                    acceptedIDs: acceptedRemarkIDs,
+                    rejectedIDs: rejectedRemarkIDs,
+                    onAccept: { acceptedRemarkIDs.insert($0.id); rejectedRemarkIDs.remove($0.id) },
+                    onReject: { rejectedRemarkIDs.insert($0.id); acceptedRemarkIDs.remove($0.id) },
+                    onSelect: { _ in }
+                )
+                .frame(minHeight: 160)
+
+                HStack {
+                    Button("Скопировать результат") {
+                        let pb = NSPasteboard.general
+                        pb.clearContents()
+                        pb.setString(correctedText, forType: .string)
+                        copiedNote = true
+                    }
+                    Button("Сохранить как тему") {
+                        newTopicTitle = QuickCheckTitle.suggest(from: correctedText)
+                        showingSaveDialog = true
+                    }
+                    Spacer()
+                    if copiedNote { Text("Скопировано").font(.caption).foregroundStyle(.green) }
+                }
+            }
+        }
+        .padding()
+        .frame(minWidth: 520, minHeight: 560)
+        .alert("Сохранить как тему", isPresented: $showingSaveDialog) {
+            TextField("Название темы", text: $newTopicTitle)
+            Button("Сохранить") { saveAsTopic() }
+            Button("Отмена", role: .cancel) { }
+        } message: {
+            Text("Будет создана новая тема с исправленным текстом.")
+        }
+    }
+
+    private func run() {
+        copiedNote = false
+        acceptedRemarkIDs = []
+        rejectedRemarkIDs = []
+        let template = fetchTemplate(for: selectedStage)
+        let exec = StageExecutor.live(model: template.modelName)
+        executor = exec
+        didRun = true
+        Task {
+            await exec.executeQuickCheck(stage: selectedStage, pastedText: inputText, template: template, in: context)
+        }
+    }
+
+    private func saveAsTopic() {
+        let title = newTopicTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let topic = Topic(title: title.isEmpty ? "Быстрая проверка" : title, articleType: .info)
+        context.insert(topic)
+        let version = ArticleVersion(stage: selectedStage, source: .checkApplied, text: correctedText)
+        version.topic = topic
+        context.insert(version)
+        topic.currentVersionID = version.uuid
+        dismiss()
+    }
+
+    private func fetchTemplate(for stage: PipelineStage) -> StageTemplate {
+        let raw = stage.rawValue
+        let descriptor = FetchDescriptor<StageTemplate>(predicate: #Predicate { $0.stageRaw == raw })
+        if let found = (try? context.fetch(descriptor))?.first { return found }
+        StageTemplateSeeder.seedIfNeeded(in: context)
+        return (try? context.fetch(descriptor))?.first
+            ?? StageTemplate(stage: stage, systemPrompt: "", userPromptTemplate: "{{текущий_текст}}")
+    }
+}
