@@ -9,6 +9,7 @@
 
 # Visual brainstorm working files
 .superpowers/
+.worktrees/
 
 # Xcode
 *.xcuserstate
