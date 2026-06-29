@@ -19,6 +19,13 @@ struct TemplateSandboxSheet: View {
         return topics.first
     }
 
+    private var topicSelectionBinding: Binding<PersistentIdentifier?> {
+        Binding(
+            get: { selectedTopicID ?? topics.first?.persistentModelID },
+            set: { selectedTopicID = $0 }
+        )
+    }
+
     private var isRunning: Bool { executor?.isRunning ?? false }
 
     private var outputText: String {
@@ -37,7 +44,7 @@ struct TemplateSandboxSheet: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Picker("Тема", selection: $selectedTopicID) {
+                Picker("Тема", selection: topicSelectionBinding) {
                     ForEach(topics) { topic in
                         Text(topic.title).tag(Optional(topic.persistentModelID))
                     }
@@ -77,6 +84,15 @@ struct TemplateSandboxSheet: View {
         .onAppear {
             if selectedTopicID == nil {
                 selectedTopicID = topics.first?.persistentModelID
+            }
+        }
+        .onChange(of: topics.map(\.persistentModelID)) { _, ids in
+            guard let selectedTopicID else {
+                self.selectedTopicID = ids.first
+                return
+            }
+            if !ids.contains(selectedTopicID) {
+                self.selectedTopicID = ids.first
             }
         }
     }
