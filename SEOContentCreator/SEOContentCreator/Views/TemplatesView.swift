@@ -264,6 +264,7 @@ private struct TemplateEditorView: View {
     @State private var reasoningEffort = ""
     @State private var showVariables = false
     @State private var savedNote: String?
+    @State private var showSandbox = false
 
     private let models = [
         "gpt-5.5-pro", "gpt-5.5",
@@ -324,6 +325,7 @@ private struct TemplateEditorView: View {
 
                 HStack {
                     Button("Сохранить") { save() }.buttonStyle(.borderedProminent)
+                    Button("Песочница") { showSandbox = true }
                     Button("Сбросить к стандартному") { resetToDefault() }
                     Spacer()
                     if let savedNote { Text(savedNote).font(.caption).foregroundStyle(.green) }
@@ -333,6 +335,12 @@ private struct TemplateEditorView: View {
             .padding()
         }
         .onAppear(perform: load)
+        .sheet(isPresented: $showSandbox) {
+            TemplateSandboxSheet(
+                stage: template.stage ?? .draft,
+                template: sandboxTemplate()
+            )
+        }
     }
 
     private func load() {
@@ -356,6 +364,22 @@ private struct TemplateEditorView: View {
         template.templateVersion += 1
         template.updatedAt = .now
         savedNote = "Сохранено (версия \(template.templateVersion))"
+    }
+
+    private func sandboxTemplate() -> StageTemplate {
+        StageTemplate(
+            stage: template.stage ?? .draft,
+            articleType: template.articleTypeRaw.flatMap(ArticleType.init(rawValue:)),
+            systemPrompt: system,
+            userPromptTemplate: user,
+            modelName: model,
+            temperature: temperature,
+            maxTokens: maxTokens,
+            reasoningEffort: (OpenAIClient.usesMaxCompletionTokens(model: model) && !reasoningEffort.isEmpty)
+                ? reasoningEffort
+                : nil,
+            templateVersion: template.templateVersion
+        )
     }
 
     private func resetToDefault() {
