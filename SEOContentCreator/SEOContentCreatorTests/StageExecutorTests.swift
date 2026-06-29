@@ -170,6 +170,8 @@ struct StageExecutorTests {
         current.topic = topic
         context.insert(current)
         topic.currentVersionID = current.uuid
+        let originalUpdatedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        topic.updatedAt = originalUpdatedAt
 
         let template = StageTemplate(
             stage: .draft,
@@ -211,6 +213,7 @@ struct StageExecutorTests {
         #expect(topic.jobs.isEmpty)
         #expect(topic.versions.count == 1)
         #expect(topic.currentVersionID == current.uuid)
+        #expect(topic.updatedAt == originalUpdatedAt)
     }
 
     @Test func sandboxSetsTruncationWarningWithoutPersisting() async throws {
