@@ -180,7 +180,7 @@ Promotion notes:
 
 ### FT-20260626-002 — Разбить TemplatesView.swift на файлы
 
-Status: idea
+Status: done
 
 Priority: low
 

@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-06-30 — Разбиение TemplatesView.swift на editor-файлы
+
+- Change: `Views/TemplatesView.swift` сокращён до основного экрана раздела «Шаблоны»: sidebar, выбор записи, сортировка и detail-routing. Восемь editor-view вынесены в отдельные файлы под `Views/Templates/`: `TemplateEditorView`, `RoleEditorView`, `ContextBlockEditorView`, `ImagePromptEditorView`, `ImageStylePresetEditorView`, `EditorDictionaryEditorView`, `SkillEditorView`, `ProductBlockEditorView`. Логика UI и тексты не менялись.
+- Impact: Раздел «Шаблоны» легче поддерживать: будущие правки конкретного редактора не требуют работы с одним файлом почти на тысячу строк. Без изменений SwiftData-схемы и пользовательского поведения.
+- Manual checks: `xcodebuild build -project SEOContentCreator/SEOContentCreator.xcodeproj -scheme SEOContentCreator -destination 'platform=macOS'` — BUILD SUCCEEDED. Unit-тесты с пропуском Keychain-наборов скомпилировались и дошли до `Testing started`, но Xcode завис; прогон был прерван без результатов. `git diff --check` — без ошибок.
+
 ### 2026-06-29 — Модель только в Настройках + подузлы Базы знаний
 
 - Change: Убран отдельный выбор модели из редактора «Промты этапов» в `TemplatesView`; в шаблоне остались температура, max tokens и reasoning effort. `StageExecutor` получил runtime override модели, а обычный запуск этапа, генерация структуры, «Быстрая проверка» и песочница промтов передают модель из `@AppStorage("openAIModel")`. Старое поле `StageTemplate.modelName` оставлено как fallback для совместимости. Кнопка «Добавить подузел» переведена на `KnowledgeNode.addChild(...)`, который явно обновляет `parent.children`.
