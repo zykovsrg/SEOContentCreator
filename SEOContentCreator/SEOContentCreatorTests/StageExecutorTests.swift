@@ -162,6 +162,43 @@ struct StageExecutorTests {
         #expect(captured == "high")
     }
 
+    @Test func executeUsesRuntimeModelOverrideInsteadOfTemplateModel() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease)
+        context.insert(topic)
+        let template = StageTemplate(
+            stage: .draft,
+            systemPrompt: "s",
+            userPromptTemplate: "{{тема}}",
+            modelName: "template-model"
+        )
+        context.insert(template)
+
+        var capturedModel = ""
+        let provider: StageExecutor.StreamProvider = { _, _, _, model, _, _, _ in
+            capturedModel = model
+            return AsyncThrowingStream { continuation in
+                continuation.yield(.token("Текст"))
+                continuation.finish()
+            }
+        }
+        let executor = StageExecutor(streamProvider: provider, keyProvider: { "k" })
+
+        await executor.execute(
+            stage: .draft,
+            topic: topic,
+            template: template,
+            currentText: nil,
+            modelName: "settings-model",
+            in: context
+        )
+
+        #expect(capturedModel == "settings-model")
+        #expect(topic.jobs.first?.modelName == "settings-model")
+        let created = topic.versions.first { $0.uuid == executor.lastResultVersionID }
+        #expect(created?.modelName == "settings-model")
+    }
+
     @Test func sandboxUsesTemporaryTemplateWithoutPersisting() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)
@@ -185,10 +222,12 @@ struct StageExecutorTests {
 
         var capturedSystem = ""
         var capturedUser = ""
+        var capturedModel = ""
         var capturedReasoning: String?
-        let provider: StageExecutor.StreamProvider = { _, system, user, _, _, _, reasoningEffort in
+        let provider: StageExecutor.StreamProvider = { _, system, user, model, _, _, reasoningEffort in
             capturedSystem = system
             capturedUser = user
+            capturedModel = model
             capturedReasoning = reasoningEffort
             return AsyncThrowingStream { continuation in
                 continuation.yield(.token("Песочный результат"))
@@ -202,11 +241,13 @@ struct StageExecutorTests {
             topic: topic,
             template: template,
             currentText: topic.currentVersion?.text,
+            modelName: "settings-model",
             in: context
         )
 
         #expect(capturedSystem == "Временная система")
         #expect(capturedUser == "UNSAVED Тема / Текущий текст")
+        #expect(capturedModel == "settings-model")
         #expect(capturedReasoning == "high")
         #expect(executor.streamingText == "Песочный результат")
         #expect(executor.lastErrorMessage == nil)

@@ -4,6 +4,7 @@ import SwiftData
 struct TemplateSandboxSheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("openAIModel") private var model = "gpt-4.1"
     @Query(sort: \Topic.updatedAt, order: .reverse) private var topics: [Topic]
 
     let stage: PipelineStage
@@ -150,7 +151,7 @@ struct TemplateSandboxSheet: View {
 
     private func run() {
         guard let topic = selectedTopic else { return }
-        let exec = StageExecutor.live(model: template.modelName)
+        let exec = StageExecutor.live(model: model)
         executor = exec
         Task {
             await exec.executeSandbox(
@@ -158,6 +159,7 @@ struct TemplateSandboxSheet: View {
                 topic: topic,
                 template: template,
                 currentText: topic.currentVersion?.text,
+                modelName: model,
                 in: context
             )
         }

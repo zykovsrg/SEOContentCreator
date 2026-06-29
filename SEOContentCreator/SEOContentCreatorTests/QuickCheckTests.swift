@@ -53,6 +53,38 @@ struct QuickCheckExecutorTests {
         #expect(jobs.isEmpty)
         #expect(versions.isEmpty)
     }
+
+    @Test func usesRuntimeModelOverrideInsteadOfTemplateModel() async throws {
+        let context = try makeContext()
+        let template = StageTemplate(
+            stage: .seoCheck,
+            systemPrompt: "sys",
+            userPromptTemplate: "Проверь: {{текущий_текст}}",
+            modelName: "template-model"
+        )
+        var capturedModel = ""
+        let executor = StageExecutor(
+            streamProvider: { _, _, _, model, _, _, _ in
+                capturedModel = model
+                return AsyncThrowingStream { continuation in
+                    continuation.yield(.token(self.remarkJSON))
+                    continuation.finish()
+                }
+            },
+            keyProvider: { "key" }
+        )
+
+        await executor.executeQuickCheck(
+            stage: .seoCheck,
+            pastedText: "плохо текст",
+            template: template,
+            modelName: "settings-model",
+            in: context
+        )
+
+        #expect(capturedModel == "settings-model")
+        #expect(executor.lastErrorMessage == nil)
+    }
 }
 
 struct QuickCheckTitleTests {

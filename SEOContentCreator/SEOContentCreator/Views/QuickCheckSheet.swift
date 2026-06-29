@@ -4,6 +4,7 @@ import SwiftData
 struct QuickCheckSheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("openAIModel") private var model = "gpt-4.1"
 
     // Только проверки (kind == .checking).
     private let checkStages: [PipelineStage] = [.seoCheck, .factCheck, .finalReview]
@@ -103,10 +104,16 @@ struct QuickCheckSheet: View {
         rejectedRemarkIDs = []
         didRun = false
         let template = fetchTemplate(for: selectedStage)
-        let exec = StageExecutor.live(model: template.modelName)
+        let exec = StageExecutor.live(model: model)
         executor = exec
         Task {
-            await exec.executeQuickCheck(stage: selectedStage, pastedText: inputText, template: template, in: context)
+            await exec.executeQuickCheck(
+                stage: selectedStage,
+                pastedText: inputText,
+                template: template,
+                modelName: model,
+                in: context
+            )
             // Show the remarks panel only on a successful run; on error the red
             // message in the run row is shown instead of an empty panel.
             didRun = exec.lastErrorMessage == nil

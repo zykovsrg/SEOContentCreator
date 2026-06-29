@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-06-29 — Модель только в Настройках + подузлы Базы знаний
+
+- Change: Убран отдельный выбор модели из редактора «Промты этапов» в `TemplatesView`; в шаблоне остались температура, max tokens и reasoning effort. `StageExecutor` получил runtime override модели, а обычный запуск этапа, генерация структуры, «Быстрая проверка» и песочница промтов передают модель из `@AppStorage("openAIModel")`. Старое поле `StageTemplate.modelName` оставлено как fallback для совместимости. Кнопка «Добавить подузел» переведена на `KnowledgeNode.addChild(...)`, который явно обновляет `parent.children`.
+- Impact: Текстовая модель теперь выбирается в одном месте — «Настройки». Сохранённые шаблоны читаются без миграции SwiftData. Подузел сразу становится видимым ребёнком выбранного узла, без потери связи в дереве.
+- Manual checks: `xcodebuild test ... -skip-testing:SEOContentCreatorUITests` — TEST SUCCEEDED. Узкие тесты `StageExecutorTests`, `QuickCheckExecutorTests`, `KnowledgeNodeHierarchyTests` — зелёные. Полный all-target `xcodebuild test` падает только на существующей UI-инфраструктурной ошибке `SEOContentCreatorUITests.testExample()` при завершении app-процесса перед UI-тестом.
+
 ### 2026-06-29 — Песочница промтов этапов (FT-20260623-007, срез 1)
 
 - Change: Добавлена песочница для раздела «Промты этапов»: кнопка «Песочница» в `TemplatesView` открывает `TemplateSandboxSheet`, где можно выбрать существующую тему и запустить текущие несохранённые поля редактора как временный `StageTemplate`. Новый `StageExecutor.executeSandbox(...)` переиспользует `PromptBuilder`, контекст роли, стриминг OpenAI, предупреждение об обрыве по лимиту и парсинг remarks для проверяющих этапов. Sandbox-запуск не создаёт `GenerationJob`, не создаёт `ArticleVersion`, не меняет `Topic.currentVersionID` и `Topic.updatedAt`.

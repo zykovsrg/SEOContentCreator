@@ -197,7 +197,8 @@ struct TopicWorkspaceView: View {
         let current = topic.currentVersion?.text
         Task {
             await executor.execute(stage: stage, topic: topic, template: template,
-                                   currentText: current, selectedBlocks: blocks, in: context)
+                                   currentText: current, selectedBlocks: blocks,
+                                   modelName: model, in: context)
             pendingVersionID = executor.lastResultVersionID
         }
     }

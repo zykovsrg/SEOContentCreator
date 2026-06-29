@@ -49,6 +49,7 @@ final class StageExecutor {
         template: StageTemplate,
         currentText: String?,
         selectedBlocks: [String] = [],
+        modelName: String? = nil,
         in context: ModelContext
     ) async {
         isRunning = true
@@ -60,7 +61,8 @@ final class StageExecutor {
 
         let role = fetchRole(for: stage, in: context)
         let agentName = role?.name ?? stage.agentName
-        let job = GenerationJob(stage: stage, agentName: agentName, modelName: template.modelName)
+        let runtimeModel = modelName ?? template.modelName
+        let job = GenerationJob(stage: stage, agentName: agentName, modelName: runtimeModel)
         job.topic = topic
         context.insert(job)
 
@@ -76,7 +78,7 @@ final class StageExecutor {
             var truncated = false
             for try await event in streamProvider(
                 key, prompt.system, prompt.user,
-                template.modelName, template.temperature, template.maxTokens,
+                runtimeModel, template.temperature, template.maxTokens,
                 template.reasoningEffort
             ) {
                 switch event {
@@ -103,7 +105,7 @@ final class StageExecutor {
                 let parsed = StageOutputParser.parse(rawText: collected, stage: stage)
                 let version = ArticleVersion(
                     stage: stage, source: .generated, text: parsed.body,
-                    agentName: agentName, templateID: template.uuid, modelName: template.modelName
+                    agentName: agentName, templateID: template.uuid, modelName: runtimeModel
                 )
                 version.h1 = parsed.h1
                 version.seoTitle = parsed.seoTitle
@@ -142,6 +144,7 @@ final class StageExecutor {
         template: StageTemplate,
         currentText: String?,
         selectedBlocks: [String] = [],
+        modelName: String? = nil,
         in context: ModelContext
     ) async {
         isRunning = true
@@ -152,6 +155,7 @@ final class StageExecutor {
         remarks = []
 
         let role = fetchRole(for: stage, in: context)
+        let runtimeModel = modelName ?? template.modelName
         do {
             let key = try keyProvider()
             let roleContext = buildRoleContext(for: role, in: context)
@@ -168,7 +172,7 @@ final class StageExecutor {
                 key,
                 prompt.system,
                 prompt.user,
-                template.modelName,
+                runtimeModel,
                 template.temperature,
                 template.maxTokens,
                 template.reasoningEffort
@@ -207,6 +211,7 @@ final class StageExecutor {
         stage: PipelineStage,
         pastedText: String,
         template: StageTemplate,
+        modelName: String? = nil,
         in context: ModelContext
     ) async {
         isRunning = true
@@ -217,6 +222,7 @@ final class StageExecutor {
         remarks = []
 
         let role = fetchRole(for: stage, in: context)
+        let runtimeModel = modelName ?? template.modelName
         do {
             let key = try keyProvider()
             let roleContext = buildRoleContext(for: role, in: context)
@@ -231,7 +237,7 @@ final class StageExecutor {
             var truncated = false
             for try await event in streamProvider(
                 key, prompt.system, prompt.user,
-                template.modelName, template.temperature, template.maxTokens,
+                runtimeModel, template.temperature, template.maxTokens,
                 template.reasoningEffort
             ) {
                 switch event {

@@ -34,6 +34,12 @@ final class KnowledgeNode {
         set { nodeTypeRaw = newValue.rawValue }
     }
 
+    func addChild(title: String, type: NodeType, content: String = "", sources: [String] = []) -> KnowledgeNode {
+        let child = KnowledgeNode(title: title, type: type, content: content, sources: sources, parent: self)
+        children.append(child)
+        return child
+    }
+
     /// For OutlineGroup: nil for leaves so no disclosure triangle shows.
     var childrenOrNil: [KnowledgeNode]? {
         children.isEmpty ? nil : children

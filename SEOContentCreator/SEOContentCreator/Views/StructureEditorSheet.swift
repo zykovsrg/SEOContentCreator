@@ -61,7 +61,7 @@ struct StructureEditorSheet: View {
         let template = fetchStructureTemplate()
         Task {
             await executor.execute(stage: .structure, topic: topic, template: template,
-                                   currentText: nil, in: context)
+                                   currentText: nil, modelName: model, in: context)
             if executor.lastErrorMessage == nil {
                 planText = executor.streamingText.trimmingCharacters(in: .whitespacesAndNewlines)
             }

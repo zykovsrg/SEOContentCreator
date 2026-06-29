@@ -111,7 +111,7 @@ private struct NodeDetailView: View {
     }
 
     private func addChild() {
-        let child = KnowledgeNode(title: "Новый узел", type: .fact, parent: node)
+        let child = node.addChild(title: "Новый узел", type: .fact)
         context.insert(child)
     }
 }

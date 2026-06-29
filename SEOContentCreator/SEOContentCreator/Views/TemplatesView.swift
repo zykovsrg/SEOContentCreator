@@ -254,10 +254,10 @@ struct TemplatesView: View {
 
 private struct TemplateEditorView: View {
     @Bindable var template: StageTemplate
+    @AppStorage("openAIModel") private var settingsModel = "gpt-4.1"
 
     @State private var system = ""
     @State private var user = ""
-    @State private var model = "gpt-4.1"
     @State private var temperature = 0.6
     @State private var maxTokens = 8000
     /// Empty string = "по умолчанию" (nil, parameter omitted).
@@ -265,13 +265,6 @@ private struct TemplateEditorView: View {
     @State private var showVariables = false
     @State private var savedNote: String?
     @State private var showSandbox = false
-
-    private let models = [
-        "gpt-5.5-pro", "gpt-5.5",
-        "gpt-5.4-pro", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
-        "gpt-5.3-chat-latest",
-        "gpt-4.1", "gpt-4o", "gpt-4o-mini"
-    ]
 
     var body: some View {
         ScrollView {
@@ -288,18 +281,17 @@ private struct TemplateEditorView: View {
                 Text("Пользовательский промт (инструкция с переменными)").font(.headline)
                 TextEditor(text: $user).frame(minHeight: 200).border(.gray.opacity(0.3))
 
-                Text("Параметры модели").font(.headline)
-                Picker("Модель", selection: $model) {
-                    ForEach(models, id: \.self) { Text($0).tag($0) }
-                }
-                .frame(maxWidth: 360, alignment: .leading)
+                Text("Параметры генерации").font(.headline)
+                Text("Модель: \(settingsModel)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Stepper("Температура: \(temperature, specifier: "%.1f")",
                         value: $temperature, in: 0...1, step: 0.1)
                     .frame(maxWidth: 360, alignment: .leading)
                 Stepper("Max tokens: \(maxTokens)", value: $maxTokens, in: 1000...16000, step: 1000)
                     .frame(maxWidth: 360, alignment: .leading)
 
-                if OpenAIClient.usesMaxCompletionTokens(model: model) {
+                if OpenAIClient.usesMaxCompletionTokens(model: settingsModel) {
                     Picker("Интенсивность мышления", selection: $reasoningEffort) {
                         Text("По умолчанию").tag("")
                         Text("Низкая").tag("low")
@@ -346,7 +338,6 @@ private struct TemplateEditorView: View {
     private func load() {
         system = template.systemPrompt
         user = template.userPromptTemplate
-        model = template.modelName
         temperature = template.temperature
         maxTokens = template.maxTokens
         reasoningEffort = template.reasoningEffort ?? ""
@@ -355,11 +346,10 @@ private struct TemplateEditorView: View {
     private func save() {
         template.systemPrompt = system
         template.userPromptTemplate = user
-        template.modelName = model
         template.temperature = temperature
         template.maxTokens = maxTokens
         // Persist only when the model supports it and a level is chosen; otherwise clear it.
-        template.reasoningEffort = (OpenAIClient.usesMaxCompletionTokens(model: model) && !reasoningEffort.isEmpty)
+        template.reasoningEffort = (OpenAIClient.usesMaxCompletionTokens(model: settingsModel) && !reasoningEffort.isEmpty)
             ? reasoningEffort : nil
         template.templateVersion += 1
         template.updatedAt = .now
@@ -372,10 +362,10 @@ private struct TemplateEditorView: View {
             articleType: template.articleTypeRaw.flatMap(ArticleType.init(rawValue:)),
             systemPrompt: system,
             userPromptTemplate: user,
-            modelName: model,
+            modelName: settingsModel,
             temperature: temperature,
             maxTokens: maxTokens,
-            reasoningEffort: (OpenAIClient.usesMaxCompletionTokens(model: model) && !reasoningEffort.isEmpty)
+            reasoningEffort: (OpenAIClient.usesMaxCompletionTokens(model: settingsModel) && !reasoningEffort.isEmpty)
                 ? reasoningEffort
                 : nil,
             templateVersion: template.templateVersion
@@ -386,7 +376,6 @@ private struct TemplateEditorView: View {
         let c = StageTemplateDefaults.content(for: template.stage ?? .draft)
         system = c.systemPrompt
         user = c.userPromptTemplate
-        model = c.modelName
         temperature = c.temperature
         maxTokens = c.maxTokens
         reasoningEffort = ""
