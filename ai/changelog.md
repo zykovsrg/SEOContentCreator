@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-06-29 — Очистка future tasks от завершённых записей
+
+- Change: Из `ai/future-tasks.md` удалены future task entries со статусом `done`; оставлены шаблон и незавершённые идеи.
+- Impact: Backlog стал короче и показывает только актуальные будущие задачи, без уже закрытых работ.
+- Manual checks: Проверено, что `Status: done` в `ai/future-tasks.md` больше не встречается.
+
 ### 2026-06-27 — Режим «Быстрая проверка» (FT-20260623-004)
 
 - Change: Новый лист «Быстрая проверка» для разовой проверки произвольного текста без создания темы. Новый метод `Logic/StageExecutor.executeQuickCheck(stage:pastedText:template:in:)` — прогоняет одну проверку (seoCheck/factCheck/finalReview) на вставленном тексте; не создаёт GenerationJob, ArticleVersion, не вставляет Topic в контекст. Для построения промта используется транзитный `Topic(title: "", articleType: .info)`, не вставляемый в ModelContext (данные не персистируются). Новый хелпер `Logic/QuickCheckTitle.swift` — предлагает имя темы из первой непустой строки исправленного текста (обрезает до 80 символов). Новый `Views/QuickCheckSheet.swift`: ввод текста, Picker проверки (сегментированный), кнопка «Проверить» с ProgressView, `RemarksPanelView` (принять/отклонить), исправленный текст через `RemarkApplier.apply`, кнопки «Скопировать результат» (NSPasteboard) и «Сохранить как тему» (алерт с TextField, prefill из QuickCheckTitle). Показывает ошибку (красный) и предупреждение об обрыве токенов (оранжевый). `Views/ContentPlanView.swift` — кнопка «Быстрая проверка» в тулбаре + `.sheet`. Тесты `Tests/QuickCheckTests.swift`: QuickCheckExecutorTests 2 (парсинг замечаний, отсутствие персистентности), QuickCheckTitleTests 3 (первая непустая строка, обрезка, фолбэк). 7 коммитов cdc1fbe..1bc8e92 на ветке `feature/quick-check`.
