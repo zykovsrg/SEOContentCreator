@@ -134,6 +134,72 @@ final class StageExecutor {
         isRunning = false
     }
 
+    /// Runs a stage template against an existing topic without persisting anything.
+    /// Intended for the stage prompt sandbox in Templates.
+    func executeSandbox(
+        stage: PipelineStage,
+        topic: Topic,
+        template: StageTemplate,
+        currentText: String?,
+        selectedBlocks: [String] = [],
+        in context: ModelContext
+    ) async {
+        isRunning = true
+        streamingText = ""
+        lastErrorMessage = nil
+        lastWarningMessage = nil
+        lastResultVersionID = nil
+        remarks = []
+
+        let role = fetchRole(for: stage, in: context)
+        do {
+            let key = try keyProvider()
+            let roleContext = buildRoleContext(for: role, in: context)
+            let prompt = PromptBuilder().build(
+                template: template,
+                topic: topic,
+                currentText: currentText,
+                selectedBlocks: selectedBlocks,
+                roleContext: roleContext
+            )
+            var collected = ""
+            var truncated = false
+            for try await event in streamProvider(
+                key,
+                prompt.system,
+                prompt.user,
+                template.modelName,
+                template.temperature,
+                template.maxTokens,
+                template.reasoningEffort
+            ) {
+                switch event {
+                case .token(let t):
+                    collected += t
+                    streamingText = collected
+                case .finish(let reason):
+                    if reason == "length" { truncated = true }
+                }
+            }
+            if truncated {
+                lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
+            }
+            if stage.kind == .checking {
+                remarks = RemarksParser.parse(rawText: collected)
+            }
+        } catch {
+            let message: String
+            if let keyError = error as? KeychainService.KeychainError, keyError == .notFound {
+                message = "Укажите API-ключ в Настройках"
+            } else {
+                message = error.localizedDescription
+            }
+            lastErrorMessage = message
+        }
+
+        isRunning = false
+    }
+
     /// Runs a single checking stage on arbitrary pasted text, without persisting
     /// anything (no GenerationJob, no ArticleVersion, no Topic). Fills `remarks`.
     /// Intended for the topic-less "Быстрая проверка" sheet.

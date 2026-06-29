@@ -162,6 +162,109 @@ struct StageExecutorTests {
         #expect(captured == "high")
     }
 
+    @Test func sandboxUsesTemporaryTemplateWithoutPersisting() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease)
+        context.insert(topic)
+        let current = ArticleVersion(stage: .draft, source: .generated, text: "Текущий текст")
+        current.topic = topic
+        context.insert(current)
+        topic.currentVersionID = current.uuid
+
+        let template = StageTemplate(
+            stage: .draft,
+            systemPrompt: "Временная система",
+            userPromptTemplate: "UNSAVED {{тема}} / {{текущий_текст}}",
+            modelName: "gpt-5.5",
+            temperature: 0.4,
+            maxTokens: 3000,
+            reasoningEffort: "high"
+        )
+
+        var capturedSystem = ""
+        var capturedUser = ""
+        var capturedReasoning: String?
+        let provider: StageExecutor.StreamProvider = { _, system, user, _, _, _, reasoningEffort in
+            capturedSystem = system
+            capturedUser = user
+            capturedReasoning = reasoningEffort
+            return AsyncThrowingStream { continuation in
+                continuation.yield(.token("Песочный результат"))
+                continuation.finish()
+            }
+        }
+        let executor = StageExecutor(streamProvider: provider, keyProvider: { "k" })
+
+        await executor.executeSandbox(
+            stage: .draft,
+            topic: topic,
+            template: template,
+            currentText: topic.currentVersion?.text,
+            in: context
+        )
+
+        #expect(capturedSystem == "Временная система")
+        #expect(capturedUser == "UNSAVED Тема / Текущий текст")
+        #expect(capturedReasoning == "high")
+        #expect(executor.streamingText == "Песочный результат")
+        #expect(executor.lastErrorMessage == nil)
+        #expect(topic.jobs.isEmpty)
+        #expect(topic.versions.count == 1)
+        #expect(topic.currentVersionID == current.uuid)
+    }
+
+    @Test func sandboxSetsTruncationWarningWithoutPersisting() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease)
+        context.insert(topic)
+        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _, _ in
+            AsyncThrowingStream { continuation in
+                continuation.yield(.token("Обрезанный песочный текст"))
+                continuation.yield(.finish(reason: "length"))
+                continuation.finish()
+            }
+        }
+        let executor = StageExecutor(streamProvider: provider, keyProvider: { "k" })
+
+        await executor.executeSandbox(
+            stage: .draft,
+            topic: topic,
+            template: template,
+            currentText: nil,
+            in: context
+        )
+
+        #expect(executor.streamingText == "Обрезанный песочный текст")
+        #expect(executor.lastWarningMessage != nil)
+        #expect(topic.jobs.isEmpty)
+        #expect(topic.versions.isEmpty)
+        #expect(topic.currentVersionID == nil)
+    }
+
+    @Test func sandboxCheckingStageParsesRemarksWithoutPersisting() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease)
+        context.insert(topic)
+        let template = StageTemplate(stage: .finalReview, systemPrompt: "s", userPromptTemplate: "{{текущий_текст}}")
+        let json = #"{"remarks":[{"category":"Язык","quote":"плохо","suggestion":"лучше","explanation":"яснее"}]}"#
+        let executor = StageExecutor(streamProvider: cannedStream([json]), keyProvider: { "k" })
+
+        await executor.executeSandbox(
+            stage: .finalReview,
+            topic: topic,
+            template: template,
+            currentText: "плохо",
+            in: context
+        )
+
+        #expect(executor.streamingText == json)
+        #expect(executor.remarks.count == 1)
+        #expect(executor.remarks.first?.suggestion == "лучше")
+        #expect(topic.jobs.isEmpty)
+        #expect(topic.versions.isEmpty)
+    }
+
     @Test func passesRoleContextIntoPromptBuilder() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)
