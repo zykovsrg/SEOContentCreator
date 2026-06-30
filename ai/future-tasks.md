@@ -178,35 +178,6 @@ Promotion notes:
 
 ---
 
-### FT-20260626-002 — Разбить TemplatesView.swift на файлы
-
-Status: done
-
-Priority: low
-
-Source: code review FT-20260623-002, 2026-06-26
-
-Created: 2026-06-26
-
-Context:
-
-`Views/TemplatesView.swift` вырос до ~905 строк и содержит основной view плюс множество приватных editor-views (`TemplateEditorView`, `RoleEditorView`, `ContextBlockEditorView`, `ImagePromptEditorView`, `ImageStylePresetEditorView`, `EditorDictionaryEditorView`, `SkillEditorView`, `ProductBlockEditorView`). Чисто организационный рефакторинг.
-
-Proposed task:
-
-1. Вынести editor-views в отдельные файлы (например, `Views/Templates/*EditorView.swift` или `TemplatesView+Editors.swift`), оставив в `TemplatesView.swift` только основной view, enum выбора и sidebar.
-
-Acceptance criteria:
-
-- Поведение не меняется; сборка и тесты зелёные.
-
-Promotion notes:
-
-- Чистый рефакторинг — не смешивать с функциональными задачами.
-- Xcode 16 file-system-sync: новые файлы попадают в таргет автоматически.
-
----
-
 ### FT-20260626-003 — Стабильная подпись приложения, чтобы Keychain не спрашивал пароль каждый раз
 
 Status: idea
