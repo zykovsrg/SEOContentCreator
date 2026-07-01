@@ -47,6 +47,8 @@ struct StageExecutorTests {
         #expect(created?.text == "Часть 1 Часть 2")
         #expect(created?.stageRaw == "draft")
         #expect(created?.source == .generated)
+        #expect(created?.status == .pending)
+        #expect(created?.isVisibleInVersionLane == false)
         #expect(topic.jobs.first?.status == .success)
         #expect(executor.lastErrorMessage == nil)
         #expect(executor.lastWarningMessage == nil)

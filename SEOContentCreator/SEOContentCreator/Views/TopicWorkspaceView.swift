@@ -129,7 +129,7 @@ struct TopicWorkspaceView: View {
     /// The just-generated version awaiting accept/reject (in the lane, not yet current).
     private var pendingVersion: ArticleVersion? {
         guard let id = pendingVersionID else { return nil }
-        return topic.versions.first { $0.uuid == id && !$0.isArchived }
+        return topic.versions.first { $0.uuid == id && $0.status == .pending }
     }
 
     private var isReviewing: Bool {
@@ -217,6 +217,7 @@ struct TopicWorkspaceView: View {
 
     private func acceptAll() {
         guard let pending = pendingVersion else { return }
+        pending.status = .accepted
         topic.currentVersionID = pending.uuid
         topic.updatedAt = .now
         pendingVersionID = nil
@@ -225,16 +226,17 @@ struct TopicWorkspaceView: View {
 
     private func reject() {
         guard let pending = pendingVersion else { return }
-        pending.isArchived = true   // current version stays unchanged
+        pending.status = .rejected
         pendingVersionID = nil
         comparisonText = nil
     }
 
     private func applyPartial(base: String, generated: ArticleVersion, indices: Set<Int>) {
         let hybrid = VersionActions.assembleHybrid(old: base, new: generated.text, acceptedNewIndices: indices)
-        generated.isArchived = true
+        generated.status = .rejected
         let version = ArticleVersion(stage: PipelineStage(rawValue: generated.stageRaw) ?? .draft,
                                      source: .acceptedPartial, text: hybrid)
+        version.status = .accepted
         version.topic = topic
         context.insert(version)
         topic.currentVersionID = version.uuid
@@ -249,6 +251,7 @@ struct TopicWorkspaceView: View {
         let result = RemarkApplier.apply(base: base, accepted: accepted)
         if result != base {
             let version = ArticleVersion(stage: selectedStage, source: .checkApplied, text: result)
+            version.status = .accepted
             version.topic = topic
             context.insert(version)
             topic.currentVersionID = version.uuid

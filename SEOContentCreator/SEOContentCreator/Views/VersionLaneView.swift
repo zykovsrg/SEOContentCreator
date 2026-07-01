@@ -19,7 +19,7 @@ struct VersionLaneView: View {
     }
 
     private var versions: [ArticleVersion] {
-        topic.versions.filter { !$0.isArchived }.sorted { $0.createdAt > $1.createdAt }
+        topic.versions.filter(\.isVisibleInVersionLane).sorted { $0.createdAt > $1.createdAt }
     }
 
     var body: some View {

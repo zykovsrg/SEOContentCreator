@@ -110,6 +110,7 @@ final class StageExecutor {
                 version.h1 = parsed.h1
                 version.seoTitle = parsed.seoTitle
                 version.seoDescription = parsed.seoDescription
+                version.status = .pending
                 version.topic = topic
                 context.insert(version)
 
