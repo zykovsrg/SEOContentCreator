@@ -4,7 +4,7 @@ Status: active
 
 Allowed statuses: empty / active / review / blocked / done / paused
 
-Stage: spec
+Stage: planning
 
 Allowed stages: intake / spec / planning / implementation / review / task-finish
 
@@ -25,6 +25,8 @@ yes
 Promoted from `FT-20260623-001 — Полноценная Семантика: частотность, статусы, индикатор`.
 
 Design spec: `docs/superpowers/specs/2026-07-02-semantic-agent-design.md`.
+
+Implementation plan: `docs/superpowers/plans/2026-07-02-semantic-agent.md`.
 
 Initial scope to design through Superpowers before implementation:
 
@@ -55,4 +57,4 @@ What changed: created branch `codex/semantic-wordstat-agent`; promoted semantic 
 
 Open risks: likely SwiftData schema migration; external Wordstat API/provider choice; API credentials and rate limits; cannibalization rules may need product decisions.
 
-Next agent should check: follow Superpowers brainstorming first; do not implement until design/spec is approved.
+Next agent should check: use `docs/superpowers/plans/2026-07-02-semantic-agent.md` and choose subagent-driven or inline execution before touching implementation code.
