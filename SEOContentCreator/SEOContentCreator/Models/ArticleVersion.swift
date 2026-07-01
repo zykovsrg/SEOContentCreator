@@ -1,11 +1,19 @@
 import Foundation
 import SwiftData
 
+enum ArticleVersionStatus: String, Codable, CaseIterable {
+    case pending
+    case accepted
+    case rejected
+    case archived
+}
+
 @Model
 final class ArticleVersion {
     var uuid: UUID
     var stageRaw: String          // PipelineStage.rawValue, or "manualEdit"/"rollback"/"importFromDocs"
     var sourceRaw: String
+    var statusRaw: String?
     var text: String
     var h1: String?
     var seoTitle: String?
@@ -31,6 +39,7 @@ final class ArticleVersion {
         self.uuid = UUID()
         self.stageRaw = stageLabel
         self.sourceRaw = source.rawValue
+        self.statusRaw = ArticleVersionStatus.accepted.rawValue
         self.text = text
         self.agentName = agentName
         self.templateID = templateID
@@ -55,6 +64,24 @@ final class ArticleVersion {
     var source: VersionSource {
         get { VersionSource(rawValue: sourceRaw) ?? .generated }
         set { sourceRaw = newValue.rawValue }
+    }
+
+    var status: ArticleVersionStatus {
+        get {
+            if isArchived { return .archived }
+            guard let statusRaw, let value = ArticleVersionStatus(rawValue: statusRaw) else {
+                return .accepted
+            }
+            return value
+        }
+        set {
+            statusRaw = newValue.rawValue
+            isArchived = newValue == .archived
+        }
+    }
+
+    var isVisibleInVersionLane: Bool {
+        status == .accepted
     }
 
     var stageTitle: String {
