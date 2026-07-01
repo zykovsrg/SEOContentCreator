@@ -67,4 +67,17 @@ enum DocsRequestBuilder {
         }
         return requests
     }
+
+    static func buildReplacingBody(blocks: [DocBlock], existingBodyEndIndex: Int) -> [[String: Any]] {
+        var requests: [[String: Any]] = []
+        if existingBodyEndIndex > 2 {
+            requests.append([
+                "deleteContentRange": [
+                    "range": ["startIndex": 1, "endIndex": existingBodyEndIndex - 1]
+                ]
+            ])
+        }
+        requests.append(contentsOf: build(blocks: blocks))
+        return requests
+    }
 }

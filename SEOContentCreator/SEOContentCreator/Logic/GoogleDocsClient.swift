@@ -41,18 +41,22 @@ struct GoogleDocsClient {
     }
 
     func clearBody(docID: String) async throws {
-        let getURL = URL(string: "https://docs.googleapis.com/v1/documents/\(docID)")!
-        let data = try await send(url: getURL, method: "GET", json: nil)
-        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let body = obj["body"] as? [String: Any],
-              let content = body["content"] as? [[String: Any]],
-              let endIndex = content.compactMap({ $0["endIndex"] as? Int }).max(),
-              endIndex > 2 else { return }
+        let endIndex = try await documentBodyEndIndex(docID: docID)
+        guard endIndex > 2 else { return }
         try await batchUpdate(docID: docID, requests: [[
             "deleteContentRange": [
                 "range": ["startIndex": 1, "endIndex": endIndex - 1]
             ]
         ]])
+    }
+
+    func documentBodyEndIndex(docID: String) async throws -> Int {
+        let getURL = URL(string: "https://docs.googleapis.com/v1/documents/\(docID)")!
+        let data = try await send(url: getURL, method: "GET", json: nil)
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let body = obj["body"] as? [String: Any],
+              let content = body["content"] as? [[String: Any]] else { throw DocsError.badResponse }
+        return content.compactMap { $0["endIndex"] as? Int }.max() ?? 1
     }
 
     func findOrCreateFolder(name: String) async throws -> String {

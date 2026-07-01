@@ -5,6 +5,7 @@ protocol DocsPublishing {
     func createDocument(title: String) async throws -> String
     func batchUpdate(docID: String, requests: [[String: Any]]) async throws
     func clearBody(docID: String) async throws
+    func documentBodyEndIndex(docID: String) async throws -> Int
     func findOrCreateFolder(name: String) async throws -> String
     func moveToFolder(fileID: String, folderID: String) async throws
 }
@@ -33,7 +34,7 @@ final class ArticlePublisher {
         return ArticlePublisher(docs: client, tokenProvider: { try await auth.validAccessToken() })
     }
 
-    func publish(topic: Topic, mode: PublishMode, in context: ModelContext) async {
+    func publish(topic: Topic, mode: PublishMode, targetDocID: String? = nil, in context: ModelContext) async {
         isPublishing = true
         lastErrorMessage = nil
         defer { isPublishing = false }
@@ -53,7 +54,8 @@ final class ArticlePublisher {
             case .newDocument:
                 docID = try await docs.createDocument(title: docTitle)
             case .overwrite:
-                guard let existing = topic.publications.sorted(by: { $0.publishedAt > $1.publishedAt }).first?.docID
+                guard let existing = targetDocID
+                        ?? topic.publications.sorted(by: { $0.publishedAt > $1.publishedAt }).first?.docID
                         ?? topic.externalDocURL.flatMap(Self.docID(fromURL:)) else {
                     let id = try await docs.createDocument(title: docTitle)
                     try await fill(docID: id, requests: requests)
@@ -62,7 +64,11 @@ final class ArticlePublisher {
                     return
                 }
                 docID = existing
-                try await docs.clearBody(docID: docID)
+                let endIndex = try await docs.documentBodyEndIndex(docID: docID)
+                let replacementRequests = DocsRequestBuilder.buildReplacingBody(blocks: blocks, existingBodyEndIndex: endIndex)
+                try await fill(docID: docID, requests: replacementRequests)
+                record(topic: topic, docID: docID, mode: mode, in: context)
+                return
             }
 
             try await fill(docID: docID, requests: requests)

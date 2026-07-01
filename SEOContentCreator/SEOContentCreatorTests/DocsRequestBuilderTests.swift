@@ -38,4 +38,16 @@ struct DocsRequestBuilderTests {
         let bullets = reqs.compactMap { $0["createParagraphBullets"] as? [String: Any] }
         #expect(bullets.count == 1)
     }
+
+    @Test func replacementRequestsDeleteExistingBodyBeforeInsert() {
+        let blocks = [DocBlock(style: .normal, listType: nil, text: "Новый текст", boldRanges: [])]
+        let reqs = DocsRequestBuilder.buildReplacingBody(blocks: blocks, existingBodyEndIndex: 20)
+        let delete = reqs.first?["deleteContentRange"] as? [String: Any]
+        let range = delete?["range"] as? [String: Any]
+        #expect(range?["startIndex"] as? Int == 1)
+        #expect(range?["endIndex"] as? Int == 19)
+
+        let insert = reqs.dropFirst().first?["insertText"] as? [String: Any]
+        #expect((insert?["text"] as? String) == "Новый текст\n")
+    }
 }
