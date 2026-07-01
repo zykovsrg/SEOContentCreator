@@ -193,6 +193,10 @@ struct TopicWorkspaceView: View {
         acceptedRemarkIDs = []
         rejectedRemarkIDs = []
         highlightedQuote = nil
+        if let message = StageRunGuard.messagePreventingRun(stage: stage, topic: topic) {
+            executor.lastErrorMessage = message
+            return
+        }
         let template = fetchTemplate(for: stage)
         let current = topic.currentVersion?.text
         Task {
