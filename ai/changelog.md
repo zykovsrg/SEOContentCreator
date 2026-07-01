@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-07-01 — Укрепление логики приложения и синхронизация main
+
+- Change: После аудита логики доработаны безопасная перезапись Google Docs, обязательный бриф перед черновиком, явный статус свежей версии, подтверждения удаления тем/узлов базы знаний и выбор документа для перезаписи. Ветки объединены в `main`; лишние локальные и удалённые ветки удалены, локальная копия синхронизирована с GitHub.
+- Impact: Приложение меньше рискует потерять опубликованный документ, случайно запустить черновик без ключевых данных или удалить важную сущность без подтверждения. История версий стала яснее: свежая генерация требует явного принятия.
+- Manual checks: Узкие unit-тесты `ArticleVersionTests`, `StageExecutorTests`, `StageRunGuardTests`, `DocsRequestBuilderTests`, `ArticlePublisherTests`, `KnowledgeNodeUsageTests` — TEST SUCCEEDED. Release/main build — BUILD SUCCEEDED. Финальная Git-проверка: осталась только `main`, рабочая копия чистая, `main` совпадает с `origin/main`.
+
 ### 2026-06-30 — Разбиение TemplatesView.swift на editor-файлы
 
 - Change: `Views/TemplatesView.swift` сокращён до основного экрана раздела «Шаблоны»: sidebar, выбор записи, сортировка и detail-routing. Восемь editor-view вынесены в отдельные файлы под `Views/Templates/`: `TemplateEditorView`, `RoleEditorView`, `ContextBlockEditorView`, `ImagePromptEditorView`, `ImageStylePresetEditorView`, `EditorDictionaryEditorView`, `SkillEditorView`, `ProductBlockEditorView`. Логика UI и тексты не менялись.
