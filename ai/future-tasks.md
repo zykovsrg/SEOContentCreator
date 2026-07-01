@@ -81,7 +81,7 @@ Promotion notes:
 
 ### FT-20260623-001 — Полноценная Семантика: частотность, статусы, индикатор
 
-Status: idea
+Status: promoted
 
 Priority: medium
 
@@ -111,6 +111,8 @@ Promotion notes:
 
 - Изменение SwiftData-схемы — сначала объяснить пользователю риск и путь миграции.
 - Топвизор-импорт — в спеке «осознанно отложен»; не включать в этот scope.
+- Promoted on 2026-07-01 into `ai/current-task.md` on branch `codex/semantic-wordstat-agent`.
+- Scope expanded: AI-agent Wordstat/API query collection, junk filtering, cannibalization check, and recommended include/exclude lists for manual user approval.
 
 ---
 
