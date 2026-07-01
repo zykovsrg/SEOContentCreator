@@ -11,6 +11,7 @@ struct ContentPlanView: View {
     @State private var showingQuickCheck = false
     @State private var editingTopic: Topic?
     @State private var opened: Topic?
+    @State private var topicPendingDeletion: Topic?
 
     private var visibleTopics: [Topic] { filter.apply(to: topics) }
 
@@ -33,7 +34,7 @@ struct ContentPlanView: View {
             if let id = ids.first, let t = topics.first(where: { $0.id == id }) {
                 Button("Открыть") { opened = t }
                 Button("Редактировать") { editingTopic = t }
-                Button("Удалить", role: .destructive) { context.delete(t) }
+                Button("Удалить", role: .destructive) { topicPendingDeletion = t }
             }
         } primaryAction: { ids in
             if let id = ids.first, let t = topics.first(where: { $0.id == id }) { opened = t }
@@ -65,5 +66,17 @@ struct ContentPlanView: View {
         .sheet(isPresented: $showingBrief) { BriefView(topic: nil) }
         .sheet(item: $editingTopic) { BriefView(topic: $0) }
         .sheet(isPresented: $showingQuickCheck) { QuickCheckSheet() }
+        .confirmationDialog("Удалить тему?", isPresented: Binding(
+            get: { topicPendingDeletion != nil },
+            set: { if !$0 { topicPendingDeletion = nil } }
+        )) {
+            Button("Удалить", role: .destructive) {
+                if let topicPendingDeletion { context.delete(topicPendingDeletion) }
+                topicPendingDeletion = nil
+            }
+            Button("Отмена", role: .cancel) { topicPendingDeletion = nil }
+        } message: {
+            Text("Тема и связанные версии, логи и изображения будут удалены.")
+        }
     }
 }

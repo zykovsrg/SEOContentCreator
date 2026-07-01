@@ -4,6 +4,7 @@ import SwiftData
 struct KnowledgeBaseView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \KnowledgeNode.title) private var allNodes: [KnowledgeNode]
+    @Query(sort: \Topic.updatedAt, order: .reverse) private var topics: [Topic]
 
     @State private var selection: KnowledgeNode?
     @State private var search = ""
@@ -50,7 +51,7 @@ struct KnowledgeBaseView: View {
             .navigationTitle("База знаний")
         } detail: {
             if let node = selection {
-                NodeDetailView(node: node)
+                NodeDetailView(node: node, topics: topics)
             } else {
                 ContentUnavailableView("Выберите узел", systemImage: "books.vertical")
             }
@@ -89,6 +90,12 @@ struct KnowledgeBaseView: View {
 private struct NodeDetailView: View {
     @Environment(\.modelContext) private var context
     @Bindable var node: KnowledgeNode
+    let topics: [Topic]
+    @State private var confirmDelete = false
+
+    private var usageCount: Int {
+        KnowledgeNodeUsage.count(for: node, in: topics)
+    }
 
     var body: some View {
         Form {
@@ -103,11 +110,19 @@ private struct NodeDetailView: View {
             TextField("Содержимое", text: $node.content, axis: .vertical).lineLimit(3...8)
             Section("Действия") {
                 Button("Добавить подузел") { addChild() }
-                Button("Удалить", role: .destructive) { context.delete(node) }
+                Button("Удалить", role: .destructive) { confirmDelete = true }
             }
         }
         .formStyle(.grouped)
         .navigationTitle(node.title)
+        .confirmationDialog("Удалить узел базы знаний?", isPresented: $confirmDelete) {
+            Button("Удалить", role: .destructive) { context.delete(node) }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text(usageCount > 0
+                 ? "Этот узел используется в \(usageCount) темах. После удаления брифы и промты могут потерять часть контекста."
+                 : "Узел будет удалён из базы знаний.")
+        }
     }
 
     private func addChild() {
