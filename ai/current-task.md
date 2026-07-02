@@ -1,10 +1,10 @@
 # Current Task
 
-Status: active
+Status: review
 
 Allowed statuses: empty / active / review / blocked / done / paused
 
-Stage: planning
+Stage: review
 
 Allowed stages: intake / spec / planning / implementation / review / task-finish
 
@@ -38,7 +38,12 @@ Initial scope to design through Superpowers before implementation:
 
 ## Relevant files
 
-unknown
+- `docs/superpowers/specs/2026-07-02-semantic-agent-design.md`
+- `docs/superpowers/plans/2026-07-02-semantic-agent.md`
+- `SEOContentCreator/SEOContentCreator/Models/SemanticKeyword.swift`
+- `SEOContentCreator/SEOContentCreator/Models/PublishedSitePage.swift`
+- `SEOContentCreator/SEOContentCreator/Views/SemanticsEditorSheet.swift`
+- `SEOContentCreator/SEOContentCreator/Views/SemanticAgentSheet.swift`
 
 ## Done criteria
 
@@ -51,10 +56,12 @@ unknown
 
 ## Agent handoff
 
-Last agent: Codex
+Last agent: Claude Code
 
-What changed: created branch `codex/semantic-wordstat-agent`; promoted semantic future task into current task memory.
+What changed: implemented all 12 tasks of the semantic agent plan — `SemanticKeyword`/`PublishedSitePage` models with legacy `Topic.semantics` fallback, prompt renderer, mock query collector, OpenAI-based `SemanticAgentAnalyzer`, response parser, site page indexer (sitemap + HTML parsing), decision-table UI (`SemanticsEditorSheet`), `SemanticAgentSheet` for running collection/analysis, manual site index refresh wired to `SitePageIndexer`, and all affected test `ModelContainer`s updated to register the two new models. Full automated test suite passes (`xcodebuild test -scheme SEOContentCreator -destination 'platform=macOS'` → TEST SUCCEEDED, no failures).
 
-Open risks: likely SwiftData schema migration; external Wordstat API/provider choice; API credentials and rate limits; cannibalization rules may need product decisions.
+Open risks: real Wordstat API remains future work (current collector is a deterministic mock); live site refresh depends on hadassah.moscow availability; OpenAI output is strictly parsed JSON and may need retry on malformed responses.
 
-Next agent should check: use `docs/superpowers/plans/2026-07-02-semantic-agent.md` and choose subagent-driven or inline execution before touching implementation code.
+Manual verification of the new mechanic (opening a topic, running the agent, reviewing include/exclude decisions, refreshing the site index in the running app) was intentionally NOT done in this session — moved to `ai/future-tasks.md` as a separate future task per user instruction, so it does not block closing this implementation task.
+
+Next agent should check: nothing pending for this task; `task-finish` cleanup already applied.
