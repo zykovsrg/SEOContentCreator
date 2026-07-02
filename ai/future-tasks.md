@@ -495,7 +495,9 @@ Promotion notes:
 
 ### FT-20260702-016 — Показывать прогресс по этапам в панели этапов
 
-Status: idea
+Status: promoted
+
+Promoted on 2026-07-02 into `ai/current-task.md`, branch `main` (автономный запуск).
 
 Priority: medium
 

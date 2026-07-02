@@ -12,11 +12,18 @@ struct StageBarView: View {
                 Button {
                     selectedStage = stage
                 } label: {
-                    VStack(spacing: 2) {
-                        Text(stage.title)
-                        Text(agentName(for: stage))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        if StageProgress.isCompleted(stage, versions: topic.versions) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.caption)
+                        }
+                        VStack(spacing: 2) {
+                            Text(stage.title)
+                            Text(agentName(for: stage))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .background(selectedStage == stage ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.1))
