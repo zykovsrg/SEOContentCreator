@@ -88,6 +88,8 @@ final class SemanticKeyword {
 
     @Relationship var topic: Topic?
 
+    var id: UUID { uuid }
+
     init(
         text: String,
         frequency: Int? = nil,
