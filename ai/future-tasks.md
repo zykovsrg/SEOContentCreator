@@ -49,6 +49,34 @@ What to check before moving this task to `ai/current-task.md`.
 
 ## Future tasks
 
+### FT-20260703-001 — Рендерить Markdown и в VersionCompareView
+
+Status: idea
+
+Priority: low
+
+Source: реализация FT-20260702-018 (2026-07-02/03) — тот же сырой-Markdown недостаток замечен в соседнем экране
+
+Created: 2026-07-03
+
+Context:
+
+`VersionCompareView.swift` сравнивает две версии текста через `ParagraphDiff` (уже показывает добавленное/удалённое корректно), но выводит абзацы обычным `Text(line.text)` — заголовки видны как «## Заголовок» с решётками, как раньше было в `SideBySideView`.
+
+Proposed task:
+
+Заменить `Text(line.text)` в `VersionCompareView.column` на `MarkdownBlocksView(text: line.text)` (уже создан в рамках FT-20260702-018) — сохранив существующие `.strikethrough`/фон по `line.kind`.
+
+Acceptance criteria:
+
+- Заголовки/списки в сравнении версий отображаются отформатированными, как в `SideBySideView`.
+
+Promotion notes:
+
+Небольшое, изолированное изменение — переиспользует уже существующий компонент.
+
+---
+
 ### FT-20260702-001 — Ручная проверка семантического AI-агента в запущенном приложении
 
 Status: idea
@@ -553,7 +581,9 @@ Promotion notes:
 
 ### FT-20260702-018 — Рендерить Markdown в SideBySideView + показывать удалённые абзацы в дифе
 
-Status: idea
+Status: promoted
+
+Promoted on 2026-07-02 into `ai/current-task.md`, branch `main` (автономный запуск, последняя из 6 задач сессии).
 
 Priority: high
 

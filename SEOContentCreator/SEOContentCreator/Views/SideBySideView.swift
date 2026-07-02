@@ -16,8 +16,12 @@ struct SideBySideView: View {
     @ViewBuilder private var leftColumn: some View {
         if let leftText, !leftText.isEmpty {
             ScrollView {
-                Text(leftText).textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading).padding()
+                if !isStreaming, let rightText {
+                    diffParagraphs(ParagraphDiff.oldSide(old: leftText, new: rightText), removedTint: .red)
+                        .padding()
+                } else {
+                    MarkdownBlocksView(text: leftText).padding()
+                }
             }
         } else {
             ContentUnavailableView("Нет текущей версии", systemImage: "doc")
@@ -31,21 +35,37 @@ struct SideBySideView: View {
             }
         } else if let rightText, let leftText {
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(ParagraphDiff.newSide(old: leftText, new: rightText).enumerated()), id: \.offset) { _, line in
-                        Text(line.text)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(6)
-                            .background(line.kind == .added ? Color.green.opacity(0.18) : Color.clear)
-                    }
-                }.padding()
+                diffParagraphs(ParagraphDiff.newSide(old: leftText, new: rightText), addedTint: .green)
+                    .padding()
             }
         } else if let rightText {
             ScrollView {
-                Text(rightText).frame(maxWidth: .infinity, alignment: .leading).padding()
+                MarkdownBlocksView(text: rightText).padding()
             }
         } else {
             ContentUnavailableView("Запустите этап", systemImage: "play.circle")
+        }
+    }
+
+    /// Renders diffed paragraphs with Markdown formatting, tinting added/removed
+    /// paragraphs with the given color (`nil` means no tint for that kind).
+    @ViewBuilder
+    private func diffParagraphs(_ lines: [ParagraphDiffLine], addedTint: Color? = nil, removedTint: Color? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                MarkdownBlocksView(text: line.text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(6)
+                    .background(tint(for: line.kind, addedTint: addedTint, removedTint: removedTint))
+            }
+        }
+    }
+
+    private func tint(for kind: ParagraphDiffKind, addedTint: Color?, removedTint: Color?) -> Color {
+        switch kind {
+        case .added:     return addedTint?.opacity(0.18) ?? .clear
+        case .removed:   return removedTint?.opacity(0.18) ?? .clear
+        case .unchanged: return .clear
         }
     }
 
