@@ -8,6 +8,7 @@ private enum TemplateSelection: Hashable {
     case imagePrompt(UUID)
     case imagePreset(UUID)
     case editorDictionary(UUID)
+    case forbiddenPhrase(UUID)
     case skill(UUID)
     case productBlock(UUID)
 }
@@ -20,6 +21,7 @@ struct TemplatesView: View {
     @Query private var imagePrompts: [ImagePromptTemplate]
     @Query private var imagePresets: [ImageStylePreset]
     @Query private var editorDictionaries: [EditorDictionary]
+    @Query private var forbiddenPhrases: [ForbiddenPhrase]
     @Query private var skills: [SkillPreset]
     @Query private var productBlocks: [ProductBlock]
     @State private var selection: TemplateSelection?
@@ -54,6 +56,10 @@ struct TemplatesView: View {
 
     private var sortedSkills: [SkillPreset] {
         skills.sorted { $0.order < $1.order }
+    }
+
+    private var sortedForbiddenPhrases: [ForbiddenPhrase] {
+        forbiddenPhrases.sorted { $0.order < $1.order }
     }
 
     private var sortedProductBlocks: [ProductBlock] {
@@ -104,6 +110,11 @@ struct TemplatesView: View {
     private var selectedEditorDictionary: EditorDictionary? {
         guard case .editorDictionary(let id) = selection else { return nil }
         return editorDictionaries.first { $0.uuid == id }
+    }
+
+    private var selectedForbiddenPhrase: ForbiddenPhrase? {
+        guard case .forbiddenPhrase(let id) = selection else { return nil }
+        return forbiddenPhrases.first { $0.uuid == id }
     }
 
     private var selectedSkill: SkillPreset? {
@@ -161,6 +172,27 @@ struct TemplatesView: View {
                     }
                 }
 
+                Section("Запрещённые формулировки") {
+                    ForEach(sortedForbiddenPhrases) { phrase in
+                        Text(phrase.phrase)
+                            .lineLimit(1)
+                            .tag(TemplateSelection.forbiddenPhrase(phrase.uuid))
+                    }
+                    Button {
+                        let next = (forbiddenPhrases.map(\.order).max() ?? -1) + 1
+                        let phrase = ForbiddenPhrase(
+                            phrase: "Новая формулировка",
+                            problem: "",
+                            replacement: "",
+                            order: next
+                        )
+                        context.insert(phrase)
+                        selection = .forbiddenPhrase(phrase.uuid)
+                    } label: {
+                        Label("Добавить формулировку", systemImage: "plus")
+                    }
+                }
+
                 Section("Скиллы") {
                     ForEach(sortedSkills) { skill in
                         Text(skill.name).tag(TemplateSelection.skill(skill.uuid))
@@ -201,6 +233,7 @@ struct TemplatesView: View {
         .onChange(of: imagePrompts.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: imagePresets.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: editorDictionaries.map(\.uuid)) { _, _ in ensureSelection() }
+        .onChange(of: forbiddenPhrases.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: skills.map(\.uuid)) { _, _ in ensureSelection() }
         .onChange(of: productBlocks.map(\.uuid)) { _, _ in ensureSelection() }
     }
@@ -219,6 +252,8 @@ struct TemplatesView: View {
             ImageStylePresetEditorView(preset: preset) { selection = nil }.id(preset.uuid)
         } else if let dict = selectedEditorDictionary {
             EditorDictionaryEditorView(dictionary: dict).id(dict.uuid)
+        } else if let phrase = selectedForbiddenPhrase {
+            ForbiddenPhraseEditorView(phrase: phrase) { selection = nil }.id(phrase.uuid)
         } else if let skill = selectedSkill {
             SkillEditorView(skill: skill) { selection = nil }.id(skill.uuid)
         } else if let block = selectedProductBlock {
@@ -242,6 +277,8 @@ struct TemplatesView: View {
             selection = .imagePreset(first.uuid)
         } else if let first = editorDictionaries.first {
             selection = .editorDictionary(first.uuid)
+        } else if let first = sortedForbiddenPhrases.first {
+            selection = .forbiddenPhrase(first.uuid)
         } else if let first = sortedSkills.first {
             selection = .skill(first.uuid)
         } else if let first = sortedProductBlocks.first {
