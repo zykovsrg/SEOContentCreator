@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 enum VersionActions {
     /// Build a hybrid text: take paragraph i from `new` if i is accepted, else from `old`.
@@ -16,5 +17,18 @@ enum VersionActions {
             }
         }
         return result.joined(separator: "\n\n")
+    }
+
+    /// Saves a manually edited full text as a new current version of the topic.
+    /// Manual edit is a sweeping, cross-cutting action per the project invariant
+    /// that hand editing must stay available at any pipeline stage.
+    @discardableResult
+    static func applyManualEdit(topic: Topic, newText: String, in context: ModelContext) -> ArticleVersion {
+        let version = ArticleVersion(stageLabel: "manualEdit", source: .manualEdit, text: newText)
+        version.topic = topic
+        context.insert(version)
+        topic.currentVersionID = version.uuid
+        topic.updatedAt = .now
+        return version
     }
 }

@@ -436,7 +436,9 @@ Promotion notes:
 
 ### FT-20260702-014 — Ручная правка всего текста статьи
 
-Status: idea
+Status: promoted
+
+Promoted on 2026-07-02 into `ai/current-task.md`, branch `main` (автономный запуск).
 
 Priority: high
 
