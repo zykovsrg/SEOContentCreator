@@ -9,6 +9,7 @@ struct TopicVersionsTests {
         let container = try ModelContainer(
             for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
                  GenerationJob.self, StageTemplate.self, GeneratedImage.self, ExternalDocument.self,
+                 SemanticKeyword.self, PublishedSitePage.self,
             configurations: config
         )
         let context = ModelContext(container)
