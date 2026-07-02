@@ -44,6 +44,23 @@ struct PromptBuilderTests {
         #expect(result.user.contains("лучевая терапия цена"))
     }
 
+    @Test func semanticKeywordDecisionsDriveSemanticsPlaceholder() {
+        let t = StageTemplate(stage: .semanticsInText, systemPrompt: "x",
+                              userPromptTemplate: "Запросы:\n{{семантика}}")
+        let topic = Topic(title: "T", articleType: .info)
+        topic.semanticKeywords = [
+            SemanticKeyword(text: "МРТ лёгких", userDecision: .accepted),
+            SemanticKeyword(text: "КТ лёгких", userDecision: .required),
+            SemanticKeyword(text: "отклонённый", userDecision: .rejected)
+        ]
+
+        let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
+
+        #expect(result.user.contains("МРТ лёгких"))
+        #expect(result.user.contains("КТ лёгких (обязательный запрос)"))
+        #expect(!result.user.contains("отклонённый"))
+    }
+
     @Test func substitutesStructure() {
         let t = StageTemplate(stage: .draft, systemPrompt: "x",
                               userPromptTemplate: "План:\n{{структура}}")

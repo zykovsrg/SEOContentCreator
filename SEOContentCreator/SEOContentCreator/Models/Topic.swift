@@ -30,6 +30,8 @@ final class Topic {
     var images: [GeneratedImage]
     @Relationship(deleteRule: .cascade, inverse: \ExternalDocument.topic)
     var publications: [ExternalDocument] = []
+    @Relationship(deleteRule: .cascade, inverse: \SemanticKeyword.topic)
+    var semanticKeywords: [SemanticKeyword]
 
     init(
         title: String,
@@ -53,6 +55,7 @@ final class Topic {
         self.jobs = []
         self.images = []
         self.publications = []
+        self.semanticKeywords = []
         self.notes = notes
         self.createdAt = .now
         self.updatedAt = .now

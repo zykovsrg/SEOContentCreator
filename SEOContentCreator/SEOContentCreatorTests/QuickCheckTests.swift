@@ -9,7 +9,7 @@ struct QuickCheckExecutorTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
             for: Topic.self, ArticleVersion.self, GenerationJob.self,
-            AIRole.self, ContextBlock.self,
+            AIRole.self, ContextBlock.self, SemanticKeyword.self, PublishedSitePage.self,
             configurations: config
         )
         return ModelContext(container)

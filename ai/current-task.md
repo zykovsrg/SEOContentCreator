@@ -10,28 +10,14 @@ Allowed stages: intake / spec / planning / implementation / review / task-finish
 
 ## Mode
 
-intake
 
 ## Goal
 
-Пусто. Готово к новой задаче.
 
-## Use Superpowers
+## Context
 
-no
-
-## Spec
-
-Пусто.
-
-## Relevant files
-
-Пусто.
 
 ## Done criteria
 
-Пусто.
 
-## Agent handoff
-
-Пусто.
+## Notes

@@ -11,7 +11,7 @@ struct ExternalDocumentTests {
                  GenerationJob.self, StageTemplate.self,
                  ContextBlock.self, AIRole.self,
                  GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,
-                 ExternalDocument.self,
+                 ExternalDocument.self, SemanticKeyword.self, PublishedSitePage.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         return ModelContext(container)
     }

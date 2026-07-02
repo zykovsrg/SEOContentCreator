@@ -11,6 +11,7 @@ struct StageExecutorTests {
             for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
                  GenerationJob.self, StageTemplate.self,
                  ContextBlock.self, AIRole.self, GeneratedImage.self, ExternalDocument.self,
+                 SemanticKeyword.self, PublishedSitePage.self,
             configurations: config
         )
         return ModelContext(container)
