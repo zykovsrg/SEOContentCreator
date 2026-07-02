@@ -3,7 +3,7 @@ import SwiftData
 
 enum StageTemplateSeeder {
     static let templatesDefaultsVersionKey = "templatesDefaultsVersion"
-    private static let currentTemplatesDefaultsVersion = 4
+    private static let currentTemplatesDefaultsVersion = 5
 
     @MainActor
     static func seedIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
@@ -88,6 +88,11 @@ enum StageTemplateSeeder {
             let content = StageTemplateDefaults.content(for: stage)
             template.systemPrompt = content.systemPrompt
             template.userPromptTemplate = content.userPromptTemplate
+            // Checking stages need a low, predictable temperature (stable JSON,
+            // less "creativity"); author stages keep their existing temperature.
+            if stage.kind == .checking {
+                template.temperature = content.temperature
+            }
             template.updatedAt = .now
         }
 

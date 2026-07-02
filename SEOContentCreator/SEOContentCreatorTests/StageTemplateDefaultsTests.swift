@@ -8,8 +8,19 @@ struct StageTemplateDefaultsTests {
             let c = StageTemplateDefaults.content(for: stage)
             #expect(!c.userPromptTemplate.isEmpty)
             #expect(c.modelName == "gpt-4.1")
-            #expect(c.temperature == 0.6)
             #expect(c.maxTokens == 8000)
+        }
+    }
+
+    @Test func checkingStagesUseLowerTemperature() {
+        for stage in PipelineStage.allCases where stage.kind == .checking {
+            #expect(StageTemplateDefaults.content(for: stage).temperature == 0.3)
+        }
+    }
+
+    @Test func authorStagesKeepDefaultTemperature() {
+        for stage in PipelineStage.allCases where stage.kind == .author {
+            #expect(StageTemplateDefaults.content(for: stage).temperature == 0.6)
         }
     }
 

@@ -97,6 +97,26 @@ struct TemplatesMigrationV3Tests {
         #expect(oldSeoCheck.userPromptTemplate == StageTemplateDefaults.content(for: .seoCheck).userPromptTemplate)
     }
 
+    @Test func checkingStagesGetLoweredTemperatureInVersion5() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+        let oldSeoCheck = StageTemplate(stage: .seoCheck, systemPrompt: "", userPromptTemplate: "x", temperature: 0.6)
+        let oldFactCheck = StageTemplate(stage: .factCheck, systemPrompt: "", userPromptTemplate: "x", temperature: 0.6)
+        let oldFinalReview = StageTemplate(stage: .finalReview, systemPrompt: "", userPromptTemplate: "x", temperature: 0.6)
+        let oldDraft = StageTemplate(stage: .draft, systemPrompt: "", userPromptTemplate: "x", temperature: 0.6)
+        context.insert(oldSeoCheck)
+        context.insert(oldFactCheck)
+        context.insert(oldFinalReview)
+        context.insert(oldDraft)
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        #expect(oldSeoCheck.temperature == 0.3)
+        #expect(oldFactCheck.temperature == 0.3)
+        #expect(oldFinalReview.temperature == 0.3)
+        #expect(oldDraft.temperature == 0.6)
+    }
+
     @Test func migrationRunsOnce() throws {
         let context = try makeContext()
         let defaults = makeDefaults()

@@ -120,7 +120,8 @@ enum StageTemplateDefaults {
                 ```
                 Категории: «Заголовки», «Ключи», «Title/Description», «Объём», «Рекламность». \
                 Поле quote — дословный фрагмент из текста (для поиска). Если правка не нужна, suggestion оставь пустым.
-                """
+                """,
+                temperature: 0.3
             )
         case .factCheck:
             return StageTemplateContent(
@@ -145,7 +146,8 @@ enum StageTemplateDefaults {
                 {"remarks":[{"category":"...","quote":"<точный фрагмент из текста>","suggestion":"<доработанный текст>","explanation":"<в чём проблема>"}]}
                 ```
                 Категории: «Факт», «Статистика», «Источник», «Российский контекст», «Имя врача», «Процедура», «Цена». Поле quote — дословный фрагмент из текста. Если правка не нужна, suggestion оставь пустым.
-                """
+                """,
+                temperature: 0.3
             )
         case .finalReview:
             return StageTemplateContent(
@@ -170,7 +172,8 @@ enum StageTemplateDefaults {
                 {"remarks":[{"category":"...","quote":"<точный фрагмент из текста>","suggestion":"<доработанный текст>","explanation":"<в чём проблема>"}]}
                 ```
                 Категории: «Орфография», «Грамматика», «Пунктуация», «Стиль», «Канцелярит», «Вода», «ИИ-штамп», «Запрещённая формулировка». Поле quote — дословный фрагмент из текста.
-                """
+                """,
+                temperature: 0.3
             )
         }
     }

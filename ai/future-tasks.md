@@ -318,7 +318,9 @@ Promotion notes:
 
 ### FT-20260702-010 — Снизить temperature для проверочных этапов
 
-Status: idea
+Status: promoted
+
+Promoted on 2026-07-02 into `ai/current-task.md`, branch `main` (автономный запуск).
 
 Priority: medium
 
