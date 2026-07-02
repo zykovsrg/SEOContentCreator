@@ -21,6 +21,7 @@ enum TemplateVariables {
         TemplateVariable(token: "{{база_знаний}}", description: "Все прикреплённые узлы (для фактчекинга)", source: "База знаний"),
         TemplateVariable(token: "{{структура}}", description: "Утверждённый план статьи", source: "Этап «Структура»"),
         TemplateVariable(token: "{{выделенный_фрагмент}}", description: "Фрагмент текста для иллюстрации", source: "Окно генерации иллюстрации"),
-        TemplateVariable(token: "{{текущий_текст}}", description: "Текст текущей версии", source: "Предыдущая версия")
+        TemplateVariable(token: "{{текущий_текст}}", description: "Текст текущей версии", source: "Предыдущая версия"),
+        TemplateVariable(token: "{{запрещённые_формулировки}}", description: "Таблица запрещённых формулировок", source: "Шаблоны → Запрещённые формулировки")
     ]
 }

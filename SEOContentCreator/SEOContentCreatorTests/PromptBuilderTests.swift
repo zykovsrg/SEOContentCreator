@@ -171,6 +171,29 @@ struct PromptBuilderTests {
         #expect(result.user.contains("Продуктовые блоки для встраивания:\nБлок CTA"))
     }
 
+    @Test func substitutesForbiddenPhrasesPlaceholder() {
+        let t = StageTemplate(stage: .finalReview, systemPrompt: "x",
+                              userPromptTemplate: "Запрещено:\n{{запрещённые_формулировки}}")
+        let topic = Topic(title: "T", articleType: .info)
+
+        let result = PromptBuilder().build(
+            template: t, topic: topic, currentText: "текст",
+            forbiddenPhrases: "- «плохая фраза» — проблема: звучит плохо; замена: «хорошая фраза»"
+        )
+
+        #expect(result.user.contains("«плохая фраза»"))
+    }
+
+    @Test func emptyForbiddenPhrasesFallsBackToStub() {
+        let t = StageTemplate(stage: .finalReview, systemPrompt: "x",
+                              userPromptTemplate: "Запрещено:\n{{запрещённые_формулировки}}")
+        let topic = Topic(title: "T", articleType: .info)
+
+        let result = PromptBuilder().build(template: t, topic: topic, currentText: "текст")
+
+        #expect(result.user.contains("(список пуст)"))
+    }
+
     @Test func emptyPlaceholderRemovedWhenNoBlocks() {
         let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
                               userPromptTemplate: "A {{продуктовые_блоки}} B")

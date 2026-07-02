@@ -6,7 +6,8 @@ struct PromptBuilder {
         topic: Topic,
         currentText: String?,
         selectedBlocks: [String] = [],
-        roleContext: String = ""
+        roleContext: String = "",
+        forbiddenPhrases: String = ""
     ) -> (system: String, user: String) {
         var user = template.userPromptTemplate
 
@@ -32,7 +33,8 @@ struct PromptBuilder {
             "{{семантика}}": semantics,
             "{{база_знаний}}": knowledge,
             "{{структура}}": topic.structureText,
-            "{{текущий_текст}}": currentText ?? ""
+            "{{текущий_текст}}": currentText ?? "",
+            "{{запрещённые_формулировки}}": forbiddenPhrases.isEmpty ? "(список пуст)" : forbiddenPhrases
         ]
         func substitute(_ text: String) -> String {
             var result = text
