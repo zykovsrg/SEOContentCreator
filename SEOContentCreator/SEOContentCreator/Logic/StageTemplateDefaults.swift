@@ -104,6 +104,10 @@ enum StageTemplateDefaults {
                 userPromptTemplate: """
                 Проверь текст на соответствие SEO-требованиям. Не переписывай — верни список замечаний.
 
+                H1: {{текущий_h1}}
+                Title: {{текущий_title}}
+                Description: {{текущий_description}}
+
                 Текст:
                 {{текущий_текст}}
 

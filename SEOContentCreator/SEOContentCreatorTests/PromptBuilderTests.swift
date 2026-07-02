@@ -194,6 +194,33 @@ struct PromptBuilderTests {
         #expect(result.user.contains("(список пуст)"))
     }
 
+    @Test func seoMetaVariablesSubstitutedFromCurrentVersion() {
+        let t = StageTemplate(stage: .seoCheck, systemPrompt: "x",
+                              userPromptTemplate: "H1: {{текущий_h1}}\nTitle: {{текущий_title}}\nDescription: {{текущий_description}}")
+        let topic = Topic(title: "T", articleType: .info)
+        let version = ArticleVersion(stage: .semanticsInText, source: .generated, text: "тело")
+        version.h1 = "Лечение рака простаты"
+        version.seoTitle = "Рак простаты — лечение | Клиника"
+        version.seoDescription = "Современное лечение рака простаты."
+        version.topic = topic
+        topic.versions = [version]
+        topic.currentVersionID = version.uuid
+
+        let result = PromptBuilder().build(template: t, topic: topic, currentText: "тело")
+
+        #expect(result.user.contains("H1: Лечение рака простаты"))
+        #expect(result.user.contains("Title: Рак простаты — лечение | Клиника"))
+        #expect(result.user.contains("Description: Современное лечение рака простаты."))
+    }
+
+    @Test func seoMetaVariablesEmptyWithoutCurrentVersion() {
+        let t = StageTemplate(stage: .seoCheck, systemPrompt: "x",
+                              userPromptTemplate: "H1:[{{текущий_h1}}]")
+        let topic = Topic(title: "T", articleType: .info)
+        let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
+        #expect(result.user == "H1:[]")
+    }
+
     @Test func emptyPlaceholderRemovedWhenNoBlocks() {
         let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
                               userPromptTemplate: "A {{продуктовые_блоки}} B")

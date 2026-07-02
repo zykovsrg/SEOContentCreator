@@ -30,13 +30,13 @@ struct TemplatesMigrationV3Tests {
             systemPrompt: "старый system",
             userPromptTemplate: "старый user"
         )
-        let oldSeoCheck = StageTemplate(
-            stage: .seoCheck,
+        let oldProductBlocks = StageTemplate(
+            stage: .productBlocks,
             systemPrompt: "",
-            userPromptTemplate: "правленный seoCheck"
+            userPromptTemplate: "правленный productBlocks"
         )
         context.insert(oldDraft)
-        context.insert(oldSeoCheck)
+        context.insert(oldProductBlocks)
         context.insert(ContextBlock(key: "editorialPolicy", title: "Редполитика", text: "старая редполитика"))
         context.insert(AIRole(
             key: "author",
@@ -48,7 +48,7 @@ struct TemplatesMigrationV3Tests {
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
 
         #expect(oldDraft.userPromptTemplate == StageTemplateDefaults.content(for: .draft).userPromptTemplate)
-        #expect(oldSeoCheck.userPromptTemplate == "правленный seoCheck")
+        #expect(oldProductBlocks.userPromptTemplate == "правленный productBlocks")
 
         let blocks = try context.fetch(FetchDescriptor<ContextBlock>())
         let policy = blocks.first { $0.key == "editorialPolicy" }
@@ -79,6 +79,22 @@ struct TemplatesMigrationV3Tests {
 
         let presets = try context.fetch(FetchDescriptor<SkillPreset>())
         #expect(presets.isEmpty)
+    }
+
+    @Test func seoCheckMigratesInVersion4ToIncludeSEOMeta() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+        let oldSeoCheck = StageTemplate(
+            stage: .seoCheck,
+            systemPrompt: "",
+            userPromptTemplate: "старый seoCheck без H1"
+        )
+        context.insert(oldSeoCheck)
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        #expect(oldSeoCheck.userPromptTemplate.contains("{{текущий_h1}}"))
+        #expect(oldSeoCheck.userPromptTemplate == StageTemplateDefaults.content(for: .seoCheck).userPromptTemplate)
     }
 
     @Test func migrationRunsOnce() throws {

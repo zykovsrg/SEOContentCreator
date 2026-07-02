@@ -34,6 +34,9 @@ struct PromptBuilder {
             "{{база_знаний}}": knowledge,
             "{{структура}}": topic.structureText,
             "{{текущий_текст}}": currentText ?? "",
+            "{{текущий_h1}}": topic.currentVersion?.h1 ?? "",
+            "{{текущий_title}}": topic.currentVersion?.seoTitle ?? "",
+            "{{текущий_description}}": topic.currentVersion?.seoDescription ?? "",
             "{{запрещённые_формулировки}}": forbiddenPhrases.isEmpty ? "(список пуст)" : forbiddenPhrases
         ]
         func substitute(_ text: String) -> String {

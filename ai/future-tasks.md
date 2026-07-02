@@ -230,7 +230,9 @@ Promotion notes:
 
 ### FT-20260702-007 — Передать Title/Description/H1 в проверку SEO и при публикации
 
-Status: idea
+Status: promoted
+
+Promoted on 2026-07-02 into `ai/current-task.md`, branch `main` (автономный запуск, реализация всех 6 отобранных задач подряд).
 
 Priority: high
 

@@ -3,7 +3,7 @@ import SwiftData
 
 enum StageTemplateSeeder {
     static let templatesDefaultsVersionKey = "templatesDefaultsVersion"
-    private static let currentTemplatesDefaultsVersion = 3
+    private static let currentTemplatesDefaultsVersion = 4
 
     @MainActor
     static func seedIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
@@ -79,7 +79,8 @@ enum StageTemplateSeeder {
             PipelineStage.structure.rawValue,
             PipelineStage.draft.rawValue,
             PipelineStage.factCheck.rawValue,
-            PipelineStage.finalReview.rawValue
+            PipelineStage.finalReview.rawValue,
+            PipelineStage.seoCheck.rawValue
         ]
         let templates = (try? context.fetch(FetchDescriptor<StageTemplate>())) ?? []
         for template in templates {

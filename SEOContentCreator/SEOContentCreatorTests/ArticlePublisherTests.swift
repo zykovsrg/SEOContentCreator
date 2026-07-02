@@ -101,4 +101,37 @@ struct ArticlePublisherTests {
         #expect(topic.publications.count == 1)
         #expect(fake.cleared.isEmpty)
     }
+
+    @Test func normalizeHeadingReplacesExistingH1() {
+        let result = ArticlePublisher.normalizeHeading(text: "# Старый заголовок\nАбзац.", h1: "Новый H1")
+        #expect(result == "# Новый H1\nАбзац.")
+    }
+
+    @Test func normalizeHeadingInsertsWhenMissing() {
+        let result = ArticlePublisher.normalizeHeading(text: "Просто абзац без заголовка.", h1: "Новый H1")
+        #expect(result == "# Новый H1\nПросто абзац без заголовка.")
+    }
+
+    @Test func normalizeHeadingKeepsTextWhenH1Nil() {
+        let result = ArticlePublisher.normalizeHeading(text: "# Заголовок\nАбзац.", h1: nil)
+        #expect(result == "# Заголовок\nАбзац.")
+    }
+
+    @Test func publishUsesNormalizedH1InRequestBody() async throws {
+        let context = try ctx()
+        let topic = Topic(title: "Тема", articleType: .info)
+        context.insert(topic)
+        let version = ArticleVersion(stage: .semanticsInText, source: .generated, text: "# Старый\nАбзац.")
+        version.h1 = "SEO H1"
+        version.topic = topic
+        context.insert(version)
+        topic.currentVersionID = version.uuid
+        let fake = FakeDocsClient()
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "f")
+
+        await publisher.publish(topic: topic, mode: .newDocument, in: context)
+
+        let insertedText = fake.batched.first?.1.first?["insertText"] as? [String: Any]
+        #expect((insertedText?["text"] as? String)?.contains("SEO H1") == true)
+    }
 }

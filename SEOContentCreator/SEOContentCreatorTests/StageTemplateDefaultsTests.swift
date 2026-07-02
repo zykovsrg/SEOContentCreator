@@ -35,6 +35,13 @@ struct StageTemplateDefaultsTests {
         #expect(StageTemplateDefaults.content(for: .finalReview).userPromptTemplate.contains("remarks"))
     }
 
+    @Test func seoCheckSeesCurrentH1TitleDescription() {
+        let c = StageTemplateDefaults.content(for: .seoCheck)
+        #expect(c.userPromptTemplate.contains("{{текущий_h1}}"))
+        #expect(c.userPromptTemplate.contains("{{текущий_title}}"))
+        #expect(c.userPromptTemplate.contains("{{текущий_description}}"))
+    }
+
     @Test func systemPromptsDoNotContainRoleMethodics() {
         for stage in PipelineStage.allCases {
             let system = StageTemplateDefaults.content(for: stage).systemPrompt

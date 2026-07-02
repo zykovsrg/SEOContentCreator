@@ -45,7 +45,7 @@ final class ArticlePublisher {
         }
         do {
             _ = try await tokenProvider()
-            let blocks = MarkdownDocParser.parse(version.text)
+            let blocks = MarkdownDocParser.parse(Self.normalizeHeading(text: version.text, h1: version.h1))
             let requests = DocsRequestBuilder.build(blocks: blocks)
 
             let docTitle = PublishTitleBuilder.title(externalID: topic.externalID, topicTitle: topic.title)
@@ -95,6 +95,21 @@ final class ArticlePublisher {
         context.insert(doc)
         topic.externalDocURL = url
         topic.publishedAt = .now
+    }
+
+    /// Публикуемый документ должен показывать SEO-утверждённый H1 (из этапа
+    /// «Семантика-в-текст»), а не только заголовок, который уже был в тексте
+    /// черновика. Title/Description сознательно НЕ публикуются в тело
+    /// документа — это метаданные для сайта, а не для читателя документа.
+    static func normalizeHeading(text: String, h1: String?) -> String {
+        guard let h1, !h1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
+        var lines = text.components(separatedBy: "\n")
+        if let first = lines.first, first.hasPrefix("# ") {
+            lines[0] = "# \(h1)"
+        } else {
+            lines.insert("# \(h1)", at: 0)
+        }
+        return lines.joined(separator: "\n")
     }
 
     static func docID(fromURL url: String) -> String? {
