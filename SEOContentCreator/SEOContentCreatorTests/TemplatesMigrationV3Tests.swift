@@ -1,0 +1,97 @@
+import Testing
+import Foundation
+import SwiftData
+@testable import SEOContentCreator
+
+@MainActor
+struct TemplatesMigrationV3Tests {
+    private func makeContext() throws -> ModelContext {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: StageTemplate.self, ContextBlock.self, AIRole.self,
+                 ImagePromptTemplate.self, ImageStylePreset.self, SkillPreset.self,
+            configurations: config
+        )
+        return ModelContext(container)
+    }
+
+    private func makeDefaults() -> UserDefaults {
+        let suiteName = "TemplatesMigrationV3Tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+
+    @Test func overwritesCascadeTemplatesAndBlocks() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+        let oldDraft = StageTemplate(
+            stage: .draft,
+            systemPrompt: "старый system",
+            userPromptTemplate: "старый user"
+        )
+        let oldSeoCheck = StageTemplate(
+            stage: .seoCheck,
+            systemPrompt: "",
+            userPromptTemplate: "правленный seoCheck"
+        )
+        context.insert(oldDraft)
+        context.insert(oldSeoCheck)
+        context.insert(ContextBlock(key: "editorialPolicy", title: "Редполитика", text: "старая редполитика"))
+        context.insert(AIRole(
+            key: "author",
+            name: "ИИ-автор",
+            mandate: "старый mandate",
+            blockKeys: ["editorialPolicy", "sources"]
+        ))
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        #expect(oldDraft.userPromptTemplate == StageTemplateDefaults.content(for: .draft).userPromptTemplate)
+        #expect(oldSeoCheck.userPromptTemplate == "правленный seoCheck")
+
+        let blocks = try context.fetch(FetchDescriptor<ContextBlock>())
+        let policy = blocks.first { $0.key == "editorialPolicy" }
+        #expect(policy?.text.contains("Один абзац") == true)
+
+        let roles = try context.fetch(FetchDescriptor<AIRole>())
+        let author = roles.first { $0.key == "author" }
+        #expect(author?.mandate.contains("Т—Ж") == true)
+    }
+
+    @Test func addsShortenPresetForExistingInstalls() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+        context.insert(SkillPreset(name: "Мой скилл", prompt: "x", roleKey: "editor", order: 0))
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        let presets = try context.fetch(FetchDescriptor<SkillPreset>())
+        #expect(presets.contains { $0.defaultKey == "shorten" })
+        #expect(presets.contains { $0.name == "Мой скилл" })
+    }
+
+    @Test func doesNotCreateSingleShortenPresetOnFreshInstall() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        let presets = try context.fetch(FetchDescriptor<SkillPreset>())
+        #expect(presets.isEmpty)
+    }
+
+    @Test func migrationRunsOnce() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+        let draft = try context.fetch(FetchDescriptor<StageTemplate>())
+            .first { $0.stageRaw == PipelineStage.draft.rawValue }
+        draft?.userPromptTemplate = "правка пользователя после миграции"
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        #expect(draft?.userPromptTemplate == "правка пользователя после миграции")
+    }
+}

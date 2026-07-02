@@ -3,7 +3,7 @@ import SwiftData
 
 enum StageTemplateSeeder {
     static let templatesDefaultsVersionKey = "templatesDefaultsVersion"
-    private static let currentTemplatesDefaultsVersion = 2
+    private static let currentTemplatesDefaultsVersion = 3
 
     @MainActor
     static func seedIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
@@ -12,7 +12,7 @@ enum StageTemplateSeeder {
         seedRolesIfNeeded(in: context)
         seedImagePromptTemplatesIfNeeded(in: context)
         seedImageStylePresetIfNeeded(in: context)
-        migrateStageTemplateSystemPromptsIfNeeded(in: context, defaults: defaults)
+        migrateTemplatesIfNeeded(in: context, defaults: defaults)
     }
 
     @MainActor
@@ -68,18 +68,48 @@ enum StageTemplateSeeder {
     }
 
     @MainActor
-    private static func migrateStageTemplateSystemPromptsIfNeeded(
+    private static func migrateTemplatesIfNeeded(
         in context: ModelContext,
         defaults: UserDefaults
     ) {
         let storedVersion = defaults.integer(forKey: templatesDefaultsVersionKey)
         guard storedVersion < currentTemplatesDefaultsVersion else { return }
 
+        let cascadeStages: Set<String> = [
+            PipelineStage.structure.rawValue,
+            PipelineStage.draft.rawValue,
+            PipelineStage.factCheck.rawValue,
+            PipelineStage.finalReview.rawValue
+        ]
         let templates = (try? context.fetch(FetchDescriptor<StageTemplate>())) ?? []
         for template in templates {
-            guard let stage = template.stage else { continue }
-            template.systemPrompt = StageTemplateDefaults.content(for: stage).systemPrompt
+            guard let stage = template.stage, cascadeStages.contains(template.stageRaw) else { continue }
+            let content = StageTemplateDefaults.content(for: stage)
+            template.systemPrompt = content.systemPrompt
+            template.userPromptTemplate = content.userPromptTemplate
             template.updatedAt = .now
+        }
+
+        let migratedBlockKeys: Set<String> = ["editorialPolicy", "sources"]
+        let blocks = (try? context.fetch(FetchDescriptor<ContextBlock>())) ?? []
+        for block in blocks where migratedBlockKeys.contains(block.key) {
+            if let def = ContextBlockDefaults.defaultForKey(block.key) {
+                block.text = def.text
+            }
+        }
+
+        let roles = (try? context.fetch(FetchDescriptor<AIRole>())) ?? []
+        if let author = roles.first(where: { $0.key == "author" }),
+           let def = RoleDefaults.defaultForKey("author") {
+            author.mandate = def.mandate
+        }
+
+        let presets = (try? context.fetch(FetchDescriptor<SkillPreset>())) ?? []
+        if !presets.isEmpty,
+           !presets.contains(where: { $0.defaultKey == "shorten" }),
+           let def = SkillPresetDefaults.all.first(where: { $0.key == "shorten" }) {
+            let nextOrder = (presets.map(\.order).max() ?? -1) + 1
+            context.insert(SkillPresetDefaults.make(def, order: nextOrder))
         }
         defaults.set(currentTemplatesDefaultsVersion, forKey: templatesDefaultsVersionKey)
     }

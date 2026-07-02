@@ -13,6 +13,7 @@ struct ImageSeedingTests {
                  ContextBlock.self, AIRole.self,
                  GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,
                  ExternalDocument.self, SemanticKeyword.self, PublishedSitePage.self,
+                 SkillPreset.self,
             configurations: config
         )
         return ModelContext(container)

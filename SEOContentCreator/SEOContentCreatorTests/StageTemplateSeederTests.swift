@@ -13,6 +13,7 @@ struct StageTemplateSeederTests {
                  ContextBlock.self, AIRole.self,
                  GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,
                  ExternalDocument.self, SemanticKeyword.self, PublishedSitePage.self,
+                 SkillPreset.self,
             configurations: config
         )
         return ModelContext(container)
@@ -62,7 +63,7 @@ struct StageTemplateSeederTests {
         #expect(roles.first { $0.key == "editor" }?.blockKeys == ["editorialPolicy"])
     }
 
-    @Test func migrationReplacesOnlySystemPromptAndStoresDefaultsVersion() throws {
+    @Test func migrationUpdatesCascadeTemplatesAndStoresDefaultsVersion() throws {
         let context = try makeContext()
         let defaults = makeDefaults()
         defaults.set(1, forKey: StageTemplateSeeder.templatesDefaultsVersionKey)
@@ -74,19 +75,27 @@ struct StageTemplateSeederTests {
             temperature: 0.2,
             maxTokens: 4000
         )
+        let oldSeoCheck = StageTemplate(
+            stage: .seoCheck,
+            systemPrompt: "seo system",
+            userPromptTemplate: "Пользовательский seoCheck"
+        )
         context.insert(old)
+        context.insert(oldSeoCheck)
 
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
 
         #expect(old.systemPrompt == StageTemplateDefaults.content(for: .draft).systemPrompt)
-        #expect(old.userPromptTemplate == "Пользовательский {{тема}}")
+        #expect(old.userPromptTemplate == StageTemplateDefaults.content(for: .draft).userPromptTemplate)
         #expect(old.modelName == "gpt-4o")
         #expect(old.temperature == 0.2)
         #expect(old.maxTokens == 4000)
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 2)
+        #expect(oldSeoCheck.systemPrompt == "seo system")
+        #expect(oldSeoCheck.userPromptTemplate == "Пользовательский seoCheck")
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 3)
 
-        old.systemPrompt = "Ручная правка после миграции"
+        old.userPromptTemplate = "Ручная правка после миграции"
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
-        #expect(old.systemPrompt == "Ручная правка после миграции")
+        #expect(old.userPromptTemplate == "Ручная правка после миграции")
     }
 }
