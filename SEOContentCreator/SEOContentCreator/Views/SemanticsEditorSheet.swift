@@ -3,7 +3,10 @@ import SwiftUI
 
 struct SemanticsEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
     @Bindable var topic: Topic
+    @Query(filter: #Predicate<PublishedSitePage> { $0.siteHost == "hadassah.moscow" })
+    private var indexedPages: [PublishedSitePage]
 
     @State private var filter: SemanticFilter = .all
     @State private var selectedIDs: Set<UUID> = []
@@ -108,6 +111,23 @@ struct SemanticsEditorSheet: View {
     }
 
     private func refreshSitePages() {
-        message = "Обновление индекса сайта будет подключено в следующем шаге."
+        isRefreshingPages = true
+        message = "Обновляю страницы сайта..."
+        Task {
+            do {
+                let freshPages = try await SitePageIndexer().fetchPages()
+                for page in indexedPages {
+                    context.delete(page)
+                }
+                for page in freshPages {
+                    context.insert(page)
+                }
+                try? context.save()
+                message = "Индекс сайта обновлён: \(freshPages.count) страниц."
+            } catch {
+                message = "Не удалось обновить страницы сайта. Можно продолжить со старым индексом."
+            }
+            isRefreshingPages = false
+        }
     }
 }
