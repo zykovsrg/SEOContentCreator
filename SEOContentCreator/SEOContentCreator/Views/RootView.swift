@@ -23,6 +23,7 @@ struct RootView: View {
             EditorDictionarySeeder.seedIfNeeded(in: context)
             SkillPresetSeeder.seedIfNeeded(in: context)
             ProductBlockSeeder.seedIfNeeded(in: context)
+            ForbiddenPhraseSeeder.seedIfNeeded(in: context)
         }
     }
 }
