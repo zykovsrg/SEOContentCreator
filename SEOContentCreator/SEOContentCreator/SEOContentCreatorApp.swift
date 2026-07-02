@@ -13,6 +13,7 @@ struct SEOContentCreatorApp: App {
             ContextBlock.self, AIRole.self,
             GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,
             ExternalDocument.self, EditorDictionary.self, SkillPreset.self,
+            SemanticKeyword.self,
             ProductBlock.self
         ])
 
