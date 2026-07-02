@@ -96,18 +96,7 @@ struct SemanticsEditorSheet: View {
             SemanticKeywordBackfill.backfill(topic)
         }
         .sheet(isPresented: $showAgent) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Сбор агентом").font(.headline)
-                Text("Экран агента будет подключён на следующем шаге.")
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Spacer()
-                    Button("Закрыть") { showAgent = false }
-                        .keyboardShortcut(.defaultAction)
-                }
-            }
-            .padding()
-            .frame(width: 420, height: 180)
+            SemanticAgentSheet(topic: topic)
         }
     }
 
