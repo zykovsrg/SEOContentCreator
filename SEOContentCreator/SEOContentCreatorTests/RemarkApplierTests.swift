@@ -31,4 +31,34 @@ struct RemarkApplierTests {
     @Test func emptyQuoteSkipped() {
         #expect(RemarkApplier.apply(base: "abc", accepted: [remark("", "qqq")]) == "abc")
     }
+
+    @Test func laterRemarkDoesNotMatchInsideEarlierSuggestion() {
+        // remark1 inserts "старый" as part of its suggestion; remark2's quote
+        // "старый" must NOT match inside that just-inserted text.
+        let result = RemarkApplier.apply(
+            base: "Это новый метод.",
+            accepted: [remark("новый", "очень старый"), remark("старый", "древний")]
+        )
+        #expect(result == "Это очень старый метод.")
+    }
+
+    @Test func secondOccurrenceOfRepeatedQuoteInOriginalTextStillMatches() {
+        // Two separate remarks quoting the same original phrase should each
+        // land on a distinct occurrence, since the first is consumed in order.
+        let result = RemarkApplier.apply(
+            base: "Боль в спине. Позже боль в ноге.",
+            accepted: [remark("оль", "*1*"), remark("оль", "*2*")]
+        )
+        #expect(result == "Б*1* в спине. Позже б*2* в ноге.")
+    }
+
+    @Test func skipsRemarkWhenOnlyRemainingMatchIsInsideProtectedText() {
+        // remark1 consumes the only occurrence of "боль"; remark2 targets the
+        // same quote again but nothing unprotected is left, so it is skipped.
+        let result = RemarkApplier.apply(
+            base: "боль в спине",
+            accepted: [remark("боль", "дискомфорт"), remark("боль", "неприятное ощущение")]
+        )
+        #expect(result == "дискомфорт в спине")
+    }
 }
