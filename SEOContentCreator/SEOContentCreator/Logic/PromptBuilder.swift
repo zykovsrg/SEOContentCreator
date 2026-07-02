@@ -16,7 +16,7 @@ struct PromptBuilder {
             .joined(separator: "\n")
 
         let sources = (topic.direction?.sources ?? []).joined(separator: "\n")
-        let semantics = topic.semantics.joined(separator: "\n")
+        let semantics = SemanticPromptRenderer.render(topic: topic)
         let knowledge = topic.attachedNodes.map { node in
             node.content.isEmpty ? node.title : "\(node.title): \(node.content)"
         }.joined(separator: "\n")
