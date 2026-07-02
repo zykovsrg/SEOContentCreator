@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-07-02 — Иконка приложения и свежая Release-сборка
+
+- Change: Для macOS-приложения добавлен полный набор `AppIcon` PNG от 16 до 1024 px в минималистичном Apple-style: бирюзовая плитка, белый документ, отметка проверки и AI-искра. `Contents.json` AppIcon обновлён так, чтобы Xcode собирал новую `AppIcon.icns`.
+- Impact: Свежая сборка приложения получает собственную читаемую иконку в Dock, Finder и `/Applications`. Код приложения и модель данных не менялись.
+- Manual checks: Проверены размеры 16 px и 1024 px через `sips`; Release-сборка `xcodebuild -project SEOContentCreator/SEOContentCreator.xcodeproj -scheme SEOContentCreator -configuration Release -destination 'platform=macOS' -derivedDataPath /private/tmp/SEOContentCreatorRelease build` завершилась `BUILD SUCCEEDED`. Сборка показывает существующие Swift 6 isolation warnings в `GoogleAuthService.swift`, они не блокируют build.
+
 ### 2026-07-02 — Каскад промтов и запрещённые формулировки
 
 - Change: Ручной 8-шаговый каскад промтов перенесён в заводские дефолты приложения: обновлены контекстные блоки редполитики и источников, шаблоны этапов `structure`, `draft`, `factCheck`, `finalReview`, мандат автора и стартовый скилл «Сократить». Добавлена редактируемая SwiftData-модель `ForbiddenPhrase` со стартовым списком, сидером, рендерером и плейсхолдером `{{запрещённые_формулировки}}`; раздел «Шаблоны» получил редактор запрещённых формулировок. Миграция дефолтов v3 точечно обновляет только каскадные шаблоны/блоки и не трогает `seoCheck`, `seoGuidelines` и некаскадные шаблоны.
