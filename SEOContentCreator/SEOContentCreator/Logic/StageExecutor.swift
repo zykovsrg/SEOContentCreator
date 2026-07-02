@@ -72,7 +72,8 @@ final class StageExecutor {
             let prompt = PromptBuilder().build(
                 template: template, topic: topic,
                 currentText: currentText, selectedBlocks: selectedBlocks,
-                roleContext: roleContext
+                roleContext: roleContext,
+                forbiddenPhrases: fetchForbiddenPhrases(in: context)
             )
             var collected = ""
             var truncated = false
@@ -165,7 +166,8 @@ final class StageExecutor {
                 topic: topic,
                 currentText: currentText,
                 selectedBlocks: selectedBlocks,
-                roleContext: roleContext
+                roleContext: roleContext,
+                forbiddenPhrases: fetchForbiddenPhrases(in: context)
             )
             var collected = ""
             var truncated = false
@@ -232,7 +234,8 @@ final class StageExecutor {
             let prompt = PromptBuilder().build(
                 template: template, topic: scratch,
                 currentText: pastedText, selectedBlocks: [],
-                roleContext: roleContext
+                roleContext: roleContext,
+                forbiddenPhrases: fetchForbiddenPhrases(in: context)
             )
             var collected = ""
             var truncated = false
@@ -278,5 +281,10 @@ final class StageExecutor {
         guard let role else { return "" }
         let blocks = (try? context.fetch(FetchDescriptor<ContextBlock>())) ?? []
         return RoleContextAssembler.assemble(role: role, blocks: blocks)
+    }
+
+    private func fetchForbiddenPhrases(in context: ModelContext) -> String {
+        let phrases = (try? context.fetch(FetchDescriptor<ForbiddenPhrase>())) ?? []
+        return ForbiddenPhraseRenderer.render(phrases)
     }
 }
