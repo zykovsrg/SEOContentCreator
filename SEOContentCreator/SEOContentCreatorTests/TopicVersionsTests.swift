@@ -29,4 +29,26 @@ struct TopicVersionsTests {
         let topic = Topic(title: "Тест", articleType: .disease)
         #expect(topic.currentVersion == nil)
     }
+
+    @Test func totalTokenCostSumsPromptAndCompletionAcrossJobs() {
+        let topic = Topic(title: "Тест", articleType: .disease)
+        let jobA = GenerationJob(stage: .draft, agentName: "Автор", modelName: "gpt-4.1")
+        jobA.promptTokens = 100
+        jobA.completionTokens = 50
+        let jobB = GenerationJob(stage: .seoCheck, agentName: "SEO", modelName: "gpt-4.1")
+        jobB.promptTokens = 30
+        jobB.completionTokens = 10
+        topic.jobs = [jobA, jobB]
+
+        #expect(topic.totalTokenCost == 190)
+    }
+
+    @Test func totalTokenCostTreatsMissingUsageAsZero() {
+        let topic = Topic(title: "Тест", articleType: .disease)
+        let job = GenerationJob(stage: .draft, agentName: "Автор", modelName: "gpt-4.1")
+        // promptTokens/completionTokens left nil, as for jobs that predate FT-20260702-005.
+        topic.jobs = [job]
+
+        #expect(topic.totalTokenCost == 0)
+    }
 }

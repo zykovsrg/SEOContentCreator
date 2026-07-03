@@ -70,4 +70,10 @@ final class Topic {
         guard let id = currentVersionID else { return nil }
         return versions.first { $0.uuid == id }
     }
+
+    /// Sum of prompt+completion tokens across every GenerationJob for this topic.
+    /// Jobs that predate FT-20260702-005, or errored before the usage chunk arrived, count as 0.
+    var totalTokenCost: Int {
+        jobs.reduce(0) { $0 + ($1.promptTokens ?? 0) + ($1.completionTokens ?? 0) }
+    }
 }

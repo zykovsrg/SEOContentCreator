@@ -29,6 +29,7 @@ struct ContentPlanView: View {
             TableColumn("Тип") { Text($0.articleType.title) }
             TableColumn("Направление") { Text($0.direction?.title ?? "—") }
             TableColumn("Статус") { Text(TopicStatus.compute(for: $0).label) }
+            TableColumn("Токены") { Text($0.totalTokenCost > 0 ? "\($0.totalTokenCost)" : "—") }
         }
         .contextMenu(forSelectionType: Topic.ID.self) { ids in
             if let id = ids.first, let t = topics.first(where: { $0.id == id }) {
