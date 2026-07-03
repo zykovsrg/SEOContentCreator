@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-07-03 — Реальный прогон тестов после освобождения места на диске
+
+- Change: Пользователь освободил место на диске (5.3 Gi свободно). Запущен настоящий `xcodebuild test` (не только компиляция) для всех шести задач сессии впервые. Найден и исправлен реальный регресс: `StageTemplateSeederTests.migrationUpdatesCascadeTemplatesAndStoresDefaultsVersion()` — тест из отдельного файла (`StageTemplateSeederTests.swift`, не тот, что правился при FT-007), который я пропустил, — проверял, что `seoCheck` НЕ мигрирует и что версия дефолтов равна 3. Обновлён под новое, осознанное поведение (миграция v5, `seoCheck` в каскаде), аналогично уже исправленному `TemplatesMigrationV3Tests.swift`.
+- Impact: Все 291 юнит-тест зелёные (`** TEST SUCCEEDED **`). Шесть задач сессии (FT-007/010/012/014/016/018) теперь подтверждены не только компиляцией, но и реальным прогоном тестов.
+- Manual checks: `cd SEOContentCreator && xcodebuild test -scheme SEOContentCreator -destination 'platform=macOS' -only-testing:SEOContentCreatorTests` — TEST SUCCEEDED, 291 passed / 0 failed. Ручная проверка UI (клики в приложении) всё ещё не выполнена — следующий шаг сессии.
+
 ### 2026-07-02 — FT-20260702-018: Markdown-рендер и удалённые абзацы в SideBySideView
 
 - Change: Новый `Views/MarkdownBlocksView.swift` переиспользует существующий `MarkdownDocParser` (тот же парсер, что используется при публикации в Google Docs) для рендера заголовков H1/H2/H3, списков и жирного текста вместо сырых символов `##`/`**`. `SideBySideView` теперь: (1) использует этот рендер в обеих колонках; (2) в режиме сравнения версий показывает в левой колонке удалённые абзацы через `ParagraphDiff.oldSide` с красным тоном — раньше эта функция существовала, но не вызывалась нигде.

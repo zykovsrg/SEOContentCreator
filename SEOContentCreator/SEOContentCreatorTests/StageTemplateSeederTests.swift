@@ -75,13 +75,13 @@ struct StageTemplateSeederTests {
             temperature: 0.2,
             maxTokens: 4000
         )
-        let oldSeoCheck = StageTemplate(
-            stage: .seoCheck,
-            systemPrompt: "seo system",
-            userPromptTemplate: "Пользовательский seoCheck"
+        let oldProductBlocks = StageTemplate(
+            stage: .productBlocks,
+            systemPrompt: "product blocks system",
+            userPromptTemplate: "Пользовательский productBlocks"
         )
         context.insert(old)
-        context.insert(oldSeoCheck)
+        context.insert(oldProductBlocks)
 
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
 
@@ -90,9 +90,10 @@ struct StageTemplateSeederTests {
         #expect(old.modelName == "gpt-4o")
         #expect(old.temperature == 0.2)
         #expect(old.maxTokens == 4000)
-        #expect(oldSeoCheck.systemPrompt == "seo system")
-        #expect(oldSeoCheck.userPromptTemplate == "Пользовательский seoCheck")
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 3)
+        // productBlocks is not part of the cascade, so its custom content survives migration.
+        #expect(oldProductBlocks.systemPrompt == "product blocks system")
+        #expect(oldProductBlocks.userPromptTemplate == "Пользовательский productBlocks")
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 5)
 
         old.userPromptTemplate = "Ручная правка после миграции"
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
