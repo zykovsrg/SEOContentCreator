@@ -14,6 +14,13 @@
 
 ## Текущий changelog
 
+### 2026-07-03 — Release-сборка установлена в /Applications
+
+- Change: Собрана Release-конфигурация (`xcodebuild -scheme SEOContentCreator -configuration Release -destination 'platform=macOS' build` — BUILD SUCCEEDED). Старое приложение в `/Applications/SEOContentCreator.app` (от 2026-07-01, root-владелец) переименовано в `SEOContentCreator.app.old-1783059317` (удалить вручную не получилось — файлы внутри принадлежат root, нужен пароль, агент пароли не вводит). Свежая сборка скопирована в `/Applications/SEOContentCreator.app` и запущена — подтверждено, что процесс стартует и не падает.
+- Impact: В `/Applications` теперь актуальная версия со всеми шестью задачами сессии (FT-007/010/012/014/016/018).
+- Manual checks: приложение запущено из `/Applications`, процесс стабильно работает. Попытка кликнуть по кнопкам через compute-use не удалась (таймаут окна разрешения доступа) — визуальную проверку новых экранов (ручная правка, галочки этапов, Markdown в сравнении версий) нужно сделать самому пользователю, приложение уже открыто.
+- Follow-up: удалить `/Applications/SEOContentCreator.app.old-1783059317` вручную через Finder (потребует пароль администратора).
+
 ### 2026-07-03 — Реальный прогон тестов после освобождения места на диске
 
 - Change: Пользователь освободил место на диске (5.3 Gi свободно). Запущен настоящий `xcodebuild test` (не только компиляция) для всех шести задач сессии впервые. Найден и исправлен реальный регресс: `StageTemplateSeederTests.migrationUpdatesCascadeTemplatesAndStoresDefaultsVersion()` — тест из отдельного файла (`StageTemplateSeederTests.swift`, не тот, что правился при FT-007), который я пропустил, — проверял, что `seoCheck` НЕ мигрирует и что версия дефолтов равна 3. Обновлён под новое, осознанное поведение (миграция v5, `seoCheck` в каскаде), аналогично уже исправленному `TemplatesMigrationV3Tests.swift`.
