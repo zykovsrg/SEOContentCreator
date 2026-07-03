@@ -19,8 +19,8 @@ final class Topic {
     var semantics: [String]
     var structureText: String = ""
 
-    @Relationship var direction: KnowledgeNode?
-    @Relationship var doctor: KnowledgeNode?
+    @Relationship(deleteRule: .nullify, inverse: \KnowledgeNode.topicsUsingAsDirection) var direction: KnowledgeNode?
+    @Relationship(deleteRule: .nullify, inverse: \KnowledgeNode.topicsUsingAsDoctor) var doctor: KnowledgeNode?
     @Relationship var attachedNodes: [KnowledgeNode]
     @Relationship(deleteRule: .cascade, inverse: \ArticleVersion.topic)
     var versions: [ArticleVersion]

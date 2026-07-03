@@ -148,6 +148,22 @@ Impact:
 
 Нельзя добавлять `context.insert(scratch)` в `executeQuickCheck` — это нарушит инвариант «быстрая проверка ничего не сохраняет». Если PromptBuilder в будущем потребует `persistentModelID` — потребуется рефакторинг интерфейса.
 
+### 2026-07-03 — Ссылки Topic → KnowledgeNode обязаны иметь `inverse` и `deleteRule: .nullify`
+
+Status: active
+
+Decision:
+
+Любая связь `@Relationship` из `Topic` на `KnowledgeNode`, хранящая FK-колонку прямо в таблице `Topic` (`direction`, `doctor` — не `attachedNodes`, у него FK на стороне ребёнка), обязана объявлять и `inverse:` на соответствующее свойство в `KnowledgeNode`, и `deleteRule: .nullify`. Обратные свойства — `KnowledgeNode.topicsUsingAsDirection`/`topicsUsingAsDoctor`.
+
+Why:
+
+Без `inverse` SwiftData физически не может найти темы, ссылающиеся на удаляемый узел, поэтому `deleteRule` без `inverse` — это no-op (проверено регрессионным тестом `TopicKnowledgeNodeDeletionTests`, который сначала падал с одним лишь `deleteRule`, без `inverse`). Баг был найден на живых данных пользователя: удаление направления «Урология» в Базе знаний оставило тему с висящей ссылкой (`ZDIRECTION` указывал на несуществующую строку), и приложение падало на каждом запуске при попытке `SwiftData` прочитать `direction?.title` в `ContentPlanView`. См. `ai/changelog.md` за эту дату.
+
+Impact:
+
+Аддитивное изменение схемы (два новых relationship-массива в `KnowledgeNode`, инициализируются пустыми) — существующие данные не мигрируют деструктивно. Любая новая to-one связь `Topic → KnowledgeNode` в будущем должна следовать этому же паттерну, иначе повторится тот же класс краша.
+
 ### 2026-06-26 — Сопоставление с заводскими дефолтами по стабильному `defaultKey`, не по имени
 
 Status: active

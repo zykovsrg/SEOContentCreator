@@ -13,6 +13,12 @@ final class KnowledgeNode {
     @Relationship(deleteRule: .cascade, inverse: \KnowledgeNode.parent)
     var children: [KnowledgeNode]
 
+    /// Backing storage for Topic.direction's inverse — lets SwiftData nullify
+    /// Topic.direction automatically when this node is deleted.
+    @Relationship var topicsUsingAsDirection: [Topic]
+    /// Backing storage for Topic.doctor's inverse — same reason as above.
+    @Relationship var topicsUsingAsDoctor: [Topic]
+
     init(
         title: String,
         type: NodeType,
@@ -27,6 +33,8 @@ final class KnowledgeNode {
         self.createdAt = .now
         self.parent = parent
         self.children = []
+        self.topicsUsingAsDirection = []
+        self.topicsUsingAsDoctor = []
     }
 
     var nodeType: NodeType {
