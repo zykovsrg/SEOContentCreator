@@ -53,6 +53,14 @@ struct StageTemplateDefaultsTests {
         #expect(c.userPromptTemplate.contains("{{текущий_description}}"))
     }
 
+    @Test func promptAnalysisAsksForRecommendationsJSONWithStageContext() {
+        let c = StageTemplateDefaults.content(for: .promptAnalysis)
+        #expect(c.userPromptTemplate.contains("{{история_версий_по_этапам}}"))
+        #expect(c.userPromptTemplate.contains("{{текущие_промты_этапов}}"))
+        #expect(c.userPromptTemplate.contains("recommendations"))
+        #expect(c.temperature == 0.3)
+    }
+
     @Test func systemPromptsDoNotContainRoleMethodics() {
         for stage in PipelineStage.allCases where stage.kind != .action {
             let system = StageTemplateDefaults.content(for: stage).systemPrompt

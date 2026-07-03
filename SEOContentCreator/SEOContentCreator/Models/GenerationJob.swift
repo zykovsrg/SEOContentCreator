@@ -17,8 +17,15 @@ final class GenerationJob {
     /// before the usage chunk arrived).
     var promptTokens: Int?
     var completionTokens: Int?
+    /// True once the user has finished the review this job's checking-stage remarks
+    /// belong to (accepted/rejected everything and pressed "Готово"/"Отклонить всё").
+    /// Lets an interrupted review (app closed mid-review) be told apart from a
+    /// finished one when restoring on the next launch (FT-20260702-011).
+    var reviewResolved: Bool = false
 
     @Relationship var topic: Topic?
+    @Relationship(deleteRule: .cascade, inverse: \PersistedRemark.job)
+    var persistedRemarks: [PersistedRemark] = []
 
     init(stageLabel: String, agentName: String, modelName: String) {
         self.uuid = UUID()

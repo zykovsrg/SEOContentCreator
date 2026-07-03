@@ -47,4 +47,9 @@ struct StageProgressTests {
         #expect(StageProgress.isCompleted(.images, versions: [], hasImages: false) == false)
         #expect(StageProgress.isCompleted(.images, versions: [], hasImages: true) == true)
     }
+
+    @Test func promptAnalysisStageCompletionFollowsHasPromptRecommendationsFlag() {
+        #expect(StageProgress.isCompleted(.promptAnalysis, versions: [], hasPromptRecommendations: false) == false)
+        #expect(StageProgress.isCompleted(.promptAnalysis, versions: [], hasPromptRecommendations: true) == true)
+    }
 }

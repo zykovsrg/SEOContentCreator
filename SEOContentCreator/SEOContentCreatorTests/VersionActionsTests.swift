@@ -7,8 +7,8 @@ struct VersionActionsTests {
     private func makeContext() throws -> ModelContext {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
-            for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
-                 GenerationJob.self, StageTemplate.self, GeneratedImage.self, ExternalDocument.self,
+            for: Topic.self, PromptRecommendation.self, KnowledgeNode.self, ArticleVersion.self,
+                 GenerationJob.self, PersistedRemark.self, StageTemplate.self, GeneratedImage.self, ExternalDocument.self,
                  SemanticKeyword.self, PublishedSitePage.self,
             configurations: config
         )

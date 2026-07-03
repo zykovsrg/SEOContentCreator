@@ -8,8 +8,8 @@ struct GeneratedImageTests {
     private func makeContext() throws -> ModelContext {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
-            for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
-                 GenerationJob.self, StageTemplate.self,
+            for: Topic.self, PromptRecommendation.self, KnowledgeNode.self, ArticleVersion.self,
+                 GenerationJob.self, PersistedRemark.self, StageTemplate.self,
                  ContextBlock.self, AIRole.self, GeneratedImage.self, ExternalDocument.self,
                  SemanticKeyword.self, PublishedSitePage.self,
             configurations: config

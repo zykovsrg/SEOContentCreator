@@ -8,8 +8,8 @@ struct StageTemplateSeederTests {
     private func makeContext() throws -> ModelContext {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
-            for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
-                 GenerationJob.self, StageTemplate.self,
+            for: Topic.self, PromptRecommendation.self, KnowledgeNode.self, ArticleVersion.self,
+                 GenerationJob.self, PersistedRemark.self, StageTemplate.self,
                  ContextBlock.self, AIRole.self,
                  GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,
                  ExternalDocument.self, SemanticKeyword.self, PublishedSitePage.self,
@@ -46,7 +46,7 @@ struct StageTemplateSeederTests {
         let all = try context.fetch(FetchDescriptor<StageTemplate>())
         #expect(all.count == PipelineStage.allCases.filter { $0.kind != .action }.count)
         #expect(try context.fetch(FetchDescriptor<ContextBlock>()).count == 3)
-        #expect(try context.fetch(FetchDescriptor<AIRole>()).count == 4)
+        #expect(try context.fetch(FetchDescriptor<AIRole>()).count == 5)
     }
 
     @Test func seedsDefaultContextBlocksAndRoles() throws {
@@ -58,11 +58,12 @@ struct StageTemplateSeederTests {
         let blocks = try context.fetch(FetchDescriptor<ContextBlock>())
         let roles = try context.fetch(FetchDescriptor<AIRole>())
         #expect(Set(blocks.map(\.key)) == ["editorialPolicy", "sources", "seoGuidelines"])
-        #expect(Set(roles.map(\.key)) == ["author", "seo", "factChecker", "editor"])
+        #expect(Set(roles.map(\.key)) == ["author", "seo", "factChecker", "editor", "analyst"])
         #expect(roles.first { $0.key == "author" }?.blockKeys == ["editorialPolicy", "sources"])
         #expect(roles.first { $0.key == "seo" }?.blockKeys == ["seoGuidelines"])
         #expect(roles.first { $0.key == "factChecker" }?.blockKeys == ["sources"])
         #expect(roles.first { $0.key == "editor" }?.blockKeys == ["editorialPolicy"])
+        #expect(roles.first { $0.key == "analyst" }?.blockKeys == [])
     }
 
     @Test func migrationUpdatesCascadeTemplatesAndStoresDefaultsVersion() throws {
@@ -95,10 +96,26 @@ struct StageTemplateSeederTests {
         // productBlocks is not part of the cascade, so its custom content survives migration.
         #expect(oldProductBlocks.systemPrompt == "product blocks system")
         #expect(oldProductBlocks.userPromptTemplate == "Пользовательский productBlocks")
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 5)
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 6)
 
         old.userPromptTemplate = "Ручная правка после миграции"
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
         #expect(old.userPromptTemplate == "Ручная правка после миграции")
+    }
+
+    @Test func migrationAddsAnalystRoleToPreExistingInstallationsWithoutIt() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+        defaults.set(5, forKey: StageTemplateSeeder.templatesDefaultsVersionKey)
+        // Simulates a database seeded before the "analyst" role existed.
+        for def in RoleDefaults.all where def.key != "analyst" {
+            context.insert(AIRole(key: def.key, name: def.name, mandate: def.mandate, blockKeys: def.blockKeys))
+        }
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        let roles = try context.fetch(FetchDescriptor<AIRole>())
+        #expect(roles.contains { $0.key == "analyst" })
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 6)
     }
 }

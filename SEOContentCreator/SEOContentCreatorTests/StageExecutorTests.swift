@@ -8,8 +8,8 @@ struct StageExecutorTests {
     private func makeContext() throws -> ModelContext {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
-            for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
-                 GenerationJob.self, StageTemplate.self,
+            for: Topic.self, PromptRecommendation.self, KnowledgeNode.self, ArticleVersion.self,
+                 GenerationJob.self, PersistedRemark.self, StageTemplate.self,
                  ContextBlock.self, AIRole.self, GeneratedImage.self, ExternalDocument.self,
                  SemanticKeyword.self, PublishedSitePage.self,
             configurations: config
@@ -157,6 +157,11 @@ struct StageExecutorTests {
         #expect(topic.currentVersion == nil)         // checking creates no version
         #expect(executor.lastResultVersionID == nil)
         #expect(topic.jobs.first?.status == .success)
+        // FT-20260702-011: remarks are durably backed so a review survives a restart.
+        #expect(executor.lastRemarksJobID == topic.jobs.first?.uuid)
+        #expect(topic.jobs.first?.persistedRemarks.count == 1)
+        #expect(topic.jobs.first?.persistedRemarks.first?.status == .pending)
+        #expect(topic.jobs.first?.persistedRemarks.first?.uuid == executor.remarks.first?.id)
     }
 
     @Test func structureStageGeneratesNoVersion() async throws {
@@ -376,6 +381,52 @@ struct StageExecutorTests {
         #expect(executor.remarks.first?.suggestion == "лучше")
         #expect(topic.jobs.isEmpty)
         #expect(topic.versions.isEmpty)
+    }
+
+    @Test func promptAnalysisStageSavesRecommendationsNoVersionNoRemarks() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease)
+        context.insert(topic)
+        let template = StageTemplate(stage: .promptAnalysis, systemPrompt: "s",
+                                     userPromptTemplate: "{{история_версий_по_этапам}} {{текущие_промты_этапов}}")
+        context.insert(template)
+
+        let json = #"{"recommendations":[{"problem":"Повторы","location":"Черновик","suggestion":"Уточнить промт"}]}"#
+        let executor = StageExecutor(streamProvider: cannedStream([json]), keyProvider: { "k" })
+        await executor.execute(stage: .promptAnalysis, topic: topic, template: template,
+                               currentText: nil, in: context)
+
+        #expect(topic.promptRecommendations.count == 1)
+        #expect(topic.promptRecommendations.first?.problem == "Повторы")
+        #expect(topic.versions.isEmpty)
+        #expect(executor.remarks.isEmpty)
+        #expect(executor.lastResultVersionID == nil)
+        #expect(topic.jobs.first?.status == .success)
+    }
+
+    @Test func promptAnalysisFillsStageTemplatesSummaryPlaceholder() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease)
+        context.insert(topic)
+        context.insert(StageTemplate(stage: .draft, systemPrompt: "draft system", userPromptTemplate: "draft user"))
+        let template = StageTemplate(stage: .promptAnalysis, systemPrompt: "s",
+                                     userPromptTemplate: "{{текущие_промты_этапов}}")
+        context.insert(template)
+
+        var capturedUser = ""
+        let provider: StageExecutor.StreamProvider = { _, _, user, _, _, _, _ in
+            capturedUser = user
+            return AsyncThrowingStream { c in
+                c.yield(.token(#"{"recommendations":[]}"#))
+                c.finish()
+            }
+        }
+        let executor = StageExecutor(streamProvider: provider, keyProvider: { "k" })
+        await executor.execute(stage: .promptAnalysis, topic: topic, template: template,
+                               currentText: nil, in: context)
+
+        #expect(capturedUser.contains("draft system"))
+        #expect(capturedUser.contains("draft user"))
     }
 
     @Test func passesRoleContextIntoPromptBuilder() async throws {

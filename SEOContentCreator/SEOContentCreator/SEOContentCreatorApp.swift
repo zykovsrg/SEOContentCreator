@@ -14,7 +14,8 @@ struct SEOContentCreatorApp: App {
             GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,
             ExternalDocument.self, EditorDictionary.self, SkillPreset.self,
             SemanticKeyword.self, PublishedSitePage.self,
-            ProductBlock.self, ForbiddenPhrase.self
+            ProductBlock.self, ForbiddenPhrase.self,
+            PersistedRemark.self, PromptRecommendation.self
         ])
 
         Settings {

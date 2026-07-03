@@ -8,13 +8,17 @@ enum StageProgress {
     /// `topic.structureText` instead of creating an `ArticleVersion`, so it
     /// has no version to look up here.
     static func isCompleted(
-        _ stage: PipelineStage, versions: [ArticleVersion], structureText: String = "", hasImages: Bool = false
+        _ stage: PipelineStage, versions: [ArticleVersion], structureText: String = "",
+        hasImages: Bool = false, hasPromptRecommendations: Bool = false
     ) -> Bool {
         if stage == .structure {
             return !structureText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
         if stage == .images {
             return hasImages
+        }
+        if stage == .promptAnalysis {
+            return hasPromptRecommendations
         }
         return versions.contains { $0.stageRaw == stage.rawValue && $0.isVisibleInVersionLane }
     }

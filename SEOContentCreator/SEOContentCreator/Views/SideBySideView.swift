@@ -5,6 +5,8 @@ struct SideBySideView: View {
     var rightText: String?
     var isStreaming: Bool
 
+    private static let streamBottomID = "streamBottom"
+
     var body: some View {
         HStack(spacing: 0) {
             column(title: "Текущая версия", content: leftColumn)
@@ -30,8 +32,19 @@ struct SideBySideView: View {
 
     @ViewBuilder private var rightColumn: some View {
         if isStreaming {
-            ScrollView {
-                Text(rightText ?? "").frame(maxWidth: .infinity, alignment: .leading).padding()
+            // During generation show only the tail of the growing text (see `streamingTail`),
+            // auto-scrolling to keep the newest output visible. The full formatted diff is
+            // shown once generation finishes.
+            ScrollViewReader { proxy in
+                ScrollView {
+                    Text((rightText ?? "").streamingTail())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                    Color.clear.frame(height: 1).id(Self.streamBottomID)
+                }
+                .onChange(of: rightText) { _, _ in
+                    proxy.scrollTo(Self.streamBottomID, anchor: .bottom)
+                }
             }
         } else if let rightText, let leftText {
             ScrollView {
@@ -76,5 +89,21 @@ struct SideBySideView: View {
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+extension String {
+    /// The last portion of a growing stream, for cheap live display. SwiftUI `Text` lays out
+    /// its entire string on every update and does not virtualize, so rendering the full,
+    /// ever-growing stream re-lays-out a larger and larger string and lags badly on long
+    /// output. While generation is in flight only the newest text matters; the complete text
+    /// (and the formatted diff) is shown once it finishes.
+    func streamingTail(maxChars: Int = 4000) -> String {
+        guard count > maxChars else { return self }
+        let tail = suffix(maxChars)
+        if let newline = tail.firstIndex(of: "\n") {
+            return "…\n" + tail[tail.index(after: newline)...]
+        }
+        return "…" + tail
     }
 }

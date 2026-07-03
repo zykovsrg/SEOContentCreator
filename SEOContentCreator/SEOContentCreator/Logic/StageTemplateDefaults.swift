@@ -180,6 +180,27 @@ enum StageTemplateDefaults {
             // running a chat completion, and StageTemplateSeeder never seeds a
             // template for it, so this case is unreachable in practice.
             return StageTemplateContent(systemPrompt: "", userPromptTemplate: "")
+        case .promptAnalysis:
+            return StageTemplateContent(
+                systemPrompt: "",
+                userPromptTemplate: """
+                Проанализируй, как система промтов справляется с написанием этой статьи, и предложи улучшения.
+
+                Версии текста по этапам (последние принятые):
+                {{история_версий_по_этапам}}
+
+                Текущие промты этапов:
+                {{текущие_промты_этапов}}
+
+                Найди повторяющиеся проблемы в тексте, которые можно устранить, изменив промт этапа, а не вручную правя каждую статью. Объединяй похожие проблемы в одну рекомендацию.
+
+                Верни ТОЛЬКО JSON в формате:
+                ```json
+                {"recommendations":[{"problem":"<проблема или объединённая группа проблем>","location":"<какой этап/промт это касается>","suggestion":"<конкретное предложение по правке промта>"}]}
+                ```
+                """,
+                temperature: 0.3
+            )
         }
     }
 }

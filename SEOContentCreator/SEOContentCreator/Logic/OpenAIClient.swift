@@ -1,4 +1,12 @@
 import Foundation
+import os
+
+/// TEMP diagnostics for the "generation slows down as text grows" investigation
+/// (see ai/current-task.md). Logs raw SSE line arrival on the network task, independent
+/// of MainActor — compare against `perfLog` in StageExecutor to see whether the network/
+/// model pacing itself slows down or whether the delay only appears once events reach
+/// MainActor. Remove once the root cause is confirmed and fixed.
+let networkPerfLog = Logger(subsystem: "com.zykovsrg.SEOContentCreator", category: "streaming-perf-network")
 
 enum OpenAIStreamEvent: Equatable {
     case token(String)
@@ -110,9 +118,21 @@ struct OpenAIClient {
                         }
                     }
 
+                    var netTokenCount = 0
+                    var netCharCount = 0
+                    let netStart = ContinuousClock.now
+                    var netLastLog = netStart
                     for try await line in bytes.lines {
                         switch OpenAILineParser.parse(line: line) {
-                        case .token(let t): continuation.yield(.token(t))
+                        case .token(let t):
+                            netTokenCount += 1
+                            netCharCount += t.count
+                            if netTokenCount % 50 == 0 {
+                                let now = ContinuousClock.now
+                                networkPerfLog.debug("net tokens=\(netTokenCount) chars=\(netCharCount) sinceStart=\(now - netStart, privacy: .public) sinceLast50=\(now - netLastLog, privacy: .public)")
+                                netLastLog = now
+                            }
+                            continuation.yield(.token(t))
                         case .finish(let reason): continuation.yield(.finish(reason: reason))
                         case .usage(let prompt, let completion):
                             continuation.yield(.usage(promptTokens: prompt, completionTokens: completion))

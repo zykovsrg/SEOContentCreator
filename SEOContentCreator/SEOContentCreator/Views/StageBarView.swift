@@ -15,7 +15,8 @@ struct StageBarView: View {
                     HStack(spacing: 6) {
                         if StageProgress.isCompleted(
                             stage, versions: topic.versions, structureText: topic.structureText,
-                            hasImages: !topic.images.filter({ !$0.isArchived }).isEmpty
+                            hasImages: !topic.images.filter({ !$0.isArchived }).isEmpty,
+                            hasPromptRecommendations: !topic.promptRecommendations.isEmpty
                         ) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)

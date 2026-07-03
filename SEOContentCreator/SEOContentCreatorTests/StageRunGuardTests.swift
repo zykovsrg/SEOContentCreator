@@ -56,4 +56,23 @@ struct StageRunGuardTests {
         topic.currentVersionID = review.uuid
         #expect(StageRunGuard.messagePreventingRun(stage: .images, topic: topic) == nil)
     }
+
+    @Test func promptAnalysisBlockedWithoutAnyAcceptedContent() {
+        let topic = Topic(title: "Тема", articleType: .disease)
+        #expect(StageRunGuard.messagePreventingRun(stage: .promptAnalysis, topic: topic) != nil)
+    }
+
+    @Test func promptAnalysisCanRunWithStructureOnly() {
+        let topic = Topic(title: "Тема", articleType: .disease)
+        topic.structureText = "# H1"
+        #expect(StageRunGuard.messagePreventingRun(stage: .promptAnalysis, topic: topic) == nil)
+    }
+
+    @Test func promptAnalysisCanRunWithAnAcceptedVersion() {
+        let topic = Topic(title: "Тема", articleType: .disease)
+        let draft = ArticleVersion(stage: .draft, source: .generated, text: "Текст")
+        draft.status = .accepted
+        topic.versions = [draft]
+        #expect(StageRunGuard.messagePreventingRun(stage: .promptAnalysis, topic: topic) == nil)
+    }
 }

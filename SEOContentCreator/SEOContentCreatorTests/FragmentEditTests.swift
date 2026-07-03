@@ -113,7 +113,7 @@ struct FragmentEditorTests {
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(
-            for: Topic.self, ArticleVersion.self, GenerationJob.self,
+            for: Topic.self, PromptRecommendation.self, ArticleVersion.self, GenerationJob.self, PersistedRemark.self,
             AIRole.self, ContextBlock.self, SkillPreset.self, SemanticKeyword.self, PublishedSitePage.self,
             configurations: config
         )

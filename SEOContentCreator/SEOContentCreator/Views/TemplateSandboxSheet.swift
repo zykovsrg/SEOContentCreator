@@ -33,6 +33,13 @@ struct TemplateSandboxSheet: View {
         executor?.streamingText ?? ""
     }
 
+    /// While generation runs, show only the tail (see `String.streamingTail`) to keep the UI
+    /// responsive on long output; once it finishes, show the complete result.
+    private var displayText: String {
+        if outputText.isEmpty { return "Здесь появится ответ модели после запуска." }
+        return isRunning ? outputText.streamingTail() : outputText
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
@@ -138,7 +145,7 @@ struct TemplateSandboxSheet: View {
                 .font(.headline)
 
             ScrollView {
-                Text(outputText.isEmpty ? "Здесь появится ответ модели после запуска." : outputText)
+                Text(displayText)
                     .foregroundStyle(outputText.isEmpty ? .secondary : .primary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)

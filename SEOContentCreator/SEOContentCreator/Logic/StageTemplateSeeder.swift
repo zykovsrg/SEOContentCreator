@@ -3,7 +3,7 @@ import SwiftData
 
 enum StageTemplateSeeder {
     static let templatesDefaultsVersionKey = "templatesDefaultsVersion"
-    private static let currentTemplatesDefaultsVersion = 5
+    private static let currentTemplatesDefaultsVersion = 6
 
     @MainActor
     static func seedIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
@@ -108,6 +108,10 @@ enum StageTemplateSeeder {
         if let author = roles.first(where: { $0.key == "author" }),
            let def = RoleDefaults.defaultForKey("author") {
             author.mandate = def.mandate
+        }
+        if !roles.isEmpty, !roles.contains(where: { $0.key == "analyst" }),
+           let def = RoleDefaults.defaultForKey("analyst") {
+            context.insert(AIRole(key: def.key, name: def.name, mandate: def.mandate, blockKeys: def.blockKeys))
         }
 
         let presets = (try? context.fetch(FetchDescriptor<SkillPreset>())) ?? []

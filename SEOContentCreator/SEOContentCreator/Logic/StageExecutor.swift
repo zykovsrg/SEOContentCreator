@@ -1,5 +1,12 @@
 import Foundation
 import SwiftData
+import os
+
+/// TEMP diagnostics for the "generation slows down as text grows" investigation
+/// (see ai/current-task.md). Logs when a token event actually reaches MainActor — compare
+/// against `networkPerfLog` in OpenAIClient to see whether MainActor is falling behind the
+/// network's own pacing. Remove once the root cause is confirmed and fixed.
+let mainActorPerfLog = Logger(subsystem: "com.zykovsrg.SEOContentCreator", category: "streaming-perf-mainactor")
 
 @MainActor
 @Observable
@@ -18,8 +25,12 @@ final class StageExecutor {
     var lastWarningMessage: String?
     /// ID of the version created by the most recent successful run (awaiting accept/reject).
     var lastResultVersionID: UUID?
-    /// Transient remarks from the most recent checking run (not persisted).
+    /// Transient remarks from the most recent checking run (durably backed by
+    /// `PersistedRemark` records on `lastRemarksJobID`'s job, see FT-20260702-011).
     var remarks: [Remark] = []
+    /// The `GenerationJob` whose `PersistedRemark`s back the current `remarks`,
+    /// so the UI can update/resolve them as the user reviews.
+    var lastRemarksJobID: UUID?
 
     private let streamProvider: StreamProvider
     private let keyProvider: KeyProvider
@@ -67,6 +78,7 @@ final class StageExecutor {
         lastWarningMessage = nil
         lastResultVersionID = nil
         remarks = []
+        lastRemarksJobID = nil
 
         let role = fetchRole(for: stage, in: context)
         let agentName = role?.name ?? stage.agentName
@@ -79,14 +91,20 @@ final class StageExecutor {
             do {
                 let key = try keyProvider()
                 let roleContext = buildRoleContext(for: role, in: context)
+                let stageTemplatesSummary = stage == .promptAnalysis ? fetchStageTemplatesSummary(in: context) : ""
                 let prompt = PromptBuilder().build(
                     template: template, topic: topic,
                     currentText: currentText, selectedBlocks: selectedBlocks,
                     roleContext: roleContext,
-                    forbiddenPhrases: fetchForbiddenPhrases(in: context)
+                    forbiddenPhrases: fetchForbiddenPhrases(in: context),
+                    stageTemplatesSummary: stageTemplatesSummary
                 )
                 var collected = ""
                 var truncated = false
+                var lastFlush = ContinuousClock.now
+                var mainTokenCount = 0
+                let mainStart = ContinuousClock.now
+                var mainLastLog = mainStart
                 for try await event in streamProvider(
                     key, prompt.system, prompt.user,
                     runtimeModel, template.temperature, template.maxTokens,
@@ -96,7 +114,21 @@ final class StageExecutor {
                     switch event {
                     case .token(let t):
                         collected += t
-                        streamingText = collected
+                        mainTokenCount += 1
+                        if mainTokenCount % 50 == 0 {
+                            let n = ContinuousClock.now
+                            mainActorPerfLog.debug("main tokens=\(mainTokenCount) chars=\(collected.count) sinceStart=\(n - mainStart, privacy: .public) sinceLast50=\(n - mainLastLog, privacy: .public)")
+                            mainLastLog = n
+                        }
+                        // Coalesce UI updates: reassigning streamingText on every token forces
+                        // SwiftUI to re-lay-out the ever-growing stream text hundreds of times a
+                        // second, and each layout costs more as the text grows (O(n²) overall).
+                        // Publishing ~10x/sec keeps streaming smooth without the quadratic blowup.
+                        let now = ContinuousClock.now
+                        if now - lastFlush >= .milliseconds(100) {
+                            streamingText = collected
+                            lastFlush = now
+                        }
                     case .finish(let reason):
                         if reason == "length" { truncated = true }
                     case .usage(let promptTokens, let completionTokens):
@@ -105,6 +137,9 @@ final class StageExecutor {
                     }
                 }
                 try Task.checkCancellation()
+                // Final flush: throttling may have skipped the last tokens, and `.structure`
+                // persists the plan straight from streamingText — it must be complete.
+                streamingText = collected
                 if truncated {
                     lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
                 }
@@ -115,6 +150,21 @@ final class StageExecutor {
                     job.finishedAt = .now
                 } else if stage.kind == .checking {
                     remarks = RemarksParser.parse(rawText: collected)
+                    lastRemarksJobID = job.uuid
+                    RemarkPersistence.persist(remarks: remarks, job: job, in: context)
+                    job.status = .success
+                    job.finishedAt = .now
+                } else if stage == .promptAnalysis {
+                    for recommendation in PromptRecommendationParser.parse(rawText: collected) {
+                        let saved = PromptRecommendation(
+                            problem: recommendation.problem,
+                            location: recommendation.location,
+                            suggestion: recommendation.suggestion
+                        )
+                        saved.topic = topic
+                        saved.job = job
+                        context.insert(saved)
+                    }
                     job.status = .success
                     job.finishedAt = .now
                 } else {
@@ -193,6 +243,7 @@ final class StageExecutor {
             )
             var collected = ""
             var truncated = false
+            var lastFlush = ContinuousClock.now
             for try await event in streamProvider(
                 key,
                 prompt.system,
@@ -205,13 +256,19 @@ final class StageExecutor {
                 switch event {
                 case .token(let t):
                     collected += t
-                    streamingText = collected
+                    // See execute(): coalesce UI updates to avoid O(n²) re-layout of the stream.
+                    let now = ContinuousClock.now
+                    if now - lastFlush >= .milliseconds(100) {
+                        streamingText = collected
+                        lastFlush = now
+                    }
                 case .finish(let reason):
                     if reason == "length" { truncated = true }
                 case .usage:
                     break // no GenerationJob in the sandbox run to persist usage against
                 }
             }
+            streamingText = collected // final flush after throttling
             if truncated {
                 lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
             }
@@ -263,6 +320,7 @@ final class StageExecutor {
             )
             var collected = ""
             var truncated = false
+            var lastFlush = ContinuousClock.now
             for try await event in streamProvider(
                 key, prompt.system, prompt.user,
                 runtimeModel, template.temperature, template.maxTokens,
@@ -271,13 +329,19 @@ final class StageExecutor {
                 switch event {
                 case .token(let t):
                     collected += t
-                    streamingText = collected
+                    // See execute(): coalesce UI updates to avoid O(n²) re-layout of the stream.
+                    let now = ContinuousClock.now
+                    if now - lastFlush >= .milliseconds(100) {
+                        streamingText = collected
+                        lastFlush = now
+                    }
                 case .finish(let reason):
                     if reason == "length" { truncated = true }
                 case .usage:
                     break // no GenerationJob in quick check to persist usage against
                 }
             }
+            streamingText = collected // final flush after throttling
             if truncated {
                 lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
             }
@@ -312,5 +376,16 @@ final class StageExecutor {
     private func fetchForbiddenPhrases(in context: ModelContext) -> String {
         let phrases = (try? context.fetch(FetchDescriptor<ForbiddenPhrase>())) ?? []
         return ForbiddenPhraseRenderer.render(phrases)
+    }
+
+    /// Renders every non-action, non-analysis stage's current system+user prompt,
+    /// for the `.promptAnalysis` stage's `{{текущие_промты_этапов}}` placeholder.
+    private func fetchStageTemplatesSummary(in context: ModelContext) -> String {
+        let templates = (try? context.fetch(FetchDescriptor<StageTemplate>())) ?? []
+        let relevantStages = PipelineStage.allCases.filter { $0.kind != .action && $0.kind != .analysis }
+        return relevantStages.compactMap { stage -> String? in
+            guard let template = templates.first(where: { $0.stageRaw == stage.rawValue }) else { return nil }
+            return "## \(stage.title)\nSystem: \(template.systemPrompt)\nUser:\n\(template.userPromptTemplate)"
+        }.joined(separator: "\n\n")
     }
 }

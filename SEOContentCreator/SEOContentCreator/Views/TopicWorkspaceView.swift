@@ -26,6 +26,7 @@ struct TopicWorkspaceView: View {
     @State private var showImages = false
     @State private var showPublish = false
     @State private var showPartialAccept = false
+    @State private var showPromptAnalysis = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -74,8 +75,16 @@ struct TopicWorkspaceView: View {
                         acceptedIDs: acceptedRemarkIDs,
                         rejectedIDs: rejectedRemarkIDs,
                         redoingIDs: redoingRemarkIDs,
-                        onAccept: { acceptedRemarkIDs.insert($0.id); rejectedRemarkIDs.remove($0.id) },
-                        onReject: { rejectedRemarkIDs.insert($0.id); acceptedRemarkIDs.remove($0.id) },
+                        onAccept: {
+                            acceptedRemarkIDs.insert($0.id); rejectedRemarkIDs.remove($0.id)
+                            RemarkPersistence.updateStatus(remarkID: $0.id, status: .accepted,
+                                                           jobID: executor?.lastRemarksJobID, topic: topic)
+                        },
+                        onReject: {
+                            rejectedRemarkIDs.insert($0.id); acceptedRemarkIDs.remove($0.id)
+                            RemarkPersistence.updateStatus(remarkID: $0.id, status: .rejected,
+                                                           jobID: executor?.lastRemarksJobID, topic: topic)
+                        },
                         onSelect: { highlightedQuote = $0.quote },
                         onRedo: { redoRemark($0, comment: $1) }
                     )
@@ -121,6 +130,9 @@ struct TopicWorkspaceView: View {
         .sheet(isPresented: $showPublish) {
             PublishSheet(topic: topic)
         }
+        .sheet(isPresented: $showPromptAnalysis) {
+            PromptRecommendationsSheet(topic: topic)
+        }
         .sheet(isPresented: $showPartialAccept) {
             if let pending = pendingVersion {
                 let base = topic.currentVersion?.text ?? ""
@@ -129,7 +141,12 @@ struct TopicWorkspaceView: View {
                 }
             }
         }
-        .onAppear { if executor == nil { executor = .live(model: model) } }
+        .onAppear {
+            if executor == nil {
+                executor = .live(model: model)
+                restoreReviewIfNeeded()
+            }
+        }
     }
 
     private var rightText: String? {
@@ -218,6 +235,11 @@ struct TopicWorkspaceView: View {
                 Label("Опубликовать", systemImage: "paperplane")
             }
         }
+        ToolbarItem {
+            Button { showPromptAnalysis = true } label: {
+                Label("Рекомендации по промтам", systemImage: "lightbulb")
+            }
+        }
     }
 
     private func runSelectedStage() {
@@ -255,6 +277,9 @@ struct TopicWorkspaceView: View {
                                    currentText: current, selectedBlocks: blocks,
                                    modelName: model, in: context)
             pendingVersionID = executor.lastResultVersionID
+            if stage == .promptAnalysis && executor.lastErrorMessage == nil {
+                showPromptAnalysis = true
+            }
         }
     }
 
@@ -322,10 +347,23 @@ struct TopicWorkspaceView: View {
             defer { redoingRemarkIDs.remove(remark.id) }
             await RemarkRedoRunner.run(remark: remark, comment: comment, model: model,
                                        executor: executor, topic: topic, in: context)
+            if let updated = executor.remarks.first(where: { $0.id == remark.id }) {
+                RemarkPersistence.updateSuggestion(remarkID: remark.id, suggestion: updated.suggestion,
+                                                   jobID: executor.lastRemarksJobID, topic: topic)
+            }
         }
     }
 
+    private func restoreReviewIfNeeded() {
+        guard let restored = RemarkPersistence.restoreLatestUnresolved(topic: topic) else { return }
+        executor?.remarks = restored.remarks
+        executor?.lastRemarksJobID = restored.jobID
+        acceptedRemarkIDs = restored.accepted
+        rejectedRemarkIDs = restored.rejected
+    }
+
     private func endReview() {
+        RemarkPersistence.resolve(jobID: executor?.lastRemarksJobID, topic: topic)
         executor?.remarks = []
         acceptedRemarkIDs = []
         rejectedRemarkIDs = []

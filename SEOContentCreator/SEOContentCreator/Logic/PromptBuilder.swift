@@ -7,7 +7,8 @@ struct PromptBuilder {
         currentText: String?,
         selectedBlocks: [String] = [],
         roleContext: String = "",
-        forbiddenPhrases: String = ""
+        forbiddenPhrases: String = "",
+        stageTemplatesSummary: String = ""
     ) -> (system: String, user: String) {
         var user = template.userPromptTemplate
 
@@ -37,7 +38,9 @@ struct PromptBuilder {
             "{{текущий_h1}}": topic.currentVersion?.h1 ?? "",
             "{{текущий_title}}": topic.currentVersion?.seoTitle ?? "",
             "{{текущий_description}}": topic.currentVersion?.seoDescription ?? "",
-            "{{запрещённые_формулировки}}": forbiddenPhrases.isEmpty ? "(список пуст)" : forbiddenPhrases
+            "{{запрещённые_формулировки}}": forbiddenPhrases.isEmpty ? "(список пуст)" : forbiddenPhrases,
+            "{{история_версий_по_этапам}}": StageVersionsSummaryBuilder.build(topic: topic),
+            "{{текущие_промты_этапов}}": stageTemplatesSummary
         ]
         func substitute(_ text: String) -> String {
             var result = text

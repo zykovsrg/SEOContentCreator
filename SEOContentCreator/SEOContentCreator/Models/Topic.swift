@@ -32,6 +32,8 @@ final class Topic {
     var publications: [ExternalDocument] = []
     @Relationship(deleteRule: .cascade, inverse: \SemanticKeyword.topic)
     var semanticKeywords: [SemanticKeyword]
+    @Relationship(deleteRule: .cascade, inverse: \PromptRecommendation.topic)
+    var promptRecommendations: [PromptRecommendation] = []
 
     init(
         title: String,
@@ -56,6 +58,7 @@ final class Topic {
         self.images = []
         self.publications = []
         self.semanticKeywords = []
+        self.promptRecommendations = []
         self.notes = notes
         self.createdAt = .now
         self.updatedAt = .now

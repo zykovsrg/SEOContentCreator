@@ -28,8 +28,10 @@ struct StructureEditorSheet: View {
             }
 
             if isRunning {
+                // Show only the tail while streaming (see `String.streamingTail`); the full plan
+                // appears in the editor below once generation finishes.
                 ScrollView {
-                    Text(executor?.streamingText ?? "")
+                    Text((executor?.streamingText ?? "").streamingTail())
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                         .padding(4)

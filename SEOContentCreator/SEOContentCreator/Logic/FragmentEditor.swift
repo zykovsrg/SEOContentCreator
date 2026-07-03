@@ -72,13 +72,21 @@ final class FragmentEditor {
             )
             var collected = ""
             var truncated = false
+            var lastFlush = ContinuousClock.now
             for try await event in streamProvider(
                 key, prompt.system, prompt.user, model, temperature, maxTokens, nil
             ) {
                 switch event {
                 case .token(let t):
                     collected += t
-                    streamingText = collected
+                    // Coalesce UI updates to ~10x/sec: reassigning streamingText on every token
+                    // forces SwiftUI to re-lay-out the growing stream text, which gets quadratically
+                    // more expensive as the text grows. See StageExecutor.execute() for details.
+                    let now = ContinuousClock.now
+                    if now - lastFlush >= .milliseconds(100) {
+                        streamingText = collected
+                        lastFlush = now
+                    }
                 case .finish(reason: let reason):
                     if reason == "length" { truncated = true }
                 case .usage(let promptTokens, let completionTokens):
@@ -86,6 +94,7 @@ final class FragmentEditor {
                     job.completionTokens = completionTokens
                 }
             }
+            streamingText = collected // final flush after throttling
             if truncated {
                 lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
             }

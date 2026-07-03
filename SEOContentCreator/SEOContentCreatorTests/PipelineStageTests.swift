@@ -56,8 +56,15 @@ struct PipelineStageTests {
     }
 
     @Test func imagesIsAnActionStageAfterFinalReview() {
-        #expect(PipelineStage.allCases.last == .images)
         #expect(PipelineStage.images.kind == .action)
         #expect(PipelineStage.images.title == "Изображения")
+    }
+
+    @Test func promptAnalysisIsTheLastStageAfterImages() {
+        #expect(PipelineStage.allCases.last == .promptAnalysis)
+        #expect(PipelineStage.promptAnalysis.kind == .analysis)
+        #expect(PipelineStage.promptAnalysis.title == "Анализ и обучение")
+        #expect(PipelineStage.promptAnalysis.agentName == "ИИ-аналитик")
+        #expect(PipelineStage.promptAnalysis.roleKey == "analyst")
     }
 }

@@ -22,6 +22,13 @@ enum StageRunGuard {
                 return "Изображения можно генерировать только после «Финальной вычитки»."
             }
         }
+        if stage == .promptAnalysis {
+            let hasStructure = !topic.structureText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let hasAcceptedVersion = topic.versions.contains { $0.isVisibleInVersionLane }
+            if !hasStructure && !hasAcceptedVersion {
+                return "Перед анализом нужна хотя бы одна принятая версия текста по любому этапу."
+            }
+        }
         return nil
     }
 }

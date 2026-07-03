@@ -18,6 +18,38 @@ Impact:
 
 ## Текущие решения
 
+### 2026-07-03 — Новая роль в RoleDefaults требует явного шага миграции, не только сидинга
+
+Status: active
+
+Decision:
+
+`StageTemplateSeeder.seedRolesIfNeeded` заполняет `AIRole` только при полностью пустой таблице (`guard existing.isEmpty else return`). Поэтому при добавлении новой записи в `RoleDefaults.all` (см. роль `"analyst"` для FT-20260703-003) для уже существующих инсталляций её нужно отдельно вставить в `migrateTemplatesIfNeeded` (проверка `!roles.isEmpty && !roles.contains(where: { $0.key == новый_key })`) и обязательно поднять `StageTemplateSeeder.currentTemplatesDefaultsVersion`. Аналогично, добавление нового `PipelineStage` (не `.action`) авто-досевается в `StageTemplate` благодаря `seedStageTemplatesIfNeeded`, которая проверяет каждый этап по отдельности, а не общую пустоту таблицы — для шаблонов отдельного шага миграции не требуется, только для ролей/контекстных блоков/скиллов, которые сидятся по принципу «таблица пуста».
+
+Why:
+
+При реализации этапа «Анализ и обучение» обнаружилось, что просто добавить роль в `RoleDefaults.all` недостаточно — на уже установленных базах данных `seedRolesIfNeeded` никогда не перезапустится (таблица ролей не пуста), и агент этапа остался бы без нужного мандата/имени, откатываясь на дефолт `stage.agentName`. Явный шаг миграции с bump версии — единственный надёжный способ доставить новую роль в существующие инсталляции, по аналогии с уже существующей миграцией `SkillPreset` "shorten".
+
+Impact:
+
+Любая будущая новая роль в `RoleDefaults.all` должна сопровождаться и bump'ом `currentTemplatesDefaultsVersion`, и точечной вставкой в `migrateTemplatesIfNeeded` — иначе она не появится у пользователей с уже существующей базой. Стадии (`StageTemplate`) этого не требуют — там достаточно просто добавить `PipelineStage`-кейс.
+
+### 2026-07-03 — PipelineStage.promptAnalysis: обычный чат-этап со StageKind.analysis, результат не версия и не remarks
+
+Status: active
+
+Decision:
+
+`StageKind` получил третий содержательный кейс `.analysis` (кроме `.author`/`.checking`/`.action`). В отличие от `.action` (`.images`), этап `.promptAnalysis` — обычный чат-completion этап: у него есть `StageTemplate`, он идёт через `StageExecutor.execute()` тем же путём, что и остальные этапы (`TopicWorkspaceView.runSelectedStage()` не перехватывает его отдельно). Но результат — не `ArticleVersion` и не `executor.remarks`, а новая сущность `PromptRecommendation` (cascade от `Topic` и от `GenerationJob`), показывается только для чтения в `PromptRecommendationsSheet`, без автоприменения.
+
+Why:
+
+Результат этапа — рекомендации по правке промтов других этапов, а не правка текста статьи, поэтому ни существующий механизм `ArticleVersion` (принятие/отклонение версии), ни `Remark`/`RemarkApplier` (замена цитаты в тексте) не подходят по смыслу. Нужен был третий вариант «результата этапа», а не только «версия» или «ремарки».
+
+Impact:
+
+Любой новый код с exhaustive `switch` над `StageKind` (уже задело `StageExecutor.execute()`, `StageProgress.isCompleted`, `StageRunGuard`, `StageVersionsSummaryBuilder`, `StageExecutor.fetchStageTemplatesSummary`) должен явно решить, что делать с `.analysis`. Если в будущем появится ещё один этап с результатом-не-версией (например, FT-20260703-005 «Правки по комментариям врачей», если решат делать отдельным этапом) — стоит сверяться с этим паттерном или с паттерном `.action` (`.images`) в зависимости от того, нужен ли чат-вызов вообще.
+
 ### 2026-07-03 — PipelineStage.images: непайплайновый этап через StageKind.action
 
 Status: active

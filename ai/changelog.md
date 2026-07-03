@@ -14,6 +14,35 @@
 
 ## Текущий changelog
 
+### 2026-07-03 — Персистентные замечания, JSON-промт картинок, этап «Анализ и обучение»
+
+- Change:
+  1. **FT-20260702-011.** Новая сущность [PersistedRemark.swift](SEOContentCreator/SEOContentCreator/Models/PersistedRemark.swift)
+     (cascade от `GenerationJob`, поле `reviewResolved`) + [RemarkPersistence.swift](SEOContentCreator/SEOContentCreator/Logic/RemarkPersistence.swift).
+     `StageExecutor.execute()` персистит замечания сразу после проверочного этапа; `TopicWorkspaceView`
+     восстанавливает незавершённую проверку при открытии темы, обновляет статус/доработку при
+     accept/reject/«Доработать», помечает job решённым при «Готово»/«Отклонить всё».
+  2. **FT-20260703-004.** [ImageJSONPromptComposer.swift](SEOContentCreator/SEOContentCreator/Logic/ImageJSONPromptComposer.swift) —
+     промт для генерации картинок теперь JSON (style/scene/subject/lighting.type/lighting.source/details/camera/mood/aspect_ratio),
+     пустые поля пропускаются, `aspect_ratio` считается из размера пресета. `subject` предлагается ИИ
+     ([ImageSubjectSuggester.swift](SEOContentCreator/SEOContentCreator/Logic/ImageSubjectSuggester.swift), переиспользует
+     существующий `ImagePromptTemplate` как инструкцию агенту) и правится пользователем в `ImageGenerationSheet`;
+     добавлены поля «Сцена»/«Освещение»/«Детали»/«Камера»/«Настроение».
+  3. **FT-20260703-003.** Новый этап пайплайна «Анализ и обучение» (`PipelineStage.promptAnalysis`,
+     новый `StageKind.analysis`) — обычный чат-этап, но результат сохраняется как `PromptRecommendation`
+     (новая сущность, cascade от `Topic`), а не как ремарки/версия. Отправляет агенту последнюю принятую
+     версию каждого этапа ([StageVersionsSummaryBuilder.swift](SEOContentCreator/SEOContentCreator/Logic/StageVersionsSummaryBuilder.swift))
+     и текущие промты этапов. Рекомендации показываются в [PromptRecommendationsSheet.swift](SEOContentCreator/SEOContentCreator/Views/PromptRecommendationsSheet.swift)
+     только для просмотра, без автоприменения. Роль «ИИ-аналитик» и шаблон этапа сеются миграцией
+     `templatesDefaultsVersion` 5→6.
+- Impact: две новые SwiftData-сущности (`PersistedRemark`, `PromptRecommendation`) + два новых поля
+  на существующих моделях (`GenerationJob.reviewResolved`/`persistedRemarks`, `Topic.promptRecommendations`) —
+  аддитивные изменения, лёгкая миграция SwiftData ожидается, но не проверена на реальной базе с данными.
+- Manual checks: `xcodebuild build-for-testing` зелёный после каждого из трёх пунктов. Юнит-тесты
+  прогнаны пользователем через Cmd+U в Xcode — 48 passed, зелено (`xcodebuild test`/`test-without-building`
+  по-прежнему зависают в CLI, см. память `env_xcodebuild_test_hang`). Ручная проверка в запущенном
+  приложении с реальными данными не проводилась — вынесена в `ai/future-tasks.md` как FT-20260703-007.
+
 ### 2026-07-03 — Четыре доработки редактора замечаний, изображений и ручной правки
 
 - Change:

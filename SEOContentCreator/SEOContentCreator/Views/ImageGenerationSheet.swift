@@ -19,9 +19,17 @@ struct ImageGenerationSheet: View {
 
     @State private var subject = ""
     @State private var fragment = ""
+    @State private var scene = ""
+    @State private var lightingType = ""
+    @State private var lightingSource = ""
+    @State private var details = ""
+    @State private var camera = ""
+    @State private var mood = ""
     @State private var selectedPresetID: UUID?
     @State private var generator: ImageGenerator?
     @State private var lastComposedPrompt = ""
+    @State private var isSuggestingSubject = false
+    @State private var subjectSuggestionError: String?
 
     private var isRunning: Bool { generator?.isRunning ?? false }
     private var isRefine: Bool { if case .refine = mode { return true } else { return false } }
@@ -61,10 +69,40 @@ struct ImageGenerationSheet: View {
                     .border(.gray.opacity(0.3))
             }
 
-            Text(isRefine ? "Что изменить" : "Промт (сюжет)").font(.subheadline)
+            HStack {
+                Text(isRefine ? "Что изменить" : "Промт (сюжет)").font(.subheadline)
+                if !isRefine {
+                    Spacer()
+                    if isSuggestingSubject {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Button("Предложить через ИИ") { suggestSubject() }
+                            .controlSize(.small)
+                    }
+                }
+            }
             TextEditor(text: $subject)
-                .frame(minHeight: 110)
+                .frame(minHeight: 90)
                 .border(.gray.opacity(0.3))
+            if let subjectSuggestionError {
+                Text(subjectSuggestionError).font(.caption).foregroundStyle(.red)
+            }
+
+            Text("Параметры сюжета (необязательно)").font(.subheadline)
+            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 4) {
+                GridRow {
+                    TextField("Сцена", text: $scene).textFieldStyle(.roundedBorder)
+                    TextField("Настроение", text: $mood).textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    TextField("Тип освещения", text: $lightingType).textFieldStyle(.roundedBorder)
+                    TextField("Источник света", text: $lightingSource).textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    TextField("Детали", text: $details).textFieldStyle(.roundedBorder)
+                    TextField("Камера/ракурс", text: $camera).textFieldStyle(.roundedBorder)
+                }
+            }
 
             Picker("Пресет стиля", selection: $selectedPresetID) {
                 ForEach(presets) { preset in
@@ -102,37 +140,68 @@ struct ImageGenerationSheet: View {
             }
         }
         .padding()
-        .frame(width: 640, height: 660)
+        .frame(width: 640, height: 760)
         .onAppear(perform: setup)
     }
 
     private func setup() {
         if generator == nil { generator = .live(model: imageModel) }
         if selectedPresetID == nil { selectedPresetID = presets.first?.uuid }
-        guard case .create(let role) = mode else { return }
-        let kind: ImagePromptKind = role == .cover ? .cover : .illustration
-        guard let template = promptTemplates.first(where: { $0.kindRaw == kind.rawValue }) else { return }
-        let placeholder = role == .illustration ? "{{выделенный_фрагмент}}" : ""
-        subject = ImagePromptBuilder().subject(template: template, topic: topic, fragment: placeholder)
+        guard case .create = mode else { return }
+        let placeholder = isIllustration ? "{{выделенный_фрагмент}}" : ""
+        if let template = currentPromptTemplate {
+            subject = ImagePromptBuilder().subject(template: template, topic: topic, fragment: placeholder)
+        }
+        suggestSubject()
+    }
+
+    private var currentPromptTemplate: ImagePromptTemplate? {
+        let kind: ImagePromptKind = isIllustration ? .illustration : .cover
+        return promptTemplates.first { $0.kindRaw == kind.rawValue }
+    }
+
+    private func suggestSubject() {
+        guard case .create = mode, let template = currentPromptTemplate else { return }
+        isSuggestingSubject = true
+        subjectSuggestionError = nil
+        Task {
+            defer { isSuggestingSubject = false }
+            do {
+                subject = try await ImageSubjectSuggester.suggest(
+                    template: template, topic: topic, fragment: fragment, model: imageModel, in: context
+                )
+            } catch {
+                subjectSuggestionError = "Не удалось предложить сюжет: \(error.localizedDescription)"
+            }
+        }
     }
 
     private func run() {
         guard let generator else { return }
         let preset = selectedPreset
-        let composed: String
+        var fields = ImagePromptFields(
+            style: preset?.styleText ?? "",
+            scene: scene,
+            subject: subject,
+            lightingType: lightingType,
+            lightingSource: lightingSource,
+            details: details,
+            camera: camera,
+            mood: mood,
+            aspectRatio: ImageJSONPromptComposer.aspectRatio(forSize: preset?.size ?? "1024x1024")
+        )
         var references: [Data] = []
 
         switch mode {
         case .create:
-            let filled = subject.replacingOccurrences(of: "{{выделенный_фрагмент}}", with: fragment)
-            composed = ImagePromptBuilder().compose(subject: filled, preset: preset)
+            fields.subject = subject.replacingOccurrences(of: "{{выделенный_фрагмент}}", with: fragment)
             if let ref = preset?.referenceImageData { references = [ref] }
         case .refine(let source):
-            composed = ImagePromptBuilder().compose(subject: subject, preset: preset)
             references = [source.data]
             if let ref = preset?.referenceImageData { references.append(ref) }
         }
 
+        let composed = ImageJSONPromptComposer.compose(fields)
         lastComposedPrompt = composed
         let size = preset?.size ?? "1024x1024"
         let quality = preset?.quality ?? "high"
