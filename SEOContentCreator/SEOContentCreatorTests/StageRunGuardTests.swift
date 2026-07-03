@@ -13,8 +13,29 @@ struct StageRunGuardTests {
         #expect(StageRunGuard.messagePreventingRun(stage: .draft, topic: topic) == nil)
     }
 
-    @Test func nonDraftStagesRemainFlexible() {
+    @Test func structureStageRemainsFlexibleOnEmptyText() {
         let topic = Topic(title: "Тема", articleType: .disease)
+        #expect(StageRunGuard.messagePreventingRun(stage: .structure, topic: topic) == nil)
+    }
+
+    @Test func checkingStageWithoutTextReturnsMessage() {
+        let topic = Topic(title: "Тема", articleType: .disease)
+        #expect(StageRunGuard.messagePreventingRun(stage: .seoCheck, topic: topic) != nil)
+    }
+
+    @Test func checkingStageWithBlankTextReturnsMessage() {
+        let topic = Topic(title: "Тема", articleType: .disease)
+        let version = ArticleVersion(stage: .draft, source: .generated, text: "   \n  ")
+        topic.versions = [version]
+        topic.currentVersionID = version.uuid
+        #expect(StageRunGuard.messagePreventingRun(stage: .factCheck, topic: topic) != nil)
+    }
+
+    @Test func checkingStageWithTextCanRun() {
+        let topic = Topic(title: "Тема", articleType: .disease)
+        let version = ArticleVersion(stage: .draft, source: .generated, text: "Готовый текст статьи")
+        topic.versions = [version]
+        topic.currentVersionID = version.uuid
         #expect(StageRunGuard.messagePreventingRun(stage: .seoCheck, topic: topic) == nil)
     }
 }
