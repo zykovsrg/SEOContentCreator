@@ -14,6 +14,21 @@
 
 ## Текущий changelog
 
+### 2026-07-03 — Меню разделов перенесено в шапку, добавлены Cmd+1/2/3
+
+- Change: [RootView.swift](SEOContentCreator/SEOContentCreator/Views/RootView.swift) больше не использует
+  `NavigationSplitView`/боковую панель — три раздела (Контент-план, Шаблоны, База знаний) переключаются
+  сегментированным `Picker` в тулбаре окна (placement `.principal`), плюс три скрытые кнопки в `.background`
+  дают горячие клавиши ⌘1/⌘2/⌘3 из любого фокуса окна. `SidebarView.swift` переименован в
+  [AppSection.swift](SEOContentCreator/SEOContentCreator/Views/AppSection.swift): класс `SidebarView` и
+  неиспользуемое поле `symbol` удалены, enum `AppSection` остался.
+- Impact: экономит место в окне (раньше сайдбар всегда занимал полосу слева ради трёх пунктов).
+  Собрана Release-сборка и установлена в `/Applications/SEOContentCreator.app` поверх версии от того же дня.
+- Manual checks: `xcodebuild build-for-testing` и `xcodebuild build -configuration Release` прошли успешно.
+  Live-клик по ⌘1/2/3 и виду тулбара агент не проверял (в песочнице нет доступа к экрану). Пользователь
+  закрыл задачу и попросил установить сборку в `/Applications`, не подтверждая явно, что уже прокликал
+  ⌘1/2/3 руками — стоит перепроверить самостоятельно после запуска из `/Applications`.
+
 ### 2026-07-03 — Release-сборка (со всеми накопленными изменениями) установлена в /Applications
 
 - Change: После полного прогона тестов (`xcodebuild test` — 363 passed / 0 failed, включает все изменения вплоть до коммита «Persist review remarks, JSON image prompts, and prompt-analysis stage») собрана Release-конфигурация и установлена в `/Applications/SEOContentCreator.app`. Работавший экземпляр закрыт (`osascript ... quit`) перед заменой. Также добавлен `FT-20260703-008` в `ai/future-tasks.md` — сводный чек-лист ручной проверки 12 задач из двух раундов аудита 2026-07-02/03 (тот же список, что был показан пользователю в чате), чтобы не потерять его в бэклоге.
