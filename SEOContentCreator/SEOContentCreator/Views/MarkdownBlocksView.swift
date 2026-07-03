@@ -9,6 +9,11 @@ struct MarkdownBlocksView: View {
     /// is only defined on `Text` and this view's body has no single `Text` to modify from outside.
     var strikethrough: Bool = false
 
+    /// Cached parse result, recomputed only when `text` actually changes (see `.task(id: text)`
+    /// below) instead of on every SwiftUI re-render — parsing is O(text length) and this view
+    /// otherwise gets re-rendered on every streamed token elsewhere on screen.
+    @State private var numberedBlocks: [NumberedBlock] = []
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(numberedBlocks.enumerated()), id: \.offset) { _, item in
@@ -19,6 +24,7 @@ struct MarkdownBlocksView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .task(id: text) { numberedBlocks = Self.parseNumberedBlocks(text) }
     }
 
     private struct NumberedBlock {
@@ -26,7 +32,7 @@ struct MarkdownBlocksView: View {
         let number: Int?
     }
 
-    private var numberedBlocks: [NumberedBlock] {
+    private static func parseNumberedBlocks(_ text: String) -> [NumberedBlock] {
         var result: [NumberedBlock] = []
         var counter = 0
         for block in MarkdownDocParser.parse(text) {
