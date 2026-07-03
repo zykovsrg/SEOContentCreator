@@ -30,4 +30,14 @@ struct OpenAILineParserTests {
         let line = #"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#
         #expect(OpenAILineParser.parse(line: line) == .finish(reason: "stop"))
     }
+
+    @Test func recognisesUsageChunkWithEmptyChoices() {
+        let line = #"data: {"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":3,"total_tokens":15}}"#
+        #expect(OpenAILineParser.parse(line: line) == .usage(promptTokens: 12, completionTokens: 3))
+    }
+
+    @Test func ignoresUsageMissingTokenCounts() {
+        let line = #"data: {"choices":[],"usage":{"total_tokens":15}}"#
+        #expect(OpenAILineParser.parse(line: line) == .ignore)
+    }
 }

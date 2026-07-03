@@ -51,7 +51,9 @@ What to check before moving this task to `ai/current-task.md`.
 
 ### FT-20260703-001 — Рендерить Markdown и в VersionCompareView
 
-Status: idea
+Status: promoted
+
+Promoted on 2026-07-03 into `ai/current-task.md`, branch `main` (автономный запуск, 2-я из 6 задач сессии). См. `ai/changelog.md`.
 
 Priority: low
 
@@ -143,7 +145,9 @@ Promotion notes:
 
 ### FT-20260702-003 — Отмена генерации: метод в StageExecutor + кнопка «Стоп» в интерфейсе
 
-Status: idea
+Status: promoted
+
+Promoted on 2026-07-03 into `ai/current-task.md`, branch `main` (автономный запуск, 1-я из 6 задач сессии). Реализовано только для `execute()`/`TopicWorkspaceView` (как и было предложено) — sandbox/quick-check/fragment-editor остались без кнопки «Стоп». См. `ai/changelog.md`.
 
 Priority: high
 
@@ -172,7 +176,9 @@ Promotion notes:
 
 ### FT-20260702-004 — Показывать точную причину ошибки OpenAI из тела ответа
 
-Status: idea
+Status: promoted
+
+Promoted on 2026-07-03 into `ai/current-task.md`, branch `main` (автономный запуск, 3-я из 6 задач сессии). Также применено к `ImageClient.swift` (тот же `OpenAIClient.OpenAIError.http`, тело ответа уже было в руках) — не только к чат-этапам, как формулировалось изначально. См. `ai/changelog.md`.
 
 Priority: medium
 
@@ -200,7 +206,9 @@ Promotion notes:
 
 ### FT-20260702-005 — Сохранять токены и стоимость запуска в GenerationJob
 
-Status: idea
+Status: promoted
+
+Promoted on 2026-07-03 into `ai/current-task.md`, branch `main` (автономный запуск, 4-я из 6 задач сессии). Реализованы оба пункта 1–2; пункт 3 (FT-20260623-006) реализуется следом в этой же сессии. Также добавлено сохранение токенов в `FragmentEditor.swift` (свой `GenerationJob`, тот же паттерн) — не только в `StageExecutor`. Схема `GenerationJob` расширена двумя опциональными полями — риск и решение см. `ai/decisions.md`. См. `ai/changelog.md`.
 
 Priority: medium
 
@@ -290,7 +298,9 @@ Promotion notes:
 
 ### FT-20260702-008 — Блокировать запуск проверочных этапов на пустом тексте
 
-Status: idea
+Status: promoted
+
+Promoted on 2026-07-03 into `ai/current-task.md`, branch `main` (автономный запуск, 5-я из 6 задач сессии). См. `ai/changelog.md`.
 
 Priority: high
 

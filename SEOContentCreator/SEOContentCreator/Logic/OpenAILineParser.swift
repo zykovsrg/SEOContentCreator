@@ -3,6 +3,7 @@ import Foundation
 enum OpenAILineResult: Equatable {
     case token(String)
     case finish(reason: String)
+    case usage(promptTokens: Int, completionTokens: Int)
     case done
     case ignore
 }
@@ -15,8 +16,16 @@ enum OpenAILineParser {
         let payload = trimmed.dropFirst("data:".count).trimmingCharacters(in: .whitespaces)
         if payload == "[DONE]" { return .done }
         guard let data = payload.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return .ignore }
+        // With `stream_options.include_usage`, the final chunk has empty `choices`
+        // and a top-level `usage` object instead of a delta/finish_reason.
+        if let usage = json["usage"] as? [String: Any],
+           let promptTokens = usage["prompt_tokens"] as? Int,
+           let completionTokens = usage["completion_tokens"] as? Int {
+            return .usage(promptTokens: promptTokens, completionTokens: completionTokens)
+        }
+        guard let choices = json["choices"] as? [[String: Any]],
               let first = choices.first
         else { return .ignore }
         if let delta = first["delta"] as? [String: Any],

@@ -55,6 +55,72 @@ struct StageExecutorTests {
         #expect(executor.lastWarningMessage == nil)
     }
 
+    @Test func cancelStopsStreamAndMarksJobCancelled() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease,
+                          direction: KnowledgeNode(title: "ЛТ", type: .direction))
+        context.insert(topic)
+        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        context.insert(template)
+
+        // Mirrors OpenAIClient's real stream shape: an inner Task feeding the continuation,
+        // cancelled via onTermination when the consumer stops iterating.
+        let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _, _ in
+            AsyncThrowingStream { continuation in
+                let inner = Task {
+                    continuation.yield(.token("Первый токен"))
+                    do {
+                        try await Task.sleep(nanoseconds: 2_000_000_000)
+                        continuation.yield(.token("Второй токен"))
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+                continuation.onTermination = { _ in inner.cancel() }
+            }
+        }
+        let executor = StageExecutor(streamProvider: provider, keyProvider: { "k" })
+
+        let execTask = Task {
+            await executor.execute(stage: .draft, topic: topic, template: template,
+                                   currentText: nil, in: context)
+        }
+        // Wait for the first token so `execute()` has stored its currentTask before we cancel.
+        while executor.streamingText.isEmpty {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        executor.cancel()
+        await execTask.value
+
+        #expect(executor.isRunning == false)
+        #expect(topic.jobs.first?.status == .cancelled)
+        #expect(topic.versions.isEmpty)
+    }
+
+    @Test func successStoresPromptAndCompletionTokensOnJob() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease,
+                          direction: KnowledgeNode(title: "ЛТ", type: .direction))
+        context.insert(topic)
+        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        context.insert(template)
+
+        let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _, _ in
+            AsyncThrowingStream { continuation in
+                continuation.yield(.token("Текст"))
+                continuation.yield(.usage(promptTokens: 120, completionTokens: 40))
+                continuation.finish()
+            }
+        }
+        let executor = StageExecutor(streamProvider: provider, keyProvider: { "k" })
+        await executor.execute(stage: .draft, topic: topic, template: template,
+                               currentText: nil, in: context)
+
+        #expect(topic.jobs.first?.promptTokens == 120)
+        #expect(topic.jobs.first?.completionTokens == 40)
+    }
+
     @Test func missingKeyProducesErrorJobNoVersion() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)

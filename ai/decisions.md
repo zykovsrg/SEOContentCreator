@@ -18,6 +18,22 @@ Impact:
 
 ## Текущие решения
 
+### 2026-07-03 — GenerationJob хранит токены запроса/ответа (аддитивная миграция)
+
+Status: active
+
+Decision:
+
+`@Model GenerationJob` получил два новых опциональных поля: `promptTokens: Int?` и `completionTokens: Int?` (FT-20260702-005). Заполняются из нового `OpenAIStreamEvent.usage(promptTokens:completionTokens:)`, который `OpenAIClient.streamCompletion` теперь эмитит по финальному SSE-чанку `usage` (запрос отправляет `stream_options: {"include_usage": true}`). Значения пишутся в `job` во всех местах, где `GenerationJob` реально сохраняется: `StageExecutor.execute(...)` и `FragmentEditor.run(...)`. В `executeSandbox`/`executeQuickCheck` (там `GenerationJob` не создаётся) событие `.usage` игнорируется.
+
+Why:
+
+Нужны данные для «Стоимости по теме» в Контент-плане (FT-20260623-006), которых раньше не было вообще — предыдущая попытка (FT-20260623-006 в исходной формулировке) ошибочно предполагала, что токены уже сохраняются. Опциональные поля с `nil` по умолчанию — стандартный путь лёгкой миграции SwiftData без явного MigrationPlan; существующие записи `GenerationJob` получают `nil` и не ломаются.
+
+Impact:
+
+Новый код, добавляющий case в `switch` над `OpenAIStreamEvent`, должен обрабатывать `.usage` явно (Swift требует исчерпывающий switch) — уже задело `StageExecutor` (3 места) и `FragmentEditor` (1 место). `Topic.totalTokenCost` (FT-20260623-006) должен трактовать `nil` как «неизвестно», а не как 0, если это важно для читаемости колонки.
+
 ### 2026-07-02 — Каскад промтов хранится в дефолтах, запрещённые фразы — отдельной таблицей
 
 Status: active

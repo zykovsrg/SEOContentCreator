@@ -81,6 +81,9 @@ final class FragmentEditor {
                     streamingText = collected
                 case .finish(reason: let reason):
                     if reason == "length" { truncated = true }
+                case .usage(let promptTokens, let completionTokens):
+                    job.promptTokens = promptTokens
+                    job.completionTokens = completionTokens
                 }
             }
             if truncated {

@@ -31,7 +31,7 @@ struct ImageClient {
             case 200...299: break
             case 401: throw OpenAIClient.OpenAIError.unauthorized
             case 429: throw OpenAIClient.OpenAIError.rateLimited
-            default: throw OpenAIClient.OpenAIError.http(http.statusCode)
+            default: throw OpenAIClient.OpenAIError.http(http.statusCode, message: OpenAIClient.extractErrorMessage(from: data))
             }
         }
         return try ImageResponseParser.parse(data)

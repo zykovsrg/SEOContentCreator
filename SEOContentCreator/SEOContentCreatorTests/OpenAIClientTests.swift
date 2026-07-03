@@ -76,10 +76,33 @@ struct OpenAIClientTests {
     }
 
     @Test func http403MessagePointsToSettingsAndAccess() {
-        let message = OpenAIClient.OpenAIError.http(403).errorDescription ?? ""
+        let message = OpenAIClient.OpenAIError.http(403, message: nil).errorDescription ?? ""
         #expect(message.contains("доступ"))
         #expect(message.contains("Настройках"))
         #expect(!message.contains("Шаблоны"))
+    }
+
+    @Test func httpErrorDescriptionIncludesOpenAIMessage() {
+        let message = OpenAIClient.OpenAIError.http(400, message: "The model `gpt-9` does not exist").errorDescription ?? ""
+        #expect(message.contains("The model `gpt-9` does not exist"))
+    }
+
+    @Test func httpErrorSurfacesOpenAIMessageFromResponseBody() async {
+        MockURLProtocol.statusCode = 400
+        MockURLProtocol.stubBody = #"{"error":{"message":"The model `gpt-9` does not exist","type":"invalid_request_error"}}"#
+        let client = OpenAIClient(session: mockSession())
+        await #expect(throws: OpenAIClient.OpenAIError.http(400, message: "The model `gpt-9` does not exist")) {
+            for try await _ in client.streamCompletion(apiKey: "k", system: "s", user: "u", model: "gpt-4.1") {}
+        }
+    }
+
+    @Test func httpErrorWithoutParsableBodyHasNilMessage() async {
+        MockURLProtocol.statusCode = 500
+        MockURLProtocol.stubBody = "internal server error, not json"
+        let client = OpenAIClient(session: mockSession())
+        await #expect(throws: OpenAIClient.OpenAIError.http(500, message: nil)) {
+            for try await _ in client.streamCompletion(apiKey: "k", system: "s", user: "u", model: "gpt-4.1") {}
+        }
     }
 
     @Test func reportsLengthFinishReason() async throws {
@@ -99,10 +122,42 @@ struct OpenAIClientTests {
             switch event {
             case .token(let t): text += t
             case .finish(let reason): if reason == "length" { sawLength = true }
+            case .usage: break
             }
         }
         #expect(text == "Часть")
         #expect(sawLength)
+    }
+
+    @Test func requestsUsageInStreamOptions() async throws {
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.stubBody = "data: [DONE]\n\n"
+        MockURLProtocol.lastRequestBody = nil
+        let client = OpenAIClient(session: mockSession())
+        for try await _ in client.streamCompletion(apiKey: "k", system: "s", user: "u", model: "gpt-4.1") {}
+        let body = try #require(MockURLProtocol.lastRequestBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let streamOptions = try #require(json["stream_options"] as? [String: Any])
+        #expect(streamOptions["include_usage"] as? Bool == true)
+    }
+
+    @Test func yieldsUsageEventFromFinalChunk() async throws {
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.stubBody = """
+        data: {"choices":[{"delta":{"content":"Привет"}}]}
+
+        data: {"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":3,"total_tokens":15}}
+
+        data: [DONE]
+
+        """
+        let client = OpenAIClient(session: mockSession())
+        var usage: (prompt: Int, completion: Int)?
+        for try await event in client.streamCompletion(apiKey: "k", system: "s", user: "u", model: "gpt-4.1") {
+            if case .usage(let p, let c) = event { usage = (p, c) }
+        }
+        #expect(usage?.prompt == 12)
+        #expect(usage?.completion == 3)
     }
 
     @Test func newModelsUseCompletionTokensParam() {

@@ -159,6 +159,10 @@ struct TopicWorkspaceView: View {
                 Label("Запустить этап", systemImage: "play.fill")
             }
             .disabled(executor?.isRunning ?? false)
+            Button(role: .destructive, action: { executor?.cancel() }) {
+                Label("Стоп", systemImage: "stop.fill")
+            }
+            .disabled(!(executor?.isRunning ?? false))
         }
         .padding()
     }

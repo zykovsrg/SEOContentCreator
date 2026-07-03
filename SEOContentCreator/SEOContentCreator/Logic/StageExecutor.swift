@@ -23,10 +23,19 @@ final class StageExecutor {
 
     private let streamProvider: StreamProvider
     private let keyProvider: KeyProvider
+    /// The in-flight `execute(...)` run, if any. Lets `cancel()` stop a run started
+    /// from a plain `Task { await executor.execute(...) }` at the call site.
+    private var currentTask: Task<Void, Never>?
 
     init(streamProvider: @escaping StreamProvider, keyProvider: @escaping KeyProvider) {
         self.streamProvider = streamProvider
         self.keyProvider = keyProvider
+    }
+
+    /// Cancels the run started by `execute(...)`, if one is in flight.
+    /// The stream stops and the job is marked `.cancelled` instead of being left `.running`.
+    func cancel() {
+        currentTask?.cancel()
     }
 
     /// Production convenience: wire to KeychainService + OpenAIClient.
@@ -66,74 +75,87 @@ final class StageExecutor {
         job.topic = topic
         context.insert(job)
 
-        do {
-            let key = try keyProvider()
-            let roleContext = buildRoleContext(for: role, in: context)
-            let prompt = PromptBuilder().build(
-                template: template, topic: topic,
-                currentText: currentText, selectedBlocks: selectedBlocks,
-                roleContext: roleContext,
-                forbiddenPhrases: fetchForbiddenPhrases(in: context)
-            )
-            var collected = ""
-            var truncated = false
-            for try await event in streamProvider(
-                key, prompt.system, prompt.user,
-                runtimeModel, template.temperature, template.maxTokens,
-                template.reasoningEffort
-            ) {
-                switch event {
-                case .token(let t):
-                    collected += t
-                    streamingText = collected
-                case .finish(let reason):
-                    if reason == "length" { truncated = true }
-                }
-            }
-            if truncated {
-                lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
-            }
-
-            if stage == .structure {
-                // Plan stays in streamingText; the caller persists it into Topic.structureText. No version is created.
-                job.status = .success
-                job.finishedAt = .now
-            } else if stage.kind == .checking {
-                remarks = RemarksParser.parse(rawText: collected)
-                job.status = .success
-                job.finishedAt = .now
-            } else {
-                let parsed = StageOutputParser.parse(rawText: collected, stage: stage)
-                let version = ArticleVersion(
-                    stage: stage, source: .generated, text: parsed.body,
-                    agentName: agentName, templateID: template.uuid, modelName: runtimeModel
+        let task = Task { [self] in
+            do {
+                let key = try keyProvider()
+                let roleContext = buildRoleContext(for: role, in: context)
+                let prompt = PromptBuilder().build(
+                    template: template, topic: topic,
+                    currentText: currentText, selectedBlocks: selectedBlocks,
+                    roleContext: roleContext,
+                    forbiddenPhrases: fetchForbiddenPhrases(in: context)
                 )
-                version.h1 = parsed.h1
-                version.seoTitle = parsed.seoTitle
-                version.seoDescription = parsed.seoDescription
-                version.status = .pending
-                version.topic = topic
-                context.insert(version)
+                var collected = ""
+                var truncated = false
+                for try await event in streamProvider(
+                    key, prompt.system, prompt.user,
+                    runtimeModel, template.temperature, template.maxTokens,
+                    template.reasoningEffort
+                ) {
+                    try Task.checkCancellation()
+                    switch event {
+                    case .token(let t):
+                        collected += t
+                        streamingText = collected
+                    case .finish(let reason):
+                        if reason == "length" { truncated = true }
+                    case .usage(let promptTokens, let completionTokens):
+                        job.promptTokens = promptTokens
+                        job.completionTokens = completionTokens
+                    }
+                }
+                try Task.checkCancellation()
+                if truncated {
+                    lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
+                }
 
-                topic.updatedAt = .now
+                if stage == .structure {
+                    // Plan stays in streamingText; the caller persists it into Topic.structureText. No version is created.
+                    job.status = .success
+                    job.finishedAt = .now
+                } else if stage.kind == .checking {
+                    remarks = RemarksParser.parse(rawText: collected)
+                    job.status = .success
+                    job.finishedAt = .now
+                } else {
+                    let parsed = StageOutputParser.parse(rawText: collected, stage: stage)
+                    let version = ArticleVersion(
+                        stage: stage, source: .generated, text: parsed.body,
+                        agentName: agentName, templateID: template.uuid, modelName: runtimeModel
+                    )
+                    version.h1 = parsed.h1
+                    version.seoTitle = parsed.seoTitle
+                    version.seoDescription = parsed.seoDescription
+                    version.status = .pending
+                    version.topic = topic
+                    context.insert(version)
 
-                job.status = .success
+                    topic.updatedAt = .now
+
+                    job.status = .success
+                    job.finishedAt = .now
+                    job.resultVersionID = version.uuid
+                    lastResultVersionID = version.uuid
+                }
+            } catch is CancellationError {
+                job.status = .cancelled
                 job.finishedAt = .now
-                job.resultVersionID = version.uuid
-                lastResultVersionID = version.uuid
+            } catch {
+                job.status = .error
+                job.finishedAt = .now
+                let message: String
+                if let keyError = error as? KeychainService.KeychainError, keyError == .notFound {
+                    message = "Укажите API-ключ в Настройках"
+                } else {
+                    message = error.localizedDescription
+                }
+                job.errorMessage = message
+                lastErrorMessage = message
             }
-        } catch {
-            job.status = .error
-            job.finishedAt = .now
-            let message: String
-            if let keyError = error as? KeychainService.KeychainError, keyError == .notFound {
-                message = "Укажите API-ключ в Настройках"
-            } else {
-                message = error.localizedDescription
-            }
-            job.errorMessage = message
-            lastErrorMessage = message
         }
+        currentTask = task
+        await task.value
+        currentTask = nil
 
         isRunning = false
     }
@@ -186,6 +208,8 @@ final class StageExecutor {
                     streamingText = collected
                 case .finish(let reason):
                     if reason == "length" { truncated = true }
+                case .usage:
+                    break // no GenerationJob in the sandbox run to persist usage against
                 }
             }
             if truncated {
@@ -250,6 +274,8 @@ final class StageExecutor {
                     streamingText = collected
                 case .finish(let reason):
                     if reason == "length" { truncated = true }
+                case .usage:
+                    break // no GenerationJob in quick check to persist usage against
                 }
             }
             if truncated {

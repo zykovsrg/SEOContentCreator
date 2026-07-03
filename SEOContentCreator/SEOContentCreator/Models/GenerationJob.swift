@@ -12,6 +12,11 @@ final class GenerationJob {
     var finishedAt: Date?
     var errorMessage: String?
     var resultVersionID: UUID?
+    /// Token usage for this run, filled from OpenAI's `stream_options.include_usage`
+    /// event. Nil for jobs that predate this field or ran without it (e.g. errored
+    /// before the usage chunk arrived).
+    var promptTokens: Int?
+    var completionTokens: Int?
 
     @Relationship var topic: Topic?
 

@@ -3,13 +3,14 @@ import Foundation
 enum OpenAIStreamEvent: Equatable {
     case token(String)
     case finish(reason: String)
+    case usage(promptTokens: Int, completionTokens: Int)
 }
 
 struct OpenAIClient {
     enum OpenAIError: Error, Equatable, LocalizedError {
         case unauthorized
         case rateLimited
-        case http(Int)
+        case http(Int, message: String?)
         case badResponse
 
         var errorDescription: String? {
@@ -18,15 +19,26 @@ struct OpenAIClient {
                 return "Ошибка авторизации (401): OpenAI отклонил запрос. Проверьте API-ключ в Настройках или доступ аккаунта к выбранной модели."
             case .rateLimited:
                 return "Превышен лимит запросов (429). Подождите немного и попробуйте снова."
-            case .http(let code):
+            case .http(let code, let message):
+                let detail = message.map { " — \($0)" } ?? ""
                 if code == 403 {
-                    return "Ошибка OpenAI (HTTP 403): нет доступа к выбранной модели или проекту. Проверьте модель изображений, API-ключ, биллинг и доступ организации в Настройках OpenAI."
+                    return "Ошибка OpenAI (HTTP 403)\(detail): нет доступа к выбранной модели или проекту. Проверьте модель изображений, API-ключ, биллинг и доступ организации в Настройках OpenAI."
                 }
-                return "Ошибка OpenAI (HTTP \(code)). Попробуйте позже или смените модель в разделе «Шаблоны»."
+                return "Ошибка OpenAI (HTTP \(code))\(detail). Попробуйте позже или смените модель в разделе «Шаблоны»."
             case .badResponse:
                 return "Не удалось разобрать ответ OpenAI."
             }
         }
+    }
+
+    /// Extracts OpenAI's `error.message` from a JSON error response body, if present.
+    static func extractErrorMessage(from data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let errorObj = json["error"] as? [String: Any],
+              let message = errorObj["message"] as? String,
+              !message.isEmpty
+        else { return nil }
+        return message
     }
 
     let session: URLSession
@@ -65,6 +77,7 @@ struct OpenAIClient {
                     var body: [String: Any] = [
                         "model": model,
                         "stream": true,
+                        "stream_options": ["include_usage": true],
                         "messages": [
                             ["role": "system", "content": system],
                             ["role": "user", "content": user]
@@ -90,7 +103,10 @@ struct OpenAIClient {
                         case 200...299: break
                         case 401: throw OpenAIError.unauthorized
                         case 429: throw OpenAIError.rateLimited
-                        default: throw OpenAIError.http(http.statusCode)
+                        default:
+                            var errorBody = Data()
+                            for try await line in bytes.lines { errorBody.append(Data(line.utf8)) }
+                            throw OpenAIError.http(http.statusCode, message: Self.extractErrorMessage(from: errorBody))
                         }
                     }
 
@@ -98,6 +114,8 @@ struct OpenAIClient {
                         switch OpenAILineParser.parse(line: line) {
                         case .token(let t): continuation.yield(.token(t))
                         case .finish(let reason): continuation.yield(.finish(reason: reason))
+                        case .usage(let prompt, let completion):
+                            continuation.yield(.usage(promptTokens: prompt, completionTokens: completion))
                         case .done: continuation.finish(); return
                         case .ignore: continue
                         }

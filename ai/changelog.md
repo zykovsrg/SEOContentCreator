@@ -14,6 +14,36 @@
 
 ## Текущий changelog
 
+### 2026-07-03 — FT-20260702-008: блокировка проверочных этапов на пустом тексте
+
+- Change: `StageRunGuard.messagePreventingRun` теперь требует непустой `topic.currentVersion?.text` для этапов с `stage.kind == .checking` (SEO/фактчекинг/финальная вычитка) — как уже было для черновика.
+- Impact: Проверочный этап больше нельзя случайно запустить впустую (без текста) — раньше запрос уходил в OpenAI без смысла.
+- Manual checks: `xcodebuild test` — 4 новых/обновлённых теста в `StageRunGuardTests.swift`, полный прогон зелёный (307 passed / 0 failed).
+
+### 2026-07-03 — FT-20260703-001: Markdown-рендер в VersionCompareView
+
+- Change: `VersionCompareView.column` использует `MarkdownBlocksView(text:)` вместо сырого `Text(line.text)`. `MarkdownBlocksView` получил новый параметр `strikethrough: Bool = false`, применяемый к каждому блоку текста до `.textSelection` (модификатор `.strikethrough` существует только на `Text`, а не на произвольном `View` — нельзя было просто обернуть весь компонент).
+- Impact: Заголовки/списки в сравнении версий отображаются отформатированными, как в `SideBySideView`; зачёркивание удалённых абзацев сохранено.
+- Manual checks: компилятор — 0 ошибок. Визуально не проверялось (нужен реальный запуск приложения).
+
+### 2026-07-03 — FT-20260702-004: точная причина ошибки OpenAI из тела ответа
+
+- Change: `OpenAIClient.OpenAIError.http` получил параметр `message: String?`; для HTTP-ошибок кроме 401/429 тело ответа читается и парсится (`error.message` из JSON) через новый `OpenAIClient.extractErrorMessage(from:)`. То же применено к `ImageClient.swift` (тот же тип ошибки, тело уже было в руках через `session.data(for:)`).
+- Impact: При ошибках вроде «модель не существует» пользователь видит конкретную причину от OpenAI, а не только код статуса.
+- Manual checks: `xcodebuild test` — новые тесты в `OpenAIClientTests.swift` (сообщение из тела ответа, откат на `nil` при непарсируемом теле), полный прогон зелёный.
+
+### 2026-07-03 — FT-20260702-005: токены запроса/ответа в GenerationJob
+
+- Change: `stream_options: {"include_usage": true}` добавлен в запрос к OpenAI; `OpenAILineParser`/`OpenAIStreamEvent` получили `.usage(promptTokens:completionTokens:)` для финального SSE-чанка. `GenerationJob` получил поля `promptTokens`/`completionTokens` (аддитивная миграция — см. `ai/decisions.md`). Заполняются в `StageExecutor.execute(...)` и `FragmentEditor.run(...)` (оба реально сохраняют `GenerationJob`); в sandbox/quick-check событие игнорируется (там `GenerationJob` не создаётся).
+- Impact: Данные для «Стоимости по теме» (FT-20260623-006, следующая задача) теперь реально собираются — раньше их не было вообще.
+- Manual checks: `xcodebuild test` — новые тесты в `OpenAILineParserTests.swift`, `OpenAIClientTests.swift`, `StageExecutorTests.swift`, полный прогон зелёный.
+
+### 2026-07-03 — FT-20260702-003: отмена генерации (кнопка «Стоп»)
+
+- Change: `StageExecutor.execute(...)` оборачивает стриминг во внутренний `Task`, сохранённый в `currentTask`; новый метод `cancel()` отменяет его. Внутри цикла стриминга и сразу после — `try Task.checkCancellation()`; при отмене `job.status = .cancelled` (кейс уже существовал в `JobStatus`, но нигде не использовался). В `TopicWorkspaceView` рядом с «Запустить этап» добавлена кнопка «Стоп» (`role: .destructive`), активная только пока `executor.isRunning`.
+- Impact: Долгую генерацию можно остановить — раньше `Task` в `runStage` нигде не сохранялся и отменить его было нечем.
+- Manual checks: `xcodebuild test` — новый тест `cancelStopsStreamAndMarksJobCancelled` (имитирует реальный поток `OpenAIClient` с `onTermination`-отменой внутреннего Task), полный прогон зелёный. Реализовано только для главного пути `execute()`/`TopicWorkspaceView` — sandbox/quick-check/правка фрагмента остались без кнопки «Стоп» (см. `ai/future-tasks.md`, FT-20260702-003).
+
 ### 2026-07-03 — Release-сборка установлена в /Applications
 
 - Change: Собрана Release-конфигурация (`xcodebuild -scheme SEOContentCreator -configuration Release -destination 'platform=macOS' build` — BUILD SUCCEEDED). Старое приложение в `/Applications/SEOContentCreator.app` (от 2026-07-01, root-владелец) переименовано в `SEOContentCreator.app.old-1783059317` (удалить вручную не получилось — файлы внутри принадлежат root, нужен пароль, агент пароли не вводит). Свежая сборка скопирована в `/Applications/SEOContentCreator.app` и запущена — подтверждено, что процесс стартует и не падает.
