@@ -13,6 +13,7 @@ struct SemanticsEditorSheet: View {
     @State private var showAgent = false
     @State private var isRefreshingPages = false
     @State private var message: String?
+    @State private var newKeywordText: String = ""
 
     private enum SemanticFilter: String, CaseIterable, Identifiable {
         case all
@@ -65,6 +66,14 @@ struct SemanticsEditorSheet: View {
                 Button("Сбор агентом") { showAgent = true }
             }
 
+            HStack {
+                TextField("Добавить запрос вручную", text: $newKeywordText)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { addManualKeyword() }
+                Button("Добавить") { addManualKeyword() }
+                    .disabled(newKeywordText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
             if let message {
                 Text(message).font(.callout).foregroundStyle(.secondary)
             }
@@ -101,6 +110,22 @@ struct SemanticsEditorSheet: View {
         .sheet(isPresented: $showAgent) {
             SemanticAgentSheet(topic: topic)
         }
+    }
+
+    private func addManualKeyword() {
+        let text = newKeywordText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        if topic.semanticKeywords.contains(where: { $0.text.localizedCaseInsensitiveCompare(text) == .orderedSame }) {
+            message = "Такой запрос уже есть в списке."
+            return
+        }
+        let keyword = SemanticKeyword(text: text, userDecision: .accepted)
+        keyword.topic = topic
+        topic.semanticKeywords.append(keyword)
+        context.insert(keyword)
+        topic.updatedAt = .now
+        newKeywordText = ""
+        message = nil
     }
 
     private func setDecision(_ decision: SemanticUserDecision) {

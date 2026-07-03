@@ -14,6 +14,17 @@
 
 ## Текущий changelog
 
+### 2026-07-03 — Ручное добавление запроса в окно "Семантика"
+
+- Change: [SemanticsEditorSheet.swift](SEOContentCreator/SEOContentCreator/Views/SemanticsEditorSheet.swift)
+  получил поле ввода и кнопку "Добавить" рядом с фильтром. Раньше запросы попадали в семантику
+  только через сбор агентом или обновление страниц сайта. Новый запрос создаётся как обычный
+  `SemanticKeyword` с `userDecision = .accepted` (пользователь добавил его сам, решение принято
+  сразу) и без рекомендации агента. Дубликаты (без учёта регистра) блокируются с сообщением.
+- Impact: пользователь может дополнить список ключевых запросов вручную, не дожидаясь агента.
+- Manual checks: `xcodebuild build-for-testing` прошёл успешно; ручная проверка в живом UI не
+  делалась отдельно от Release-сборки ниже.
+
 ### 2026-07-03 — Фикс тормозов интерфейса при длинной генерации + Release-переустановка
 
 - Change: [MarkdownBlocksView.swift](SEOContentCreator/SEOContentCreator/Views/MarkdownBlocksView.swift)

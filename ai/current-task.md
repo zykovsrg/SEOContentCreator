@@ -10,10 +10,30 @@ Allowed stages: intake / spec / planning / implementation / review / task-finish
 
 ## Mode
 
+
+
 ## Goal
 
-## Context
+
+
+## Use Superpowers
+
+
+
+## Relevant files
+
+
 
 ## Done criteria
 
-## Notes
+
+
+## Agent handoff
+
+Last agent:
+
+What changed:
+
+Open risks:
+
+Next agent should check:
