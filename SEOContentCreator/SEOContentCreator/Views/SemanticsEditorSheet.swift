@@ -14,6 +14,8 @@ struct SemanticsEditorSheet: View {
     @State private var isRefreshingPages = false
     @State private var message: String?
     @State private var newKeywordText: String = ""
+    @State private var showBulkAdd = false
+    @State private var bulkKeywordText: String = ""
 
     private enum SemanticFilter: String, CaseIterable, Identifiable {
         case all
@@ -72,6 +74,10 @@ struct SemanticsEditorSheet: View {
                     .onSubmit { addManualKeyword() }
                 Button("Добавить") { addManualKeyword() }
                     .disabled(newKeywordText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Вставить список...") {
+                    bulkKeywordText = ""
+                    showBulkAdd = true
+                }
             }
 
             if let message {
@@ -110,6 +116,34 @@ struct SemanticsEditorSheet: View {
         .sheet(isPresented: $showAgent) {
             SemanticAgentSheet(topic: topic)
         }
+        .sheet(isPresented: $showBulkAdd) {
+            bulkAddSheet
+        }
+    }
+
+    private var bulkAddSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Вставить список запросов").font(.headline)
+            Text("Один запрос на строку. Можно вставить из Wordstat — частотность через таб "
+                + "распознаётся автоматически.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            TextEditor(text: $bulkKeywordText)
+                .font(.body.monospaced())
+                .frame(minWidth: 460, minHeight: 320)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
+            HStack {
+                Spacer()
+                Button("Отмена") { showBulkAdd = false }
+                Button("Добавить всё") {
+                    addBulkKeywords()
+                    showBulkAdd = false
+                }
+                .disabled(bulkKeywordText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 520)
     }
 
     private func addManualKeyword() {
@@ -126,6 +160,53 @@ struct SemanticsEditorSheet: View {
         topic.updatedAt = .now
         newKeywordText = ""
         message = nil
+    }
+
+    private func addBulkKeywords() {
+        var existingTexts = Set(topic.semanticKeywords.map { $0.text.localizedLowercase })
+        var added = 0
+        var skipped = 0
+
+        for rawLine in bulkKeywordText.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            guard !line.isEmpty else { continue }
+
+            let (text, frequency) = parseWordstatLine(line)
+            guard !text.isEmpty else { continue }
+
+            let key = text.localizedLowercase
+            guard !existingTexts.contains(key) else {
+                skipped += 1
+                continue
+            }
+
+            let keyword = SemanticKeyword(text: text, frequency: frequency, userDecision: .accepted)
+            keyword.topic = topic
+            topic.semanticKeywords.append(keyword)
+            context.insert(keyword)
+            existingTexts.insert(key)
+            added += 1
+        }
+
+        if added > 0 {
+            topic.updatedAt = .now
+        }
+        message = "Добавлено запросов: \(added)" + (skipped > 0 ? ", пропущено дубликатов: \(skipped)." : ".")
+        bulkKeywordText = ""
+    }
+
+    /// Wordstat при копировании строки таблицы обычно даёт "запрос<TAB>частотность".
+    private func parseWordstatLine(_ line: String) -> (text: String, frequency: Int?) {
+        let parts = line.components(separatedBy: "\t").map { $0.trimmingCharacters(in: .whitespaces) }
+        guard parts.count > 1, let lastPart = parts.last else {
+            return (line, nil)
+        }
+        let digitsOnly = lastPart.filter { $0.isNumber }
+        if !digitsOnly.isEmpty, let frequency = Int(digitsOnly) {
+            let text = parts.dropLast().joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            return (text.isEmpty ? lastPart : text, frequency)
+        }
+        return (parts.joined(separator: " ").trimmingCharacters(in: .whitespaces), nil)
     }
 
     private func setDecision(_ decision: SemanticUserDecision) {
