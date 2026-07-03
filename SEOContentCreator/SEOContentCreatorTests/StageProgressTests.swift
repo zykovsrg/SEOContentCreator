@@ -42,4 +42,9 @@ struct StageProgressTests {
         let draft = ArticleVersion(stage: .structure, source: .generated, text: "Текст")
         #expect(StageProgress.isCompleted(.structure, versions: [draft], structureText: "") == false)
     }
+
+    @Test func imagesStageCompletionFollowsHasImagesFlag() {
+        #expect(StageProgress.isCompleted(.images, versions: [], hasImages: false) == false)
+        #expect(StageProgress.isCompleted(.images, versions: [], hasImages: true) == true)
+    }
 }

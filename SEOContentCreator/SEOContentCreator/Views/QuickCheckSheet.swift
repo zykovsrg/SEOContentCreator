@@ -14,7 +14,9 @@ struct QuickCheckSheet: View {
     @State private var executor: StageExecutor?
     @State private var acceptedRemarkIDs: Set<UUID> = []
     @State private var rejectedRemarkIDs: Set<UUID> = []
+    @State private var redoingRemarkIDs: Set<UUID> = []
     @State private var didRun = false
+    @State private var highlightedQuote: String?
 
     // Сохранение как тему.
     @State private var showingSaveDialog = false
@@ -27,6 +29,13 @@ struct QuickCheckSheet: View {
     private var correctedText: String {
         let accepted = remarks.filter { acceptedRemarkIDs.contains($0.id) }
         return RemarkApplier.apply(base: inputText, accepted: accepted)
+    }
+
+    private var highlightedParagraphIndex: Int? {
+        guard let highlightedQuote, !highlightedQuote.isEmpty,
+              let range = inputText.range(of: highlightedQuote)
+        else { return nil }
+        return TextParagraphs.index(of: range.lowerBound, in: TextParagraphs.ranges(in: inputText))
     }
 
     var body: some View {
@@ -43,7 +52,21 @@ struct QuickCheckSheet: View {
             .pickerStyle(.segmented)
 
             Text("Вставьте текст для проверки").font(.headline)
-            TextEditor(text: $inputText).frame(minHeight: 140).border(.gray.opacity(0.3))
+            if didRun && !isRunning {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        HighlightedText(text: inputText, highlight: highlightedQuote)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(4)
+                    }
+                    .frame(minHeight: 140).border(.gray.opacity(0.3))
+                    .onChange(of: highlightedQuote) { _, _ in
+                        guard let index = highlightedParagraphIndex else { return }
+                        withAnimation { proxy.scrollTo(index, anchor: .center) }
+                    }
+                }
+            } else {
+                TextEditor(text: $inputText).frame(minHeight: 140).border(.gray.opacity(0.3))
+            }
 
             HStack {
                 Button("Проверить") { run() }
@@ -65,9 +88,11 @@ struct QuickCheckSheet: View {
                     remarks: remarks,
                     acceptedIDs: acceptedRemarkIDs,
                     rejectedIDs: rejectedRemarkIDs,
+                    redoingIDs: redoingRemarkIDs,
                     onAccept: { acceptedRemarkIDs.insert($0.id); rejectedRemarkIDs.remove($0.id) },
                     onReject: { rejectedRemarkIDs.insert($0.id); acceptedRemarkIDs.remove($0.id) },
-                    onSelect: { _ in }
+                    onSelect: { highlightedQuote = $0.quote },
+                    onRedo: { redoRemark($0, comment: $1) }
                 )
                 .frame(minHeight: 160)
 
@@ -98,10 +123,21 @@ struct QuickCheckSheet: View {
         }
     }
 
+    private func redoRemark(_ remark: Remark, comment: String) {
+        guard let executor else { return }
+        redoingRemarkIDs.insert(remark.id)
+        Task {
+            defer { redoingRemarkIDs.remove(remark.id) }
+            await RemarkRedoRunner.run(remark: remark, comment: comment, model: model,
+                                       executor: executor, topic: nil, in: context)
+        }
+    }
+
     private func run() {
         copiedNote = false
         acceptedRemarkIDs = []
         rejectedRemarkIDs = []
+        highlightedQuote = nil
         didRun = false
         let template = fetchTemplate(for: selectedStage)
         let exec = StageExecutor.live(model: model)

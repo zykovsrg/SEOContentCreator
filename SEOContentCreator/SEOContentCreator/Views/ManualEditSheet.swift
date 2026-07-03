@@ -11,11 +11,11 @@ struct ManualEditSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Ручная правка текста").font(.headline)
-            Text("Правка сохранится как новая версия и станет текущей.")
+            Text("Правка сохранится как новая версия и станет текущей. Cmd+B — жирный, Cmd+I — курсив, Cmd+Option+1/2/3 — заголовок.")
                 .font(.caption).foregroundStyle(.secondary)
 
-            TextEditor(text: $text)
-                .frame(minHeight: 420)
+            MarkdownTextEditor(text: $text, font: .systemFont(ofSize: 15))
+                .frame(minWidth: 500, minHeight: 300)
                 .border(Color.secondary.opacity(0.3))
 
             HStack {
@@ -27,7 +27,8 @@ struct ManualEditSheet: View {
             }
         }
         .padding()
-        .frame(width: 720, height: 560)
+        .frame(minWidth: 720, idealWidth: 900, maxWidth: .infinity,
+               minHeight: 560, idealHeight: 700, maxHeight: .infinity)
         .onAppear { text = topic.currentVersion?.text ?? "" }
     }
 

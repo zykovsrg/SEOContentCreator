@@ -38,4 +38,22 @@ struct StageRunGuardTests {
         topic.currentVersionID = version.uuid
         #expect(StageRunGuard.messagePreventingRun(stage: .seoCheck, topic: topic) == nil)
     }
+
+    @Test func imagesStageBlockedBeforeFinalReview() {
+        let topic = Topic(title: "Тема", articleType: .disease)
+        let draft = ArticleVersion(stage: .draft, source: .generated, text: "Текст")
+        draft.status = .accepted
+        topic.versions = [draft]
+        topic.currentVersionID = draft.uuid
+        #expect(StageRunGuard.messagePreventingRun(stage: .images, topic: topic) != nil)
+    }
+
+    @Test func imagesStageCanRunAfterFinalReview() {
+        let topic = Topic(title: "Тема", articleType: .disease)
+        let review = ArticleVersion(stage: .finalReview, source: .checkApplied, text: "Текст")
+        review.status = .accepted
+        topic.versions = [review]
+        topic.currentVersionID = review.uuid
+        #expect(StageRunGuard.messagePreventingRun(stage: .images, topic: topic) == nil)
+    }
 }

@@ -30,10 +30,12 @@ struct StageTemplateSeederTests {
         let context = try makeContext()
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: makeDefaults())
         let all = try context.fetch(FetchDescriptor<StageTemplate>())
-        #expect(all.count == PipelineStage.allCases.count)
-        for stage in PipelineStage.allCases {
+        let chatStages = PipelineStage.allCases.filter { $0.kind != .action }
+        #expect(all.count == chatStages.count)
+        for stage in chatStages {
             #expect(all.contains { $0.stageRaw == stage.rawValue })
         }
+        #expect(!all.contains { $0.stageRaw == PipelineStage.images.rawValue })
     }
 
     @Test func seedingIsIdempotent() throws {
@@ -42,7 +44,7 @@ struct StageTemplateSeederTests {
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
         let all = try context.fetch(FetchDescriptor<StageTemplate>())
-        #expect(all.count == PipelineStage.allCases.count)
+        #expect(all.count == PipelineStage.allCases.filter { $0.kind != .action }.count)
         #expect(try context.fetch(FetchDescriptor<ContextBlock>()).count == 3)
         #expect(try context.fetch(FetchDescriptor<AIRole>()).count == 4)
     }

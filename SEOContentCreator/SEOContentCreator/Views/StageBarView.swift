@@ -13,7 +13,10 @@ struct StageBarView: View {
                     selectedStage = stage
                 } label: {
                     HStack(spacing: 6) {
-                        if StageProgress.isCompleted(stage, versions: topic.versions, structureText: topic.structureText) {
+                        if StageProgress.isCompleted(
+                            stage, versions: topic.versions, structureText: topic.structureText,
+                            hasImages: !topic.images.filter({ !$0.isArchived }).isEmpty
+                        ) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                                 .font(.caption)

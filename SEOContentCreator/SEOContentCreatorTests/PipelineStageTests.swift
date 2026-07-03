@@ -54,4 +54,10 @@ struct PipelineStageTests {
         #expect(PipelineStage.factCheck.roleKey == "factChecker")
         #expect(PipelineStage.finalReview.roleKey == "editor")
     }
+
+    @Test func imagesIsAnActionStageAfterFinalReview() {
+        #expect(PipelineStage.allCases.last == .images)
+        #expect(PipelineStage.images.kind == .action)
+        #expect(PipelineStage.images.title == "Изображения")
+    }
 }

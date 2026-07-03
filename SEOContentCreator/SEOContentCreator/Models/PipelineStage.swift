@@ -3,6 +3,9 @@ import Foundation
 enum StageKind {
     case author
     case checking
+    /// Not a chat-completion stage: no `StageTemplate` is seeded for it, and
+    /// running it opens a dedicated screen instead of calling `StageExecutor`.
+    case action
 }
 
 enum PipelineStage: String, CaseIterable, Identifiable, Codable {
@@ -13,6 +16,7 @@ enum PipelineStage: String, CaseIterable, Identifiable, Codable {
     case seoCheck
     case factCheck
     case finalReview
+    case images
 
     var id: String { rawValue }
 
@@ -25,6 +29,7 @@ enum PipelineStage: String, CaseIterable, Identifiable, Codable {
         case .seoCheck:        return "Проверка SEO"
         case .factCheck:       return "Фактчекинг"
         case .finalReview:     return "Финальная вычитка"
+        case .images:          return "Изображения"
         }
     }
 
@@ -32,6 +37,7 @@ enum PipelineStage: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .structure, .draft, .productBlocks, .semanticsInText: return .author
         case .seoCheck, .factCheck, .finalReview:      return .checking
+        case .images: return .action
         }
     }
 
@@ -41,6 +47,7 @@ enum PipelineStage: String, CaseIterable, Identifiable, Codable {
         case .seoCheck:    return "ИИ-SEO"
         case .factCheck:   return "ИИ-фактчекер"
         case .finalReview: return "ИИ-редактор"
+        case .images:      return "Генератор изображений"
         }
     }
 
@@ -50,6 +57,7 @@ enum PipelineStage: String, CaseIterable, Identifiable, Codable {
         case .seoCheck:    return "seo"
         case .factCheck:   return "factChecker"
         case .finalReview: return "editor"
+        case .images:      return "images"
         }
     }
 }

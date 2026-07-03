@@ -13,6 +13,7 @@ struct TopicWorkspaceView: View {
     @State private var pendingVersionID: UUID?     // just-generated version awaiting accept
     @State private var acceptedRemarkIDs: Set<UUID> = []
     @State private var rejectedRemarkIDs: Set<UUID> = []
+    @State private var redoingRemarkIDs: Set<UUID> = []
     @State private var highlightedQuote: String?
     @State private var showVersions = false
     @State private var showLog = false
@@ -57,18 +58,26 @@ struct TopicWorkspaceView: View {
             }
             if isReviewing {
                 HStack(spacing: 0) {
-                    ScrollView {
-                        HighlightedText(text: workingCopy, highlight: highlightedQuote)
-                            .frame(maxWidth: .infinity, alignment: .leading).padding()
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            HighlightedText(text: workingCopy, highlight: highlightedQuote)
+                                .frame(maxWidth: .infinity, alignment: .leading).padding()
+                        }
+                        .onChange(of: highlightedQuote) { _, _ in
+                            guard let index = highlightedParagraphIndex else { return }
+                            withAnimation { proxy.scrollTo(index, anchor: .center) }
+                        }
                     }
                     Divider()
                     RemarksPanelView(
                         remarks: executor?.remarks ?? [],
                         acceptedIDs: acceptedRemarkIDs,
                         rejectedIDs: rejectedRemarkIDs,
+                        redoingIDs: redoingRemarkIDs,
                         onAccept: { acceptedRemarkIDs.insert($0.id); rejectedRemarkIDs.remove($0.id) },
                         onReject: { rejectedRemarkIDs.insert($0.id); acceptedRemarkIDs.remove($0.id) },
-                        onSelect: { highlightedQuote = $0.quote }
+                        onSelect: { highlightedQuote = $0.quote },
+                        onRedo: { redoRemark($0, comment: $1) }
                     )
                     .frame(width: 380)
                 }
@@ -157,6 +166,13 @@ struct TopicWorkspaceView: View {
         return RemarkApplier.apply(base: reviewBaseText, accepted: accepted)
     }
 
+    private var highlightedParagraphIndex: Int? {
+        guard let highlightedQuote, !highlightedQuote.isEmpty,
+              let range = workingCopy.range(of: highlightedQuote)
+        else { return nil }
+        return TextParagraphs.index(of: range.lowerBound, in: TextParagraphs.ranges(in: workingCopy))
+    }
+
     private var header: some View {
         HStack {
             VStack(alignment: .leading) {
@@ -191,7 +207,10 @@ struct TopicWorkspaceView: View {
             Button { showManualEdit = true } label: { Label("Ручная правка", systemImage: "pencil") }
                 .disabled(topic.currentVersion == nil)
         }
-        ToolbarItem { Button { showImages = true } label: { Label("Изображения", systemImage: "photo.on.rectangle") } }
+        ToolbarItem {
+            Button { showImages = true } label: { Label("Изображения", systemImage: "photo.on.rectangle") }
+                .disabled(!canGenerateImages)
+        }
         ToolbarItem {
             Button {
                 showPublish = true
@@ -204,7 +223,19 @@ struct TopicWorkspaceView: View {
     private func runSelectedStage() {
         if selectedStage == .structure { showStructure = true; return }
         if selectedStage == .productBlocks { showProductBlocks = true; return }
+        if selectedStage == .images {
+            if let message = StageRunGuard.messagePreventingRun(stage: .images, topic: topic) {
+                executor?.lastErrorMessage = message
+                return
+            }
+            showImages = true
+            return
+        }
         runStage(selectedStage, blocks: [])
+    }
+
+    private var canGenerateImages: Bool {
+        StageRunGuard.messagePreventingRun(stage: .images, topic: topic) == nil
     }
 
     private func runStage(_ stage: PipelineStage, blocks: [String]) {
@@ -282,6 +313,16 @@ struct TopicWorkspaceView: View {
             topic.updatedAt = .now
         }
         endReview()
+    }
+
+    private func redoRemark(_ remark: Remark, comment: String) {
+        guard let executor else { return }
+        redoingRemarkIDs.insert(remark.id)
+        Task {
+            defer { redoingRemarkIDs.remove(remark.id) }
+            await RemarkRedoRunner.run(remark: remark, comment: comment, model: model,
+                                       executor: executor, topic: topic, in: context)
+        }
     }
 
     private func endReview() {

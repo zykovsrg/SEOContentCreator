@@ -4,7 +4,7 @@ import Foundation
 
 struct StageTemplateDefaultsTests {
     @Test func hasContentForEveryStage() {
-        for stage in PipelineStage.allCases {
+        for stage in PipelineStage.allCases where stage.kind != .action {
             let c = StageTemplateDefaults.content(for: stage)
             #expect(!c.userPromptTemplate.isEmpty)
             #expect(c.modelName == "gpt-4.1")
@@ -54,7 +54,7 @@ struct StageTemplateDefaultsTests {
     }
 
     @Test func systemPromptsDoNotContainRoleMethodics() {
-        for stage in PipelineStage.allCases {
+        for stage in PipelineStage.allCases where stage.kind != .action {
             let system = StageTemplateDefaults.content(for: stage).systemPrompt
             #expect(!system.contains("Ты —"))
             #expect(!system.localizedCaseInsensitiveContains("markdown"))

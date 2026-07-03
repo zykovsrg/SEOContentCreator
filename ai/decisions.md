@@ -18,6 +18,22 @@ Impact:
 
 ## Текущие решения
 
+### 2026-07-03 — PipelineStage.images: непайплайновый этап через StageKind.action
+
+Status: active
+
+Decision:
+
+`PipelineStage` получил кейс `.images` (генерация изображений) и `StageKind` — кейс `.action`. В отличие от `.author`/`.checking` этапов, `.action`-этапы НЕ проходят через чат-генерацию: `StageTemplateSeeder` не сидирует для них `StageTemplate` (фильтр `stage.kind != .action`), `StageTemplateDefaults.content(for:)` для `.images` возвращает недостижимую заглушку (только чтобы switch был исчерпывающим), а `TopicWorkspaceView.runSelectedStage()` перехватывает `.images` до вызова `StageExecutor` и открывает `ImagesView`. `StageProgress.isCompleted`/`StageRunGuard` получили специальные ветки для `.images` (готовность = наличие неархивных `GeneratedImage`; запуск блокируется, пока не принята версия `.finalReview`).
+
+Why:
+
+Пользователь явно выбрал «сделать отдельным этапом в пайплайне» вместо более безопасной альтернативы «просто заблокировать существующую кнопку», зная о риске (см. `ai/current-task.md`/`ai/changelog.md` за 2026-07-03). Изображения генерируются через отдельный `ImageGenerator`/`ImageClient`, а не через `StageExecutor`/чат-completion — втискивать их в существующий чат-пайплайн было бы либо ломающим (пришлось бы городить фиктивный `StageTemplate`, который ничего не делает и путает пользователя в разделе «Шаблоны»), либо требовало бы отдельного `StageKind`.
+
+Impact:
+
+Любой новый код, добавляющий `case` в exhaustive `switch` над `PipelineStage` (уже задело `StageTemplateDefaults.content(for:)`) или над `StageKind`, должен явно решить, что делать с `.images`/`.action`. Если в будущем добавится ещё один нечат-этап (например, будущая FT-20260703-005 «Правки по комментариям врачей», если её решат делать отдельным этапом, а не переиспользованием remarks) — стоит сверяться с этим паттерном, а не изобретать новый.
+
 ### 2026-07-03 — GenerationJob хранит токены запроса/ответа (аддитивная миграция)
 
 Status: active

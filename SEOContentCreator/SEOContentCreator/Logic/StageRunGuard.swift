@@ -17,6 +17,11 @@ enum StageRunGuard {
                 return "Перед проверкой нужен текст статьи — сначала сгенерируйте черновик."
             }
         }
+        if stage == .images {
+            if !StageProgress.isCompleted(.finalReview, versions: topic.versions) {
+                return "Изображения можно генерировать только после «Финальной вычитки»."
+            }
+        }
         return nil
     }
 }

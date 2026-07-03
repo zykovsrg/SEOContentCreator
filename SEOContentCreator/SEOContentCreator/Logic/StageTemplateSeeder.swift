@@ -20,7 +20,7 @@ enum StageTemplateSeeder {
         let existing = (try? context.fetch(FetchDescriptor<StageTemplate>())) ?? []
         let seededStages = Set(existing.map { $0.stageRaw })
 
-        for stage in PipelineStage.allCases where !seededStages.contains(stage.rawValue) {
+        for stage in PipelineStage.allCases where stage.kind != .action && !seededStages.contains(stage.rawValue) {
             let template = makeTemplate(for: stage)
             context.insert(template)
         }

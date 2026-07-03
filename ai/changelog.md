@@ -14,6 +14,48 @@
 
 ## Текущий changelog
 
+### 2026-07-03 — Четыре доработки редактора замечаний, изображений и ручной правки
+
+- Change:
+  1. [StageTemplateDefaults.swift](SEOContentCreator/SEOContentCreator/Logic/StageTemplateDefaults.swift) —
+     промты проверочных этапов (SEO/фактчекинг/финальная вычитка) теперь явно просят пустой
+     `suggestion` для удаления фрагмента вместо слова «удалить»; [RemarksPanelView.swift](SEOContentCreator/SEOContentCreator/Views/RemarksPanelView.swift)
+     показывает пустой `suggestion` как явную метку «станет: Удалить» (красным), а не молчит.
+     Добавлено поле комментария + кнопка «Доработать» на карточке замечания — вызывает ИИ
+     ([RemarkRedoBuilder.swift](SEOContentCreator/SEOContentCreator/Logic/RemarkRedoBuilder.swift),
+     [RemarkRedoParser.swift](SEOContentCreator/SEOContentCreator/Logic/RemarkRedoParser.swift),
+     [RemarkRedoRunner.swift](SEOContentCreator/SEOContentCreator/Logic/RemarkRedoRunner.swift))
+     и перезаписывает `suggestion` на месте. Подключено и в `TopicWorkspaceView`, и в `QuickCheckSheet`.
+  2. [TextParagraphs.swift](SEOContentCreator/SEOContentCreator/Logic/TextParagraphs.swift) — новый
+     помощник разбивает текст на абзацы для стабильных `.id()`. `HighlightedText`/`MultiHighlightedText`
+     теперь рендерятся по абзацам; `SoftHintsSheet`, `TopicWorkspaceView` (панель замечаний) и
+     `QuickCheckSheet` оборачивают ScrollView в `ScrollViewReader` и центрируют экран на выбранном
+     замечании/подсказке. `QuickCheckSheet` заодно получил подсветку по клику (раньше `onSelect` был пустым).
+  3. Генерация изображений вынесена в пайплайн: `PipelineStage.images` (новый `StageKind.action` —
+     без чат-шаблона, открывает `ImagesView` вместо `StageExecutor`). `StageRunGuard` блокирует
+     запуск, пока не принята версия «Финальной вычитки»; `StageBarView` показывает «Изображения»
+     последней капсулой с галочкой по факту наличия неархивных `GeneratedImage`.
+  4. [ManualEditSheet.swift](SEOContentCreator/SEOContentCreator/Views/ManualEditSheet.swift) — вместо
+     голого `TextEditor` теперь [MarkdownTextEditor.swift](SEOContentCreator/SEOContentCreator/Views/MarkdownTextEditor.swift)
+     (NSTextView-обёртка): Cmd+B — жирный, Cmd+I — курсив, Cmd+Option+1/2/3 — заголовки H1–H3
+     (вставляют/меняют markdown-символы, текст остаётся обычной строкой). Окно сделано resizable
+     и увеличено (900×700 по умолчанию, было 720×560).
+- Impact: не более критичный баг с «Удалить» в тексте статьи устранён; точечная доработка замечаний
+  через комментарий; удобнее ориентироваться в длинных статьях при разборе замечаний/подсказок;
+  генерация изображений больше не отвлекает до готовности текста; ручная правка удобнее для длинных правок.
+- Manual checks: `xcodebuild build-for-testing` прошёл успешно (0 ошибок). Юнит-тесты новой/изменённой
+  логики (`TextParagraphsTests`, `RemarkRedoBuilderTests`, `RemarkRedoParserTests`, `StageProgressTests`,
+  `StageRunGuardTests`, `PipelineStageTests`, `StageTemplateSeederTests`, `StageTemplateDefaultsTests`)
+  прогнаны через `xcodebuild test-without-building -only-testing:...` — все прошли (не зависло, в
+  отличие от полного `xcodebuild test`, см. `ai/current-task.md`/память об этом различии). Ручная
+  проверка в живом UI (Cmd+U/запуск приложения) НЕ проводилась агентом — особенно нужно руками
+  проверить: клавиатурные хоткеи в `MarkdownTextEditor` (Cmd+Option+1/2/3 могут теоретически
+  перехватываться системными шорткатами переключения вкладок окна, хотя обычный Cmd+1..9 для этого
+  сознательно не использовался); центрирование скролла в трёх экранах; сценарий «Доработать»
+  замечание (нужен настроенный ключ OpenAI). Задача закрыта пользователем БЕЗ этой ручной проверки
+  (явное решение при `task-finish` 2026-07-03) — see `ai/future-tasks.md` FT-20260703-006 для
+  отложенной ручной проверки всех 4 пунктов.
+
 ### 2026-07-03 — Массовая вставка списка запросов в окно "Семантика"
 
 - Change: [SemanticsEditorSheet.swift](SEOContentCreator/SEOContentCreator/Views/SemanticsEditorSheet.swift)

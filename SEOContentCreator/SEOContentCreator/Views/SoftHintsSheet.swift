@@ -20,10 +20,16 @@ struct SoftHintsSheet: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 HStack(spacing: 0) {
-                    ScrollView {
-                        MultiHighlightedText(text: text, marks: marks, emphasized: emphasizedRange)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            MultiHighlightedText(text: text, marks: marks, emphasized: emphasizedRange)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                        }
+                        .onChange(of: selectedHintID) { _, _ in
+                            guard let index = emphasizedParagraphIndex else { return }
+                            withAnimation { proxy.scrollTo(index, anchor: .center) }
+                        }
                     }
                     Divider()
                     panel.frame(width: 320)
@@ -77,6 +83,11 @@ struct SoftHintsSheet: View {
     private var emphasizedRange: Range<String.Index>? {
         guard let id = selectedHintID else { return nil }
         return hints.first { $0.id == id }?.range
+    }
+
+    private var emphasizedParagraphIndex: Int? {
+        guard let range = emphasizedRange else { return nil }
+        return TextParagraphs.index(of: range.lowerBound, in: TextParagraphs.ranges(in: text))
     }
 
     private func recompute() {
