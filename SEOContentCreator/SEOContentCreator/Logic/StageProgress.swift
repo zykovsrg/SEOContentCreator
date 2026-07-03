@@ -3,7 +3,14 @@ import Foundation
 enum StageProgress {
     /// A stage counts as passed once the topic has at least one accepted
     /// (visible-in-lane) version created for it.
-    static func isCompleted(_ stage: PipelineStage, versions: [ArticleVersion]) -> Bool {
-        versions.contains { $0.stageRaw == stage.rawValue && $0.isVisibleInVersionLane }
+    ///
+    /// The "Структура" stage is a special case: it saves straight into
+    /// `topic.structureText` instead of creating an `ArticleVersion`, so it
+    /// has no version to look up here.
+    static func isCompleted(_ stage: PipelineStage, versions: [ArticleVersion], structureText: String = "") -> Bool {
+        if stage == .structure {
+            return !structureText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return versions.contains { $0.stageRaw == stage.rawValue && $0.isVisibleInVersionLane }
     }
 }

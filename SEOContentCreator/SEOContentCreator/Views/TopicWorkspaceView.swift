@@ -81,7 +81,7 @@ struct TopicWorkspaceView: View {
                 .padding(8)
             } else {
                 SideBySideView(
-                    leftText: comparisonText ?? topic.currentVersion?.text,
+                    leftText: comparisonText ?? leftText,
                     rightText: rightText,
                     isStreaming: executor?.isRunning ?? false
                 )
@@ -126,6 +126,16 @@ struct TopicWorkspaceView: View {
     private var rightText: String? {
         if let executor, executor.isRunning { return executor.streamingText }
         return pendingVersion?.text
+    }
+
+    /// The "Текущая версия" panel content. The "Структура" stage saves
+    /// straight into `topic.structureText` (no `ArticleVersion`), so it
+    /// needs its own source instead of `topic.currentVersion`.
+    private var leftText: String? {
+        if selectedStage == .structure {
+            return topic.structureText.isEmpty ? nil : topic.structureText
+        }
+        return topic.currentVersion?.text
     }
 
     /// The just-generated version awaiting accept/reject (in the lane, not yet current).

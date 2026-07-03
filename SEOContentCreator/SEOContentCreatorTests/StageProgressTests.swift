@@ -28,4 +28,18 @@ struct StageProgressTests {
             #expect(StageProgress.isCompleted(stage, versions: [manual]) == false)
         }
     }
+
+    @Test func structureStageIsCompletedWhenStructureTextIsSaved() {
+        #expect(StageProgress.isCompleted(.structure, versions: [], structureText: "H1: Заголовок") == true)
+    }
+
+    @Test func structureStageIsNotCompletedWithoutStructureText() {
+        #expect(StageProgress.isCompleted(.structure, versions: [], structureText: "") == false)
+        #expect(StageProgress.isCompleted(.structure, versions: [], structureText: "   \n") == false)
+    }
+
+    @Test func structureStageIgnoresVersionsEvenIfPresent() {
+        let draft = ArticleVersion(stage: .structure, source: .generated, text: "Текст")
+        #expect(StageProgress.isCompleted(.structure, versions: [draft], structureText: "") == false)
+    }
 }

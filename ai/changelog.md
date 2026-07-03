@@ -14,6 +14,29 @@
 
 ## Текущий changelog
 
+### 2026-07-03 — Фикс: сгенерированная "Структура" не отображалась на главном экране
+
+- Change: Этап "Структура" сохранял результат в отдельное поле `topic.structureText`
+  ([StructureEditorSheet.swift](SEOContentCreator/SEOContentCreator/Views/StructureEditorSheet.swift)),
+  минуя общую систему версий (`ArticleVersion`), которую показывает главный экран
+  контент-плана и по которой считается зелёная галочка "этап пройден". Из-за этого
+  после генерации и сохранения структуры пользователь не видел никакого
+  подтверждения — экран продолжал показывать "Нет текущей версии" / "Запустите этап".
+  Исправлено: `StageProgress.isCompleted` теперь для этапа `.structure` проверяет
+  `structureText`, а не `versions` ([StageProgress.swift](SEOContentCreator/SEOContentCreator/Logic/StageProgress.swift));
+  `TopicWorkspaceView` показывает `topic.structureText` в панели "Текущая версия",
+  когда выбрана вкладка "Структура" ([TopicWorkspaceView.swift](SEOContentCreator/SEOContentCreator/Views/TopicWorkspaceView.swift)).
+- Impact: После генерации структуры результат сразу виден на главном экране, вкладка
+  "Структура" получает галочку прогресса. Другие этапы (черновик, семантика и т.д.)
+  не затронуты — они по-прежнему используют обычный поток версий.
+- Manual checks: `xcodebuild build-for-testing` — BUILD SUCCEEDED; добавлены/обновлены
+  unit-тесты в `StageProgressTests.swift` (структура завершена только при непустом
+  `structureText`, версии для `.structure` игнорируются). Полный прогон тестов
+  (Cmd+U) и ручная проверка сценария в UI пользователем в этой сессии не выполнялись.
+  Release-сборка (`xcodebuild ... -configuration Release build`) — BUILD SUCCEEDED,
+  установлена в `/Applications/SEOContentCreator.app` (старая версия удалена),
+  приложение запущено и стабильно работает (процесс жив после запуска).
+
 ### 2026-07-03 — Исправлен краш при удалении узла Базы знаний, использованного темой
 
 - Change: Найден и исправлен баг: `Topic.direction`/`Topic.doctor` (`Models/Topic.swift`) не имели `deleteRule` и обратной связи (`inverse`), поэтому при удалении `KnowledgeNode`, на который ссылалась тема, SwiftData не обнуляла ссылку — тема оставалась с «битой» ссылкой на несуществующий узел. При следующем запуске `ContentPlanView` падала с крашем при попытке прочитать `direction?.title` у такой темы (SwiftData не может разрешить fault на удалённый объект). Добавлены обратные relationship-свойства `topicsUsingAsDirection`/`topicsUsingAsDoctor` в `Models/KnowledgeNode.swift` и `inverse:`/`deleteRule: .nullify` в `Topic.direction`/`Topic.doctor` — теперь SwiftData сама обнуляет ссылку у темы при удалении связанного узла. Добавлен регрессионный тест `TopicKnowledgeNodeDeletionTests` (2 теста): проверяет, что удаление направления/врача, использованных темой, обнуляет ссылку, а не оставляет её висящей. Полный набор тестов зелёный (309 → 311 passed).
