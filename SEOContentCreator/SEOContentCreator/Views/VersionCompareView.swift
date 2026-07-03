@@ -39,8 +39,7 @@ struct VersionCompareView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                        Text(line.text)
-                            .textSelection(.enabled)
+                        MarkdownBlocksView(text: line.text)
                             .strikethrough(line.kind == .removed)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(6)

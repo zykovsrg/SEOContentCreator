@@ -5,12 +5,16 @@ import SwiftUI
 /// raw "## " syntax as plain text.
 struct MarkdownBlocksView: View {
     var text: String
+    /// Applied to each block's Text before `.textSelection`, since `.strikethrough`
+    /// is only defined on `Text` and this view's body has no single `Text` to modify from outside.
+    var strikethrough: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(numberedBlocks.enumerated()), id: \.offset) { _, item in
                 blockText(item.block, number: item.number)
                     .font(font(for: item.block.style))
+                    .strikethrough(strikethrough)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
