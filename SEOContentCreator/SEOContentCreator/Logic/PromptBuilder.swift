@@ -64,9 +64,7 @@ struct PromptBuilder {
             user += "\n\nПродуктовые блоки для встраивания:\n" + renderedBlocks
         }
 
-        let system = [roleContext, template.systemPrompt]
-            .compactMap { nonEmpty($0) }
-            .joined(separator: "\n\n")
+        let system = nonEmpty(roleContext) ?? ""
 
         return (system, user)
     }

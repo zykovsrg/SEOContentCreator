@@ -385,7 +385,7 @@ final class StageExecutor {
         let relevantStages = PipelineStage.allCases.filter { $0.kind != .action && $0.kind != .analysis }
         return relevantStages.compactMap { stage -> String? in
             guard let template = templates.first(where: { $0.stageRaw == stage.rawValue }) else { return nil }
-            return "## \(stage.title)\nSystem: \(template.systemPrompt)\nUser:\n\(template.userPromptTemplate)"
+            return "## \(stage.title)\nUser:\n\(template.userPromptTemplate)"
         }.joined(separator: "\n\n")
     }
 }

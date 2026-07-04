@@ -1,7 +1,6 @@
 import Foundation
 
 struct StageTemplateContent {
-    var systemPrompt: String
     var userPromptTemplate: String
     var modelName: String = "gpt-4.1"
     var temperature: Double = 0.6
@@ -13,7 +12,6 @@ enum StageTemplateDefaults {
         switch stage {
         case .structure:
             return StageTemplateContent(
-                systemPrompt: "",
                 userPromptTemplate: """
                 Подготовь структуру текста для посадочной страницы. Только структуру, без текста статьи.
 
@@ -34,7 +32,6 @@ enum StageTemplateDefaults {
             )
         case .draft:
             return StageTemplateContent(
-                systemPrompt: "",
                 userPromptTemplate: """
                 Напиши текст строго по утверждённой структуре.
 
@@ -66,7 +63,6 @@ enum StageTemplateDefaults {
             )
         case .productBlocks:
             return StageTemplateContent(
-                systemPrompt: "",
                 userPromptTemplate: """
                 Встрой выбранные продуктовые блоки в текст, не ломая его структуру.
 
@@ -81,7 +77,6 @@ enum StageTemplateDefaults {
             )
         case .semanticsInText:
             return StageTemplateContent(
-                systemPrompt: "",
                 userPromptTemplate: """
                 Встрой ключевые запросы в текст естественно. Учитывай частотность и обязательность. \
                 Допиши/поправь H1, сгенерируй Title и Description.
@@ -100,7 +95,6 @@ enum StageTemplateDefaults {
             )
         case .seoCheck:
             return StageTemplateContent(
-                systemPrompt: "",
                 userPromptTemplate: """
                 Проверь текст на соответствие SEO-требованиям. Не переписывай — верни список замечаний.
 
@@ -125,7 +119,6 @@ enum StageTemplateDefaults {
             )
         case .factCheck:
             return StageTemplateContent(
-                systemPrompt: "",
                 userPromptTemplate: """
                 Проведи фактчекинг текста. Сверь медицинские утверждения с принципами доказательной медицины и алгоритмом работы с источниками, а данные клиники — со справочником. Не переписывай текст — верни список замечаний.
 
@@ -151,7 +144,6 @@ enum StageTemplateDefaults {
             )
         case .finalReview:
             return StageTemplateContent(
-                systemPrompt: "",
                 userPromptTemplate: """
                 Проверь текст свежим редакторским взглядом. Не переписывай целиком — верни список точечных замечаний.
 
@@ -179,10 +171,9 @@ enum StageTemplateDefaults {
             // .images is a StageKind.action stage: it opens ImagesView instead of
             // running a chat completion, and StageTemplateSeeder never seeds a
             // template for it, so this case is unreachable in practice.
-            return StageTemplateContent(systemPrompt: "", userPromptTemplate: "")
+            return StageTemplateContent(userPromptTemplate: "")
         case .promptAnalysis:
             return StageTemplateContent(
-                systemPrompt: "",
                 userPromptTemplate: """
                 Проанализируй, как система промтов справляется с написанием этой статьи, и предложи улучшения.
 

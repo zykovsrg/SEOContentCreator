@@ -83,6 +83,6 @@ struct StructureEditorSheet: View {
         StageTemplateSeeder.seedIfNeeded(in: context)
         let c = StageTemplateDefaults.content(for: .structure)
         return (try? context.fetch(descriptor))?.first
-            ?? StageTemplate(stage: .structure, systemPrompt: c.systemPrompt, userPromptTemplate: c.userPromptTemplate)
+            ?? StageTemplate(stage: .structure, userPromptTemplate: c.userPromptTemplate)
     }
 }

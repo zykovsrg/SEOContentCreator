@@ -173,6 +173,6 @@ struct QuickCheckSheet: View {
         if let found = (try? context.fetch(descriptor))?.first { return found }
         StageTemplateSeeder.seedIfNeeded(in: context)
         return (try? context.fetch(descriptor))?.first
-            ?? StageTemplate(stage: stage, systemPrompt: "", userPromptTemplate: "{{текущий_текст}}")
+            ?? StageTemplate(stage: stage, userPromptTemplate: "{{текущий_текст}}")
     }
 }

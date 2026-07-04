@@ -5,7 +5,6 @@ struct PromptBuilderTests {
     private func draftTemplate() -> StageTemplate {
         StageTemplate(
             stage: .draft,
-            systemPrompt: "Ты медицинский автор.",
             userPromptTemplate: "Тема: {{тема}}\nТип: {{тип}}\nОбъём: {{объём}}\nНаправление: {{направление}}\nПреимущества: {{преимущества}}"
         )
     }
@@ -18,7 +17,6 @@ struct PromptBuilderTests {
 
         let result = PromptBuilder().build(template: draftTemplate(), topic: topic, currentText: nil)
 
-        #expect(result.system == "Ты медицинский автор.")
         #expect(result.user.contains("Тема: Рак простаты"))
         #expect(result.user.contains("Тип: Заболевание"))
         #expect(result.user.contains("Объём: 4000"))
@@ -27,15 +25,14 @@ struct PromptBuilderTests {
     }
 
     @Test func unknownPlaceholdersLeftAsIs() {
-        let t = StageTemplate(stage: .draft, systemPrompt: "x", userPromptTemplate: "Привет {{неизвестно}}")
+        let t = StageTemplate(stage: .draft, userPromptTemplate: "Привет {{неизвестно}}")
         let topic = Topic(title: "T", articleType: .info)
         let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
         #expect(result.user == "Привет {{неизвестно}}")
     }
 
     @Test func currentTextAndSemanticsSubstituted() {
-        let t = StageTemplate(stage: .semanticsInText, systemPrompt: "x",
-                              userPromptTemplate: "Текст: {{текущий_текст}}\nЗапросы: {{семантика}}")
+        let t = StageTemplate(stage: .semanticsInText, userPromptTemplate: "Текст: {{текущий_текст}}\nЗапросы: {{семантика}}")
         let topic = Topic(title: "T", articleType: .info)
         topic.semantics = ["рак простаты лечение", "лучевая терапия цена"]
         let result = PromptBuilder().build(template: t, topic: topic, currentText: "Готовый текст")
@@ -45,8 +42,7 @@ struct PromptBuilderTests {
     }
 
     @Test func semanticKeywordDecisionsDriveSemanticsPlaceholder() {
-        let t = StageTemplate(stage: .semanticsInText, systemPrompt: "x",
-                              userPromptTemplate: "Запросы:\n{{семантика}}")
+        let t = StageTemplate(stage: .semanticsInText, userPromptTemplate: "Запросы:\n{{семантика}}")
         let topic = Topic(title: "T", articleType: .info)
         topic.semanticKeywords = [
             SemanticKeyword(text: "МРТ лёгких", userDecision: .accepted),
@@ -62,8 +58,7 @@ struct PromptBuilderTests {
     }
 
     @Test func substitutesStructure() {
-        let t = StageTemplate(stage: .draft, systemPrompt: "x",
-                              userPromptTemplate: "План:\n{{структура}}")
+        let t = StageTemplate(stage: .draft, userPromptTemplate: "План:\n{{структура}}")
         let topic = Topic(title: "T", articleType: .info)
         topic.structureText = "# H1 Рак простаты\n## Введение\n- о чём раздел"
         let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
@@ -72,16 +67,14 @@ struct PromptBuilderTests {
     }
 
     @Test func emptyStructureLeavesPlaceholderEmpty() {
-        let t = StageTemplate(stage: .draft, systemPrompt: "x",
-                              userPromptTemplate: "План:[{{структура}}]")
+        let t = StageTemplate(stage: .draft, userPromptTemplate: "План:[{{структура}}]")
         let topic = Topic(title: "T", articleType: .info)
         let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
         #expect(result.user == "План:[]")
     }
 
     @Test func selectedBlocksAppendedWhenPresent() {
-        let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
-                              userPromptTemplate: "Текст: {{текущий_текст}}")
+        let t = StageTemplate(stage: .productBlocks, userPromptTemplate: "Текст: {{текущий_текст}}")
         let topic = Topic(title: "T", articleType: .service)
         let result = PromptBuilder().build(template: t, topic: topic, currentText: "Базовый текст",
                                            selectedBlocks: ["CTA", "Блок врача"])
@@ -90,8 +83,7 @@ struct PromptBuilderTests {
     }
 
     @Test func substitutesKnowledgeBase() {
-        let t = StageTemplate(stage: .factCheck, systemPrompt: "x",
-                              userPromptTemplate: "Справочник:\n{{база_знаний}}")
+        let t = StageTemplate(stage: .factCheck, userPromptTemplate: "Справочник:\n{{база_знаний}}")
         let topic = Topic(title: "T", articleType: .disease)
         let adv = KnowledgeNode(title: "Преимущество", type: .advantage, content: "Лечение за один визит")
         let doc = KnowledgeNode(title: "Усычкин С.В.", type: .doctor, content: "Стаж 20 лет")
@@ -101,8 +93,8 @@ struct PromptBuilderTests {
         #expect(result.user.contains("Усычкин С.В.: Стаж 20 лет"))
     }
 
-    @Test func prependsRoleContextToSystemPrompt() {
-        let t = StageTemplate(stage: .draft, systemPrompt: "Промт этапа", userPromptTemplate: "{{тема}}")
+    @Test func systemComesDirectlyFromRoleContext() {
+        let t = StageTemplate(stage: .draft, userPromptTemplate: "{{тема}}")
         let topic = Topic(title: "T", articleType: .info)
 
         let result = PromptBuilder().build(
@@ -112,12 +104,12 @@ struct PromptBuilderTests {
             roleContext: "Контекст роли"
         )
 
-        #expect(result.system == "Контекст роли\n\nПромт этапа")
+        #expect(result.system == "Контекст роли")
         #expect(result.user == "T")
     }
 
-    @Test func emptyRoleContextKeepsExistingSystemPrompt() {
-        let t = StageTemplate(stage: .draft, systemPrompt: "Промт этапа", userPromptTemplate: "{{тема}}")
+    @Test func emptyRoleContextProducesEmptySystem() {
+        let t = StageTemplate(stage: .draft, userPromptTemplate: "{{тема}}")
         let topic = Topic(title: "T", articleType: .info)
 
         let result = PromptBuilder().build(
@@ -127,13 +119,12 @@ struct PromptBuilderTests {
             roleContext: ""
         )
 
-        #expect(result.system == "Промт этапа")
+        #expect(result.system == "")
         #expect(result.user == "T")
     }
 
     @Test func selectedBlockPromptsInjectedViaPlaceholder() {
-        let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
-                              userPromptTemplate: "Текст: {{текущий_текст}}\nБлоки:\n{{продуктовые_блоки}}")
+        let t = StageTemplate(stage: .productBlocks, userPromptTemplate: "Текст: {{текущий_текст}}\nБлоки:\n{{продуктовые_блоки}}")
         let topic = Topic(title: "T", articleType: .info)
         let result = PromptBuilder().build(
             template: t, topic: topic, currentText: "тело",
@@ -149,8 +140,7 @@ struct PromptBuilderTests {
         let doctor = KnowledgeNode(title: "Врач", type: .doctor, content: "Иванов И.И., онколог")
         let topic = Topic(title: "T", articleType: .info)
         topic.doctor = doctor
-        let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
-                              userPromptTemplate: "{{продуктовые_блоки}}")
+        let t = StageTemplate(stage: .productBlocks, userPromptTemplate: "{{продуктовые_блоки}}")
         let result = PromptBuilder().build(
             template: t, topic: topic, currentText: nil,
             selectedBlocks: ["Данные врача: {{врач_данные}}"]
@@ -159,8 +149,7 @@ struct PromptBuilderTests {
     }
 
     @Test func blocksAppendedWhenNoPlaceholder() {
-        let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
-                              userPromptTemplate: "Текст: {{текущий_текст}}")
+        let t = StageTemplate(stage: .productBlocks, userPromptTemplate: "Текст: {{текущий_текст}}")
         let topic = Topic(title: "T", articleType: .info)
         let result = PromptBuilder().build(
             template: t, topic: topic, currentText: "тело",
@@ -172,8 +161,7 @@ struct PromptBuilderTests {
     }
 
     @Test func substitutesForbiddenPhrasesPlaceholder() {
-        let t = StageTemplate(stage: .finalReview, systemPrompt: "x",
-                              userPromptTemplate: "Запрещено:\n{{запрещённые_формулировки}}")
+        let t = StageTemplate(stage: .finalReview, userPromptTemplate: "Запрещено:\n{{запрещённые_формулировки}}")
         let topic = Topic(title: "T", articleType: .info)
 
         let result = PromptBuilder().build(
@@ -185,8 +173,7 @@ struct PromptBuilderTests {
     }
 
     @Test func emptyForbiddenPhrasesFallsBackToStub() {
-        let t = StageTemplate(stage: .finalReview, systemPrompt: "x",
-                              userPromptTemplate: "Запрещено:\n{{запрещённые_формулировки}}")
+        let t = StageTemplate(stage: .finalReview, userPromptTemplate: "Запрещено:\n{{запрещённые_формулировки}}")
         let topic = Topic(title: "T", articleType: .info)
 
         let result = PromptBuilder().build(template: t, topic: topic, currentText: "текст")
@@ -195,8 +182,7 @@ struct PromptBuilderTests {
     }
 
     @Test func seoMetaVariablesSubstitutedFromCurrentVersion() {
-        let t = StageTemplate(stage: .seoCheck, systemPrompt: "x",
-                              userPromptTemplate: "H1: {{текущий_h1}}\nTitle: {{текущий_title}}\nDescription: {{текущий_description}}")
+        let t = StageTemplate(stage: .seoCheck, userPromptTemplate: "H1: {{текущий_h1}}\nTitle: {{текущий_title}}\nDescription: {{текущий_description}}")
         let topic = Topic(title: "T", articleType: .info)
         let version = ArticleVersion(stage: .semanticsInText, source: .generated, text: "тело")
         version.h1 = "Лечение рака простаты"
@@ -214,16 +200,14 @@ struct PromptBuilderTests {
     }
 
     @Test func seoMetaVariablesEmptyWithoutCurrentVersion() {
-        let t = StageTemplate(stage: .seoCheck, systemPrompt: "x",
-                              userPromptTemplate: "H1:[{{текущий_h1}}]")
+        let t = StageTemplate(stage: .seoCheck, userPromptTemplate: "H1:[{{текущий_h1}}]")
         let topic = Topic(title: "T", articleType: .info)
         let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
         #expect(result.user == "H1:[]")
     }
 
     @Test func emptyPlaceholderRemovedWhenNoBlocks() {
-        let t = StageTemplate(stage: .productBlocks, systemPrompt: "x",
-                              userPromptTemplate: "A {{продуктовые_блоки}} B")
+        let t = StageTemplate(stage: .productBlocks, userPromptTemplate: "A {{продуктовые_блоки}} B")
         let topic = Topic(title: "T", articleType: .info)
         let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
         #expect(!result.user.contains("{{продуктовые_блоки}}"))

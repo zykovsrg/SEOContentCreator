@@ -4,7 +4,6 @@ struct TemplateEditorView: View {
     @Bindable var template: StageTemplate
     @AppStorage("openAIModel") private var settingsModel = "gpt-4.1"
 
-    @State private var system = ""
     @State private var user = ""
     @State private var temperature = 0.6
     @State private var maxTokens = 8000
@@ -21,12 +20,9 @@ struct TemplateEditorView: View {
                 Text("Версия шаблона: \(template.templateVersion)")
                     .font(.caption).foregroundStyle(.secondary)
 
-                Text("Дополнение к системному промту этапа").font(.headline)
-                Text("Основная роль и общие правила берутся из разделов «ИИ-роли» и «Редполитика и источники».")
-                    .font(.caption).foregroundStyle(.secondary)
-                TextEditor(text: $system).frame(minHeight: 120).border(.gray.opacity(0.3))
-
                 Text("Пользовательский промт (инструкция с переменными)").font(.headline)
+                Text("Роль, общие правила и редполитика берутся из разделов «ИИ-роли» и «Редполитика и источники» и добавляются автоматически.")
+                    .font(.caption).foregroundStyle(.secondary)
                 TextEditor(text: $user).frame(minHeight: 200).border(.gray.opacity(0.3))
 
                 Text("Параметры генерации").font(.headline)
@@ -84,7 +80,6 @@ struct TemplateEditorView: View {
     }
 
     private func load() {
-        system = template.systemPrompt
         user = template.userPromptTemplate
         temperature = template.temperature
         maxTokens = template.maxTokens
@@ -92,7 +87,6 @@ struct TemplateEditorView: View {
     }
 
     private func save() {
-        template.systemPrompt = system
         template.userPromptTemplate = user
         template.temperature = temperature
         template.maxTokens = maxTokens
@@ -108,7 +102,6 @@ struct TemplateEditorView: View {
         StageTemplate(
             stage: template.stage ?? .draft,
             articleType: template.articleTypeRaw.flatMap(ArticleType.init(rawValue:)),
-            systemPrompt: system,
             userPromptTemplate: user,
             modelName: settingsModel,
             temperature: temperature,
@@ -122,7 +115,6 @@ struct TemplateEditorView: View {
 
     private func resetToDefault() {
         let c = StageTemplateDefaults.content(for: template.stage ?? .draft)
-        system = c.systemPrompt
         user = c.userPromptTemplate
         temperature = c.temperature
         maxTokens = c.maxTokens

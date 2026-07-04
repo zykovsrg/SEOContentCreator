@@ -4,6 +4,13 @@ struct SideBySideView: View {
     var leftText: String?
     var rightText: String?
     var isStreaming: Bool
+    /// True while running a checking stage (SEO/факт/финальная вычитка) — those
+    /// stream raw JSON remarks, not article text, so the right column shows a
+    /// status indicator instead of the raw stream.
+    var isCheckingStage: Bool = false
+    /// True once a checking stage finished with zero remarks — shows an explicit
+    /// "no remarks" confirmation instead of the empty "start the stage" placeholder.
+    var checkedWithNoRemarks: Bool = false
 
     private static let streamBottomID = "streamBottom"
 
@@ -11,8 +18,13 @@ struct SideBySideView: View {
         HStack(spacing: 0) {
             column(title: "Текущая версия", content: leftColumn)
             Divider()
-            column(title: isStreaming ? "Генерация…" : "Новая версия", content: rightColumn)
+            column(title: rightTitle, content: rightColumn)
         }
+    }
+
+    private var rightTitle: String {
+        if isStreaming { return isCheckingStage ? "Идёт проверка…" : "Генерация…" }
+        return "Новая версия"
     }
 
     @ViewBuilder private var leftColumn: some View {
@@ -31,7 +43,13 @@ struct SideBySideView: View {
     }
 
     @ViewBuilder private var rightColumn: some View {
-        if isStreaming {
+        if isStreaming && isCheckingStage {
+            ContentUnavailableView {
+                Label("Идёт проверка…", systemImage: "hourglass")
+            } description: {
+                ProgressView()
+            }
+        } else if isStreaming {
             // During generation show only the tail of the growing text (see `streamingTail`),
             // auto-scrolling to keep the newest output visible. The full formatted diff is
             // shown once generation finishes.
@@ -55,6 +73,8 @@ struct SideBySideView: View {
             ScrollView {
                 MarkdownBlocksView(text: rightText).padding()
             }
+        } else if checkedWithNoRemarks {
+            ContentUnavailableView("Проверка пройдена, замечаний нет", systemImage: "checkmark.circle")
         } else {
             ContentUnavailableView("Запустите этап", systemImage: "play.circle")
         }

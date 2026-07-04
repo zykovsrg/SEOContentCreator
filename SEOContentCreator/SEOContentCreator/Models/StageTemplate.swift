@@ -6,7 +6,6 @@ final class StageTemplate {
     var uuid: UUID
     var stageRaw: String
     var articleTypeRaw: String?   // nil = universal (applies to all article types)
-    var systemPrompt: String
     var userPromptTemplate: String
     var modelName: String
     var temperature: Double
@@ -21,7 +20,6 @@ final class StageTemplate {
     init(
         stage: PipelineStage,
         articleType: ArticleType? = nil,
-        systemPrompt: String,
         userPromptTemplate: String,
         modelName: String = "gpt-4.1",
         temperature: Double = 0.6,
@@ -32,7 +30,6 @@ final class StageTemplate {
         self.uuid = UUID()
         self.stageRaw = stage.rawValue
         self.articleTypeRaw = articleType?.rawValue
-        self.systemPrompt = systemPrompt
         self.userPromptTemplate = userPromptTemplate
         self.modelName = modelName
         self.temperature = temperature

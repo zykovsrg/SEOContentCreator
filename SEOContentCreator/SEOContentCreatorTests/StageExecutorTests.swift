@@ -31,7 +31,7 @@ struct StageExecutorTests {
         let topic = Topic(title: "Тема", articleType: .disease,
                           direction: KnowledgeNode(title: "ЛТ", type: .direction))
         context.insert(topic)
-        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "{{тема}}")
         context.insert(template)
 
         let executor = StageExecutor(
@@ -60,7 +60,7 @@ struct StageExecutorTests {
         let topic = Topic(title: "Тема", articleType: .disease,
                           direction: KnowledgeNode(title: "ЛТ", type: .direction))
         context.insert(topic)
-        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "{{тема}}")
         context.insert(template)
 
         // Mirrors OpenAIClient's real stream shape: an inner Task feeding the continuation,
@@ -103,7 +103,7 @@ struct StageExecutorTests {
         let topic = Topic(title: "Тема", articleType: .disease,
                           direction: KnowledgeNode(title: "ЛТ", type: .direction))
         context.insert(topic)
-        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "{{тема}}")
         context.insert(template)
 
         let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _, _ in
@@ -125,7 +125,7 @@ struct StageExecutorTests {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)
         context.insert(topic)
-        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "x")
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "x")
         context.insert(template)
 
         let executor = StageExecutor(
@@ -144,7 +144,7 @@ struct StageExecutorTests {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)
         context.insert(topic)
-        let template = StageTemplate(stage: .finalReview, systemPrompt: "s", userPromptTemplate: "{{текущий_текст}}")
+        let template = StageTemplate(stage: .finalReview, userPromptTemplate: "{{текущий_текст}}")
         context.insert(template)
 
         let json = #"{"remarks":[{"category":"Орфография","quote":"тест","suggestion":"текст","explanation":"опечатка"}]}"#
@@ -169,7 +169,7 @@ struct StageExecutorTests {
         let topic = Topic(title: "Тема", articleType: .disease,
                           direction: KnowledgeNode(title: "ЛТ", type: .direction))
         context.insert(topic)
-        let template = StageTemplate(stage: .structure, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        let template = StageTemplate(stage: .structure, userPromptTemplate: "{{тема}}")
         context.insert(template)
 
         let executor = StageExecutor(
@@ -192,7 +192,7 @@ struct StageExecutorTests {
         let topic = Topic(title: "Тема", articleType: .disease,
                           direction: KnowledgeNode(title: "ЛТ", type: .direction))
         context.insert(topic)
-        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "{{тема}}")
         context.insert(template)
 
         let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _, _ in
@@ -217,7 +217,7 @@ struct StageExecutorTests {
         let topic = Topic(title: "Тема", articleType: .disease,
                           direction: KnowledgeNode(title: "ЛТ", type: .direction))
         context.insert(topic)
-        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "{{тема}}")
         template.reasoningEffort = "high"
         context.insert(template)
 
@@ -242,7 +242,6 @@ struct StageExecutorTests {
         context.insert(topic)
         let template = StageTemplate(
             stage: .draft,
-            systemPrompt: "s",
             userPromptTemplate: "{{тема}}",
             modelName: "template-model"
         )
@@ -286,7 +285,6 @@ struct StageExecutorTests {
 
         let template = StageTemplate(
             stage: .draft,
-            systemPrompt: "Временная система",
             userPromptTemplate: "UNSAVED {{тема}} / {{текущий_текст}}",
             modelName: "gpt-5.5",
             temperature: 0.4,
@@ -319,7 +317,7 @@ struct StageExecutorTests {
             in: context
         )
 
-        #expect(capturedSystem == "Временная система")
+        #expect(capturedSystem == "")
         #expect(capturedUser == "UNSAVED Тема / Текущий текст")
         #expect(capturedModel == "settings-model")
         #expect(capturedReasoning == "high")
@@ -335,7 +333,7 @@ struct StageExecutorTests {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)
         context.insert(topic)
-        let template = StageTemplate(stage: .draft, systemPrompt: "s", userPromptTemplate: "{{тема}}")
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "{{тема}}")
         let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _, _ in
             AsyncThrowingStream { continuation in
                 continuation.yield(.token("Обрезанный песочный текст"))
@@ -364,7 +362,7 @@ struct StageExecutorTests {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)
         context.insert(topic)
-        let template = StageTemplate(stage: .finalReview, systemPrompt: "s", userPromptTemplate: "{{текущий_текст}}")
+        let template = StageTemplate(stage: .finalReview, userPromptTemplate: "{{текущий_текст}}")
         let json = #"{"remarks":[{"category":"Язык","quote":"плохо","suggestion":"лучше","explanation":"яснее"}]}"#
         let executor = StageExecutor(streamProvider: cannedStream([json]), keyProvider: { "k" })
 
@@ -387,8 +385,7 @@ struct StageExecutorTests {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)
         context.insert(topic)
-        let template = StageTemplate(stage: .promptAnalysis, systemPrompt: "s",
-                                     userPromptTemplate: "{{история_версий_по_этапам}} {{текущие_промты_этапов}}")
+        let template = StageTemplate(stage: .promptAnalysis, userPromptTemplate: "{{история_версий_по_этапам}} {{текущие_промты_этапов}}")
         context.insert(template)
 
         let json = #"{"recommendations":[{"problem":"Повторы","location":"Черновик","suggestion":"Уточнить промт"}]}"#
@@ -408,9 +405,8 @@ struct StageExecutorTests {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)
         context.insert(topic)
-        context.insert(StageTemplate(stage: .draft, systemPrompt: "draft system", userPromptTemplate: "draft user"))
-        let template = StageTemplate(stage: .promptAnalysis, systemPrompt: "s",
-                                     userPromptTemplate: "{{текущие_промты_этапов}}")
+        context.insert(StageTemplate(stage: .draft, userPromptTemplate: "draft user"))
+        let template = StageTemplate(stage: .promptAnalysis, userPromptTemplate: "{{текущие_промты_этапов}}")
         context.insert(template)
 
         var capturedUser = ""
@@ -425,7 +421,6 @@ struct StageExecutorTests {
         await executor.execute(stage: .promptAnalysis, topic: topic, template: template,
                                currentText: nil, in: context)
 
-        #expect(capturedUser.contains("draft system"))
         #expect(capturedUser.contains("draft user"))
     }
 
@@ -435,7 +430,7 @@ struct StageExecutorTests {
         context.insert(topic)
         context.insert(AIRole(key: "author", name: "Новый автор", mandate: "Мандат роли", blockKeys: ["editorialPolicy"]))
         context.insert(ContextBlock(key: "editorialPolicy", title: "Редполитика", text: "Текст редполитики"))
-        let template = StageTemplate(stage: .draft, systemPrompt: "Промт этапа", userPromptTemplate: "{{тема}}")
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "{{тема}}")
         context.insert(template)
 
         var capturedSystem = ""
@@ -451,7 +446,7 @@ struct StageExecutorTests {
         await executor.execute(stage: .draft, topic: topic, template: template,
                                currentText: nil, in: context)
 
-        #expect(capturedSystem == "Мандат роли\n\nТекст редполитики\n\nПромт этапа")
+        #expect(capturedSystem == "Мандат роли\n\nТекст редполитики")
         #expect(topic.jobs.first?.agentName == "Новый автор")
         let created = topic.versions.first { $0.uuid == executor.lastResultVersionID }
         #expect(created?.agentName == "Новый автор")

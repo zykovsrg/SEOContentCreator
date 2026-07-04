@@ -86,7 +86,6 @@ enum StageTemplateSeeder {
         for template in templates {
             guard let stage = template.stage, cascadeStages.contains(template.stageRaw) else { continue }
             let content = StageTemplateDefaults.content(for: stage)
-            template.systemPrompt = content.systemPrompt
             template.userPromptTemplate = content.userPromptTemplate
             // Checking stages need a low, predictable temperature (stable JSON,
             // less "creativity"); author stages keep their existing temperature.
@@ -128,7 +127,6 @@ enum StageTemplateSeeder {
         let c = StageTemplateDefaults.content(for: stage)
         return StageTemplate(
             stage: stage,
-            systemPrompt: c.systemPrompt,
             userPromptTemplate: c.userPromptTemplate,
             modelName: c.modelName,
             temperature: c.temperature,

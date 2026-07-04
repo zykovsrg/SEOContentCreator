@@ -60,15 +60,4 @@ struct StageTemplateDefaultsTests {
         #expect(c.userPromptTemplate.contains("recommendations"))
         #expect(c.temperature == 0.3)
     }
-
-    @Test func systemPromptsDoNotContainRoleMethodics() {
-        for stage in PipelineStage.allCases where stage.kind != .action {
-            let system = StageTemplateDefaults.content(for: stage).systemPrompt
-            #expect(!system.contains("Ты —"))
-            #expect(!system.localizedCaseInsensitiveContains("markdown"))
-            #expect(!system.localizedCaseInsensitiveContains("не выдум"))
-            #expect(!system.localizedCaseInsensitiveContains("доказатель"))
-            #expect(!system.localizedCaseInsensitiveContains("русск"))
-        }
-    }
 }

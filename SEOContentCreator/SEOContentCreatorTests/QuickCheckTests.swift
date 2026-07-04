@@ -32,7 +32,7 @@ struct QuickCheckExecutorTests {
     @Test func parsesRemarksFromResponse() async throws {
         let context = try makeContext()
         let executor = StageExecutor(streamProvider: tokenStream(remarkJSON), keyProvider: { "key" })
-        let template = StageTemplate(stage: .seoCheck, systemPrompt: "sys", userPromptTemplate: "Проверь: {{текущий_текст}}")
+        let template = StageTemplate(stage: .seoCheck, userPromptTemplate: "Проверь: {{текущий_текст}}")
 
         await executor.executeQuickCheck(stage: .seoCheck, pastedText: "плохо текст", template: template, in: context)
 
@@ -44,7 +44,7 @@ struct QuickCheckExecutorTests {
     @Test func doesNotPersistJobOrVersion() async throws {
         let context = try makeContext()
         let executor = StageExecutor(streamProvider: tokenStream(remarkJSON), keyProvider: { "key" })
-        let template = StageTemplate(stage: .factCheck, systemPrompt: "sys", userPromptTemplate: "{{текущий_текст}}")
+        let template = StageTemplate(stage: .factCheck, userPromptTemplate: "{{текущий_текст}}")
 
         await executor.executeQuickCheck(stage: .factCheck, pastedText: "текст", template: template, in: context)
 
@@ -58,7 +58,6 @@ struct QuickCheckExecutorTests {
         let context = try makeContext()
         let template = StageTemplate(
             stage: .seoCheck,
-            systemPrompt: "sys",
             userPromptTemplate: "Проверь: {{текущий_текст}}",
             modelName: "template-model"
         )

@@ -27,12 +27,10 @@ struct TemplatesMigrationV3Tests {
         let defaults = makeDefaults()
         let oldDraft = StageTemplate(
             stage: .draft,
-            systemPrompt: "старый system",
             userPromptTemplate: "старый user"
         )
         let oldProductBlocks = StageTemplate(
             stage: .productBlocks,
-            systemPrompt: "",
             userPromptTemplate: "правленный productBlocks"
         )
         context.insert(oldDraft)
@@ -86,7 +84,6 @@ struct TemplatesMigrationV3Tests {
         let defaults = makeDefaults()
         let oldSeoCheck = StageTemplate(
             stage: .seoCheck,
-            systemPrompt: "",
             userPromptTemplate: "старый seoCheck без H1"
         )
         context.insert(oldSeoCheck)
@@ -100,10 +97,10 @@ struct TemplatesMigrationV3Tests {
     @Test func checkingStagesGetLoweredTemperatureInVersion5() throws {
         let context = try makeContext()
         let defaults = makeDefaults()
-        let oldSeoCheck = StageTemplate(stage: .seoCheck, systemPrompt: "", userPromptTemplate: "x", temperature: 0.6)
-        let oldFactCheck = StageTemplate(stage: .factCheck, systemPrompt: "", userPromptTemplate: "x", temperature: 0.6)
-        let oldFinalReview = StageTemplate(stage: .finalReview, systemPrompt: "", userPromptTemplate: "x", temperature: 0.6)
-        let oldDraft = StageTemplate(stage: .draft, systemPrompt: "", userPromptTemplate: "x", temperature: 0.6)
+        let oldSeoCheck = StageTemplate(stage: .seoCheck, userPromptTemplate: "x", temperature: 0.6)
+        let oldFactCheck = StageTemplate(stage: .factCheck, userPromptTemplate: "x", temperature: 0.6)
+        let oldFinalReview = StageTemplate(stage: .finalReview, userPromptTemplate: "x", temperature: 0.6)
+        let oldDraft = StageTemplate(stage: .draft, userPromptTemplate: "x", temperature: 0.6)
         context.insert(oldSeoCheck)
         context.insert(oldFactCheck)
         context.insert(oldFinalReview)

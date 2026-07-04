@@ -27,6 +27,7 @@ struct TopicWorkspaceView: View {
     @State private var showPublish = false
     @State private var showPartialAccept = false
     @State private var showPromptAnalysis = false
+    @State private var checkedWithNoRemarks = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -101,7 +102,9 @@ struct TopicWorkspaceView: View {
                 SideBySideView(
                     leftText: comparisonText ?? leftText,
                     rightText: rightText,
-                    isStreaming: executor?.isRunning ?? false
+                    isStreaming: executor?.isRunning ?? false,
+                    isCheckingStage: selectedStage.kind == .checking,
+                    checkedWithNoRemarks: checkedWithNoRemarks
                 )
                 Divider()
                 AcceptRejectBar(
@@ -266,6 +269,7 @@ struct TopicWorkspaceView: View {
         acceptedRemarkIDs = []
         rejectedRemarkIDs = []
         highlightedQuote = nil
+        checkedWithNoRemarks = false
         if let message = StageRunGuard.messagePreventingRun(stage: stage, topic: topic) {
             executor.lastErrorMessage = message
             return
@@ -277,6 +281,9 @@ struct TopicWorkspaceView: View {
                                    currentText: current, selectedBlocks: blocks,
                                    modelName: model, in: context)
             pendingVersionID = executor.lastResultVersionID
+            if stage.kind == .checking && executor.remarks.isEmpty && executor.lastErrorMessage == nil {
+                checkedWithNoRemarks = true
+            }
             if stage == .promptAnalysis && executor.lastErrorMessage == nil {
                 showPromptAnalysis = true
             }
@@ -292,7 +299,7 @@ struct TopicWorkspaceView: View {
         // Fallback: seed then refetch.
         StageTemplateSeeder.seedIfNeeded(in: context)
         return (try? context.fetch(descriptor))?.first
-            ?? StageTemplate(stage: stage, systemPrompt: "", userPromptTemplate: "{{текущий_текст}}")
+            ?? StageTemplate(stage: stage, userPromptTemplate: "{{текущий_текст}}")
     }
 
     private func acceptAll() {
