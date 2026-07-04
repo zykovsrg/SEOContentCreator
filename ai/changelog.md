@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-07-04 — Увеличены отступы перед подзаголовками; Release-сборка установлена в /Applications
+
+- Change: [MarkdownBlocksView.swift](SEOContentCreator/SEOContentCreator/Views/MarkdownBlocksView.swift) — `VStack` с равномерным `spacing: 6` заменён на `spacing: 0` с индивидуальным `.padding(.top, topSpacing(...))` на каждый блок: перед H1/H2/H3 отступ увеличен до 28/24/20pt, между обычными абзацами — 8pt (было 6pt), перед самым первым блоком статьи отступа нет. Компонент общий — эффект виден везде, где рендерится текст статьи (рабочий экран темы, сравнение версий, предпросмотр правки фрагмента).
+- Impact: длинный текст статьи визуально разбивается на блоки заметнее, читать проще. Затем `xcodebuild build -configuration Release` собран и установлен в `/Applications` (старая копия удалена, приложение предварительно закрыто через `osascript`, после установки запущено и подтверждён живой процесс).
+- Manual checks: `xcodebuild build-for-testing` и `xcodebuild build -configuration Release` — оба BUILD SUCCEEDED. Чисто визуальная правка — автотест не добавлялся. Глубокая проверка в реально запущенном приложении не проводилась (только подтверждён живой процесс) — добавлено в `FT-20260704-004`.
+
 ### 2026-07-04 — Release-сборка (коммит fb638ee) установлена в /Applications
 
 - Change: `xcodebuild build -configuration Release` собран после коммита `fb638ee` (одна колонка вместо всегда-пустой правой в `TopicWorkspaceView`). Работавшего экземпляра не было, старая копия `/Applications/SEOContentCreator.app` удалена и заменена свежей сборкой.

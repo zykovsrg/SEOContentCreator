@@ -15,16 +15,30 @@ struct MarkdownBlocksView: View {
     @State private var numberedBlocks: [NumberedBlock] = []
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(numberedBlocks.enumerated()), id: \.offset) { _, item in
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(numberedBlocks.enumerated()), id: \.offset) { index, item in
                 blockText(item.block, number: item.number)
                     .font(font(for: item.block.style))
                     .strikethrough(strikethrough)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, topSpacing(for: item.block.style, isFirst: index == 0))
             }
         }
         .task(id: text) { numberedBlocks = Self.parseNumberedBlocks(text) }
+    }
+
+    /// Extra breathing room before each block so headings read as clear section
+    /// breaks instead of blending into the paragraph above (no gap for the very
+    /// first block, so the article doesn't start with dead space at the top).
+    private func topSpacing(for style: DocParagraphStyle, isFirst: Bool) -> CGFloat {
+        guard !isFirst else { return 0 }
+        switch style {
+        case .heading1: return 28
+        case .heading2: return 24
+        case .heading3: return 20
+        case .normal:   return 8
+        }
     }
 
     private struct NumberedBlock {
