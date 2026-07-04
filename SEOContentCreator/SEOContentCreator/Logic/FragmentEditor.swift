@@ -11,10 +11,13 @@ final class FragmentEditor {
     var isRunning: Bool = false
     var lastErrorMessage: String?
     var lastWarningMessage: String?
-    /// Spliced full text awaiting accept/reject; nil until a successful run.
-    var proposedText: String?
+    /// The AI's rewritten fragment (trimmed), nil until a successful run finishes.
+    /// The caller (the unified editor) already knows the exact range this
+    /// fragment came from, so splicing it back into the full text and
+    /// deciding whether/when to persist a new `ArticleVersion` is entirely
+    /// the caller's responsibility.
+    var rewrittenFragment: String?
 
-    private(set) var proposedSource: VersionSource = .skillApplied
     private(set) var agentName: String?
 
     private let streamProvider: StreamProvider
@@ -39,14 +42,13 @@ final class FragmentEditor {
     }
 
     func run(
-        fullText: String,
         fragment: String,
         instruction: String,
-        source: VersionSource,
         roleKey: String,
         model: String,
         temperature: Double,
         maxTokens: Int,
+        source: VersionSource,
         topic: Topic,
         in context: ModelContext
     ) async {
@@ -54,8 +56,7 @@ final class FragmentEditor {
         streamingText = ""
         lastErrorMessage = nil
         lastWarningMessage = nil
-        proposedText = nil
-        proposedSource = source
+        rewrittenFragment = nil
 
         let role = fetchRole(roleKey, in: context)
         let name = role?.name ?? "ИИ"
@@ -79,9 +80,6 @@ final class FragmentEditor {
                 switch event {
                 case .token(let t):
                     collected += t
-                    // Coalesce UI updates to ~10x/sec: reassigning streamingText on every token
-                    // forces SwiftUI to re-lay-out the growing stream text, which gets quadratically
-                    // more expensive as the text grows. See StageExecutor.execute() for details.
                     let now = ContinuousClock.now
                     if now - lastFlush >= .milliseconds(100) {
                         streamingText = collected
@@ -99,21 +97,9 @@ final class FragmentEditor {
                 lastWarningMessage = "Ответ оборван по лимиту токенов. Текст может быть неполным — увеличьте max tokens в разделе «Шаблоны»."
             }
 
-            let rewritten = collected.trimmingCharacters(in: .whitespacesAndNewlines)
-            switch FragmentSplicer.splice(fullText: fullText, fragment: fragment, replacement: rewritten) {
-            case .replaced(let newText):
-                proposedText = newText
-                job.status = .success
-                job.finishedAt = .now
-            case .notFound:
-                lastErrorMessage = "Фрагмент не найден в тексте — проверьте, что скопировали его точно."
-                job.status = .error
-                job.finishedAt = .now
-            case .ambiguous(let count):
-                lastErrorMessage = "Фрагмент встречается \(count) раз — расширьте выделение, чтобы он был уникальным."
-                job.status = .error
-                job.finishedAt = .now
-            }
+            rewrittenFragment = collected.trimmingCharacters(in: .whitespacesAndNewlines)
+            job.status = .success
+            job.finishedAt = .now
         } catch {
             let message: String
             if let keyError = error as? KeychainService.KeychainError, keyError == .notFound {
@@ -128,19 +114,6 @@ final class FragmentEditor {
         }
 
         isRunning = false
-    }
-
-    func accept(topic: Topic, in context: ModelContext) {
-        guard let text = proposedText else { return }
-        let version = ArticleVersion(
-            stageLabel: proposedSource.rawValue, source: proposedSource,
-            text: text, agentName: agentName
-        )
-        version.topic = topic
-        context.insert(version)
-        topic.currentVersionID = version.uuid
-        topic.updatedAt = .now
-        proposedText = nil
     }
 
     private func fetchRole(_ key: String, in context: ModelContext) -> AIRole? {

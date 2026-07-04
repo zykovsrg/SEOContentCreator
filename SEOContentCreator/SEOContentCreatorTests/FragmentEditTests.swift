@@ -137,62 +137,35 @@ struct FragmentEditorTests {
         }
     }
 
-    @Test func successProducesProposedTextAndAcceptCreatesVersion() async throws {
+    @Test func successProducesRewrittenFragment() async throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let topic = Topic(title: "Тема", articleType: .info)
         context.insert(topic)
 
-        let editor = FragmentEditor(streamProvider: tokenStream("Новый кусок."), keyProvider: { "key" })
+        let editor = FragmentEditor(streamProvider: tokenStream("  Новый кусок.  "), keyProvider: { "key" })
         await editor.run(
-            fullText: "Начало. Старый кусок. Конец.",
             fragment: "Старый кусок.",
             instruction: "Упрости.",
-            source: .skillApplied,
             roleKey: "editor",
             model: "gpt-4.1",
             temperature: 0.6,
             maxTokens: 4000,
+            source: .skillApplied,
             topic: topic,
             in: context
         )
 
-        #expect(editor.proposedText == "Начало. Новый кусок. Конец.")
+        // Trimmed — leading/trailing whitespace from the model's raw output is stripped.
+        #expect(editor.rewrittenFragment == "Новый кусок.")
         #expect(editor.lastErrorMessage == nil)
 
-        editor.accept(topic: topic, in: context)
-        let versions = try context.fetch(FetchDescriptor<ArticleVersion>())
-        #expect(versions.count == 1)
-        #expect(versions.first?.text == "Начало. Новый кусок. Конец.")
-        #expect(versions.first?.source == .skillApplied)
-        #expect(topic.currentVersionID == versions.first?.uuid)
+        let jobs = try context.fetch(FetchDescriptor<GenerationJob>())
+        #expect(jobs.count == 1)
+        #expect(jobs.first?.status == .success)
     }
 
-    @Test func ambiguousFragmentSetsErrorAndNoProposedText() async throws {
-        let container = try makeContainer()
-        let context = ModelContext(container)
-        let topic = Topic(title: "Тема", articleType: .info)
-        context.insert(topic)
-
-        let editor = FragmentEditor(streamProvider: tokenStream("X"), keyProvider: { "key" })
-        await editor.run(
-            fullText: "Повтор. Повтор.",
-            fragment: "Повтор.",
-            instruction: "Упрости.",
-            source: .skillApplied,
-            roleKey: "editor",
-            model: "gpt-4.1",
-            temperature: 0.6,
-            maxTokens: 4000,
-            topic: topic,
-            in: context
-        )
-
-        #expect(editor.proposedText == nil)
-        #expect(editor.lastErrorMessage?.contains("2 раз") == true)
-    }
-
-    @Test func errorPathSurfacesMessage() async throws {
+    @Test func errorPathSurfacesMessageAndNoRewrittenFragment() async throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let topic = Topic(title: "Тема", articleType: .info)
@@ -200,19 +173,18 @@ struct FragmentEditorTests {
 
         let editor = FragmentEditor(streamProvider: errorStream(), keyProvider: { "key" })
         await editor.run(
-            fullText: "Текст. Кусок. Конец.",
             fragment: "Кусок.",
             instruction: "Упрости.",
-            source: .fragmentRegenerated,
             roleKey: "author",
             model: "gpt-4.1",
             temperature: 0.6,
             maxTokens: 4000,
+            source: .fragmentRegenerated,
             topic: topic,
             in: context
         )
 
-        #expect(editor.proposedText == nil)
+        #expect(editor.rewrittenFragment == nil)
         #expect(editor.lastErrorMessage != nil)
     }
 }
