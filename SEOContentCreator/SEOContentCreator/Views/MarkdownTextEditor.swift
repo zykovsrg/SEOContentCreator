@@ -4,7 +4,9 @@ import AppKit
 /// A plain-text NSTextView wrapper for editing Markdown, with Google-Docs-style
 /// keyboard shortcuts that insert/toggle Markdown syntax around the selection
 /// or current line. The stored text stays a plain Markdown string — there is
-/// no rich-text/AttributedString conversion.
+/// no rich-text/AttributedString conversion. Background highlighting (see
+/// `highlightRange`) uses `NSLayoutManager` temporary attributes, which are
+/// display-only and never touch the stored string.
 ///
 /// Shortcuts: Cmd+B bold (`**..**`), Cmd+I italic (`_.._`),
 /// Cmd+Option+1/2/3 heading level 1/2/3 (`#`/`##`/`###` on the current line).
@@ -13,13 +15,24 @@ import AppKit
 struct MarkdownTextEditor: NSViewRepresentable {
     @Binding var text: String
     var font: NSFont = .systemFont(ofSize: 14)
+    /// Set to `false` to make the editor temporarily read-only, e.g. while a
+    /// fragment regeneration is in flight or awaiting accept/reject.
+    var isEditable: Bool = true
+    /// Called whenever the text view's selection changes. `range.length == 0`
+    /// means an empty (caret-only) selection; `rect` is the selection's
+    /// bounding box in the enclosing `NSScrollView`'s coordinate space (nil
+    /// when the selection is empty), for positioning a SwiftUI overlay button.
+    var onSelectionChange: (NSRange, CGRect?) -> Void = { _, _ in }
+    /// When non-nil, this range gets a temporary highlighted background — used
+    /// to mark a freshly regenerated fragment awaiting accept/reject.
+    var highlightRange: NSRange?
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = MarkdownEditorTextView()
         textView.delegate = context.coordinator
         textView.isRichText = false
         textView.font = font
-        textView.isEditable = true
+        textView.isEditable = isEditable
         textView.isSelectable = true
         textView.allowsUndo = true
         textView.textContainerInset = NSSize(width: 8, height: 8)
@@ -47,17 +60,61 @@ struct MarkdownTextEditor: NSViewRepresentable {
         if textView.font != font {
             textView.font = font
         }
+        if textView.isEditable != isEditable {
+            textView.isEditable = isEditable
+        }
+        applyHighlight(to: textView)
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+    private func applyHighlight(to textView: NSTextView) {
+        guard let layoutManager = textView.layoutManager else { return }
+        let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
+        layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: fullRange)
+        guard let highlightRange,
+              highlightRange.location >= 0,
+              highlightRange.location + highlightRange.length <= fullRange.length
+        else { return }
+        layoutManager.addTemporaryAttribute(
+            .backgroundColor, value: NSColor.systemGreen.withAlphaComponent(0.25),
+            forCharacterRange: highlightRange
+        )
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, onSelectionChange: onSelectionChange)
+    }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
-        init(text: Binding<String>) { self.text = text }
+        var onSelectionChange: (NSRange, CGRect?) -> Void
+
+        init(text: Binding<String>, onSelectionChange: @escaping (NSRange, CGRect?) -> Void) {
+            self.text = text
+            self.onSelectionChange = onSelectionChange
+        }
 
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
             text.wrappedValue = tv.string
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let tv = notification.object as? NSTextView else { return }
+            let range = tv.selectedRange()
+            guard range.length > 0,
+                  let layoutManager = tv.layoutManager,
+                  let container = tv.textContainer,
+                  let scrollView = tv.enclosingScrollView
+            else {
+                onSelectionChange(range, nil)
+                return
+            }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+            rect.origin.x += tv.textContainerInset.width
+            rect.origin.y += tv.textContainerInset.height
+            let rectInScrollView = tv.convert(rect, to: scrollView)
+            onSelectionChange(range, rectInScrollView)
         }
     }
 }
