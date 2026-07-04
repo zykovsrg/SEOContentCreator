@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-07-04 — Release-сборка (коммит 4f54762) установлена в /Applications
+
+- Change: `xcodebuild build -configuration Release` собран после коммита `4f54762` (индикатор проверки/«Замечаний нет» + удаление `StageTemplate.systemPrompt`). Работавшего экземпляра не было (проверено через System Events), старая копия `/Applications/SEOContentCreator.app` удалена и заменена свежей сборкой.
+- Impact: пользователь получил обе доработки в установленном приложении.
+- Manual checks: `xcodebuild build -configuration Release` — BUILD SUCCEEDED. Приложение запущено (`open`) и подтверждён живой процесс — глубже функциональность не проверялась (см. `FT-20260704-003`).
+
 ### 2026-07-04 — «Замечаний нет» + скрытие сырого JSON при проверке; удалено поле StageTemplate.systemPrompt
 
 - Change 1 (FT-20260702-013): [SideBySideView.swift](SEOContentCreator/SEOContentCreator/Views/SideBySideView.swift) — во время выполнения проверочного этапа (SEO/фактчекинг/финальная вычитка) правая колонка показывает индикатор «Идёт проверка…» вместо сырого потока JSON; если проверка завершилась с нулём замечаний — явное сообщение «Проверка пройдена, замечаний нет» вместо пустого «Запустите этап». [TopicWorkspaceView.swift](SEOContentCreator/SEOContentCreator/Views/TopicWorkspaceView.swift) передаёт новые флаги (`isCheckingStage`, `checkedWithNoRemarks`), сбрасывает `checkedWithNoRemarks` при каждом запуске этапа.
