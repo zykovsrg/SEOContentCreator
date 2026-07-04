@@ -4,13 +4,6 @@ struct SideBySideView: View {
     var leftText: String?
     var rightText: String?
     var isStreaming: Bool
-    /// True while running a checking stage (SEO/факт/финальная вычитка) — those
-    /// stream raw JSON remarks, not article text, so the right column shows a
-    /// status indicator instead of the raw stream.
-    var isCheckingStage: Bool = false
-    /// True once a checking stage finished with zero remarks — shows an explicit
-    /// "no remarks" confirmation instead of the empty "start the stage" placeholder.
-    var checkedWithNoRemarks: Bool = false
 
     private static let streamBottomID = "streamBottom"
 
@@ -23,7 +16,7 @@ struct SideBySideView: View {
     }
 
     private var rightTitle: String {
-        if isStreaming { return isCheckingStage ? "Идёт проверка…" : "Генерация…" }
+        if isStreaming { return "Генерация…" }
         return "Новая версия"
     }
 
@@ -43,13 +36,7 @@ struct SideBySideView: View {
     }
 
     @ViewBuilder private var rightColumn: some View {
-        if isStreaming && isCheckingStage {
-            ContentUnavailableView {
-                Label("Идёт проверка…", systemImage: "hourglass")
-            } description: {
-                ProgressView()
-            }
-        } else if isStreaming {
+        if isStreaming {
             // During generation show only the tail of the growing text (see `streamingTail`),
             // auto-scrolling to keep the newest output visible. The full formatted diff is
             // shown once generation finishes.
@@ -73,8 +60,6 @@ struct SideBySideView: View {
             ScrollView {
                 MarkdownBlocksView(text: rightText).padding()
             }
-        } else if checkedWithNoRemarks {
-            ContentUnavailableView("Проверка пройдена, замечаний нет", systemImage: "checkmark.circle")
         } else {
             ContentUnavailableView("Запустите этап", systemImage: "play.circle")
         }
@@ -104,11 +89,87 @@ struct SideBySideView: View {
 
     private func column<C: View>(title: String, content: C) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title).font(.caption).foregroundStyle(.secondary).padding(6)
+            ColumnTitle(title)
             Divider()
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// A single full-width column showing one version of the article text, used
+/// when there is nothing to compare against (see `TopicWorkspaceView.isComparing`).
+/// Constrains the reading width so long articles stay comfortable to read at
+/// full window width, and can show a compact status banner instead of the
+/// second, otherwise-empty comparison column.
+struct SingleVersionView: View {
+    enum Banner {
+        case checking
+        case checkedNoRemarks
+    }
+
+    var title: String
+    var text: String?
+    var banner: Banner?
+
+    private let readingWidth: CGFloat = 760
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ColumnTitle(title)
+            Divider()
+            if let banner {
+                bannerView(banner)
+                Divider()
+            }
+            if let text, !text.isEmpty {
+                ScrollView {
+                    MarkdownBlocksView(text: text)
+                        .frame(maxWidth: readingWidth, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding()
+                }
+            } else {
+                ContentUnavailableView("Нет текущей версии", systemImage: "doc")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func bannerView(_ banner: Banner) -> some View {
+        switch banner {
+        case .checking:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Идёт проверка…").font(.callout)
+                Spacer()
+            }
+            .padding(8)
+            .background(Color.blue.opacity(0.1))
+        case .checkedNoRemarks:
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Text("Проверка пройдена, замечаний нет").font(.callout)
+                Spacer()
+            }
+            .padding(8)
+            .background(Color.green.opacity(0.1))
+        }
+    }
+}
+
+/// Shared column header style, made a bit more prominent than plain `.caption`
+/// secondary text so it stays legible as an orientation cue while comparing.
+private struct ColumnTitle: View {
+    let title: String
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.primary)
+            .padding(8)
     }
 }
 

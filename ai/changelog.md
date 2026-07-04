@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-07-04 — Одна колонка вместо всегда-пустой правой в TopicWorkspaceView
+
+- Change: [TopicWorkspaceView.swift](SEOContentCreator/SEOContentCreator/Views/TopicWorkspaceView.swift) показывает одну широкую колонку «Текущая версия» вместо всегда разделённого экрана; на две колонки (`SideBySideView`) переключается автоматически только пока идёт генерация этапа-«автора» или пока висит непринятая новая версия (новая чистая функция `WorkspaceLayout.isComparing`, [Logic/WorkspaceLayout.swift](SEOContentCreator/SEOContentCreator/Logic/WorkspaceLayout.swift)). `AcceptRejectBar` теперь рендерится только когда есть что принимать (раньше был виден всегда, просто неактивен). [SideBySideView.swift](SEOContentCreator/SEOContentCreator/Views/SideBySideView.swift): добавлен `SingleVersionView` для одноколоночного режима — текст ограничен по ширине для читаемости, для проверочных этапов (SEO/фактчекинг/финальная вычитка) вместо второй пустой колонки показывается компактный баннер «Идёт проверка…»/«Проверка пройдена, замечаний нет» (заменяет прежние `isCheckingStage`/`checkedWithNoRemarks`-ветки в `SideBySideView`, которые для сравнения колонок больше не нужны); подписи колонок сделаны заметнее (общий `ColumnTitle`, полужирный текст вместо бледной подписи).
+- Impact: убрана постоянно пустая правая половина экрана, о которой сообщил пользователь; экран занимает всю ширину, когда сравнивать нечего, и разъезжается на две колонки только когда это осмысленно.
+- Manual checks: `xcodebuild build-for-testing` — BUILD SUCCEEDED, включая новый `WorkspaceLayoutTests.swift` (5 тестов на комбинации idle/running/pending-version/checking-stage — юнит-тесты чистой функции раскладки, `xcodebuild test` не запускался). Ручная проверка в запущенном приложении не проводилась — вынесена в `FT-20260704-004`.
+
 ### 2026-07-04 — Release-сборка (коммит 4f54762) установлена в /Applications
 
 - Change: `xcodebuild build -configuration Release` собран после коммита `4f54762` (индикатор проверки/«Замечаний нет» + удаление `StageTemplate.systemPrompt`). Работавшего экземпляра не было (проверено через System Events), старая копия `/Applications/SEOContentCreator.app` удалена и заменена свежей сборкой.

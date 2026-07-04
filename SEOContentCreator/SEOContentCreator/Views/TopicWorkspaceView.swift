@@ -99,20 +99,28 @@ struct TopicWorkspaceView: View {
                 }
                 .padding(8)
             } else {
-                SideBySideView(
-                    leftText: comparisonText ?? leftText,
-                    rightText: rightText,
-                    isStreaming: executor?.isRunning ?? false,
-                    isCheckingStage: selectedStage.kind == .checking,
-                    checkedWithNoRemarks: checkedWithNoRemarks
-                )
-                Divider()
-                AcceptRejectBar(
-                    canAct: pendingVersion != nil && !(executor?.isRunning ?? false),
-                    onAcceptAll: acceptAll,
-                    onAcceptPartial: { showPartialAccept = true },
-                    onReject: reject
-                )
+                if isComparing {
+                    SideBySideView(
+                        leftText: comparisonText ?? leftText,
+                        rightText: rightText,
+                        isStreaming: executor?.isRunning ?? false
+                    )
+                } else {
+                    SingleVersionView(
+                        title: "Текущая версия",
+                        text: comparisonText ?? leftText,
+                        banner: singleColumnBanner
+                    )
+                }
+                if pendingVersion != nil {
+                    Divider()
+                    AcceptRejectBar(
+                        canAct: !(executor?.isRunning ?? false),
+                        onAcceptAll: acceptAll,
+                        onAcceptPartial: { showPartialAccept = true },
+                        onReject: reject
+                    )
+                }
             }
         }
         .navigationTitle(topic.title)
@@ -175,6 +183,20 @@ struct TopicWorkspaceView: View {
 
     private var isReviewing: Bool {
         !(executor?.remarks.isEmpty ?? true)
+    }
+
+    private var isComparing: Bool {
+        WorkspaceLayout.isComparing(
+            stageKind: selectedStage.kind,
+            isRunning: executor?.isRunning ?? false,
+            hasPendingVersion: pendingVersion != nil
+        )
+    }
+
+    private var singleColumnBanner: SingleVersionView.Banner? {
+        if selectedStage.kind == .checking, executor?.isRunning ?? false { return .checking }
+        if checkedWithNoRemarks { return .checkedNoRemarks }
+        return nil
     }
 
     private var reviewBaseText: String {
