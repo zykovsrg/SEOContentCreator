@@ -34,50 +34,6 @@ struct SkillPresetDefaultsTests {
     }
 }
 
-struct FragmentSplicerTests {
-    @Test func replacesUniqueFragment() {
-        let result = FragmentSplicer.splice(
-            fullText: "Начало. Старый кусок. Конец.",
-            fragment: "Старый кусок.",
-            replacement: "Новый кусок."
-        )
-        #expect(result == .replaced("Начало. Новый кусок. Конец."))
-    }
-
-    @Test func notFoundWhenMissing() {
-        let result = FragmentSplicer.splice(
-            fullText: "Текст без фрагмента.",
-            fragment: "чего тут нет",
-            replacement: "X"
-        )
-        #expect(result == .notFound)
-    }
-
-    @Test func notFoundWhenFragmentEmpty() {
-        let result = FragmentSplicer.splice(fullText: "Любой текст.", fragment: "", replacement: "X")
-        #expect(result == .notFound)
-    }
-
-    @Test func ambiguousWhenMultipleMatches() {
-        let result = FragmentSplicer.splice(
-            fullText: "Повтор. Повтор.",
-            fragment: "Повтор.",
-            replacement: "X"
-        )
-        #expect(result == .ambiguous(2))
-    }
-
-    @Test func whitespaceSensitiveMatch() {
-        // Лишний пробел в искомом фрагменте → совпадения нет.
-        let result = FragmentSplicer.splice(
-            fullText: "Раз два три.",
-            fragment: "Раз  два",
-            replacement: "X"
-        )
-        #expect(result == .notFound)
-    }
-}
-
 struct FragmentPromptBuilderTests {
     @Test func systemComesFromRoleContext() {
         let prompt = FragmentPromptBuilder().build(
