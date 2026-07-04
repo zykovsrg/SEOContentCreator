@@ -14,6 +14,12 @@
 
 ## Текущий changelog
 
+### 2026-07-04 — Копирование и «Применить» в «Рекомендациях по промтам»
+
+- Change: [PromptRecommendationsSheet.swift](SEOContentCreator/SEOContentCreator/Views/PromptRecommendationsSheet.swift) — текст каждой рекомендации теперь можно выделять и копировать (`.textSelection(.enabled)`); у каждой рекомендации добавлена кнопка «Применить». Новый [PromptFixApplySheet.swift](SEOContentCreator/SEOContentCreator/Views/PromptFixApplySheet.swift): Picker с целевым этапом (по умолчанию подобран эвристикой — совпадение `location` с названием этапа), diff-предпросмотр «было/стало» (переиспользует существующий `ParagraphDiff`, добавленный текст подсвечен зелёным), редактируемый `TextEditor` с черновиком (исходный `userPromptTemplate` + вставленная рекомендация). Запись в `StageTemplate.userPromptTemplate` и `templateVersion += 1` происходит только по явному нажатию «Сохранить в шаблон».
+- Impact: решение 2026-07-03 «PromptRecommendationsSheet только для чтения, без автоприменения» расширено (см. новую запись в `ai/decisions.md` за 2026-07-04) — автоприменения по-прежнему нет, но появился быстрый путь от рекомендации к правке шаблона с явным подтверждением. Также добавлена future-task про поле `StageTemplate.systemPrompt` («Дополнение к системному промту») — пользователь не уверен, что оно вообще нужно (`FT-20260704-001`).
+- Manual checks: `xcodebuild build-for-testing` — BUILD SUCCEEDED. Экран не открывался в реально запущенном приложении в этой сессии — пользователь попросил закрыть задачу без этого шага; чек-лист ручной проверки вынесен в `FT-20260704-002`.
+
 ### 2026-07-03 — Меню разделов перенесено в шапку, добавлены Cmd+1/2/3
 
 - Change: [RootView.swift](SEOContentCreator/SEOContentCreator/Views/RootView.swift) больше не использует
