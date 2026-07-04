@@ -21,8 +21,7 @@ struct TopicWorkspaceView: View {
     @State private var showSemantics = false
     @State private var showStructure = false
     @State private var showHints = false
-    @State private var showFragmentEdit = false
-    @State private var showManualEdit = false
+    @State private var showEditor = false
     @State private var showImages = false
     @State private var showPublish = false
     @State private var showPartialAccept = false
@@ -135,8 +134,7 @@ struct TopicWorkspaceView: View {
         .sheet(isPresented: $showSemantics) { SemanticsEditorSheet(topic: topic) }
         .sheet(isPresented: $showStructure) { StructureEditorSheet(topic: topic) }
         .sheet(isPresented: $showHints) { SoftHintsSheet(topic: topic) }
-        .sheet(isPresented: $showFragmentEdit) { FragmentEditSheet(topic: topic) }
-        .sheet(isPresented: $showManualEdit) { ManualEditSheet(topic: topic) }
+        .sheet(isPresented: $showEditor) { EditorSheet(topic: topic) }
         .sheet(isPresented: $showImages) { ImagesView(topic: topic) }
         .sheet(isPresented: $showPublish) {
             PublishSheet(topic: topic)
@@ -244,9 +242,8 @@ struct TopicWorkspaceView: View {
         ToolbarItem { Button { showVersions = true } label: { Label("Версии", systemImage: "clock.arrow.circlepath") } }
         ToolbarItem { Button { showLog = true } label: { Label("Лог", systemImage: "doc.text") } }
         ToolbarItem { Button { showHints = true } label: { Label("Подсказки", systemImage: "text.magnifyingglass") } }
-        ToolbarItem { Button { showFragmentEdit = true } label: { Label("Правка фрагмента", systemImage: "wand.and.stars") } }
         ToolbarItem {
-            Button { showManualEdit = true } label: { Label("Ручная правка", systemImage: "pencil") }
+            Button { showEditor = true } label: { Label("Редактор", systemImage: "pencil") }
                 .disabled(topic.currentVersion == nil)
         }
         ToolbarItem {
