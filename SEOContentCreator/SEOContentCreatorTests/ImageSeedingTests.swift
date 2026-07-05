@@ -26,7 +26,7 @@ struct ImageSeedingTests {
         return defaults
     }
 
-    @Test func seedsOnePromptTemplatePerKindAndOnePreset() throws {
+    @Test func seedsOnePromptTemplatePerKindAndOnePresetPerDefault() throws {
         let context = try makeContext()
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: makeDefaults())
 
@@ -36,8 +36,11 @@ struct ImageSeedingTests {
             #expect(templates.contains { $0.kindRaw == kind.rawValue })
         }
         let presets = try context.fetch(FetchDescriptor<ImageStylePreset>())
-        #expect(presets.count == 1)
-        #expect(presets.first?.name == ImageStylePresetDefaults.name)
+        #expect(presets.count == ImageStylePresetDefaults.all.count)
+        let presetNames = Set(presets.map(\.name))
+        for def in ImageStylePresetDefaults.all {
+            #expect(presetNames.contains(def.name))
+        }
     }
 
     @Test func imageSeedingIsIdempotent() throws {
@@ -47,6 +50,6 @@ struct ImageSeedingTests {
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
 
         #expect(try context.fetch(FetchDescriptor<ImagePromptTemplate>()).count == ImagePromptKind.allCases.count)
-        #expect(try context.fetch(FetchDescriptor<ImageStylePreset>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<ImageStylePreset>()).count == ImageStylePresetDefaults.all.count)
     }
 }

@@ -14,17 +14,30 @@ struct ImageDefaultsTests {
         #expect(c.contains("{{выделенный_фрагмент}}"))
     }
 
-    @Test func templatesDoNotEmbedStyle() {
+    @Test func templatesDoNotEmbedCompositionOrBackground() {
         for kind in ImagePromptKind.allCases {
             let c = ImagePromptDefaults.content(for: kind)
-            #expect(!c.contains("#F4F9FF"))
+            #expect(!c.contains("Фон:"))
+            #expect(!c.contains("Свет:"))
+            #expect(!c.contains("16:9"))
+            #expect(!c.contains("#"))
         }
     }
 
-    @Test func defaultPresetCarriesBrandPalette() {
-        let preset = ImageStylePresetDefaults.makeDefault()
-        #expect(preset.styleText.contains("#F4F9FF"))
-        #expect(preset.styleText.contains("#007AC0"))
-        #expect(!preset.name.isEmpty)
+    @Test func defaultPresetsAreDistinctGlassStylesAtCoverSize() {
+        let presets = ImageStylePresetDefaults.makeDefaults()
+        #expect(presets.count == 2)
+        #expect(Set(presets.map(\.name)).count == 2)
+        for preset in presets {
+            #expect(preset.styleText.contains("стекл"))
+            #expect(preset.size == "1536x1024")
+        }
+    }
+
+    @Test func resetDefaultMatchesByPresetName() {
+        for def in ImageStylePresetDefaults.all {
+            #expect(ImageStylePresetDefaults.matching(name: def.name)?.styleText == def.styleText)
+        }
+        #expect(ImageStylePresetDefaults.matching(name: "Не существующий пресет") == nil)
     }
 }

@@ -92,7 +92,7 @@ struct StageTemplateSeederTests {
         #expect(old.maxTokens == 4000)
         // productBlocks is not part of the cascade, so its custom content survives migration.
         #expect(oldProductBlocks.userPromptTemplate == "Пользовательский productBlocks")
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 6)
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 7)
 
         old.userPromptTemplate = "Ручная правка после миграции"
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
@@ -112,6 +112,32 @@ struct StageTemplateSeederTests {
 
         let roles = try context.fetch(FetchDescriptor<AIRole>())
         #expect(roles.contains { $0.key == "analyst" })
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 6)
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 7)
+    }
+
+    @Test func migrationAddsGlassStylePresetsToPreExistingInstallationsWithoutThem() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+        defaults.set(6, forKey: StageTemplateSeeder.templatesDefaultsVersionKey)
+        // Simulates a database seeded before the glass-style presets existed:
+        // seedImageStylePresetIfNeeded only fills an empty table, so a pre-existing
+        // custom preset would otherwise block the new named defaults forever.
+        let customPreset = ImageStylePreset(name: "Фирменный стиль клиники", styleText: "старый стиль")
+        context.insert(customPreset)
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        let presets = try context.fetch(FetchDescriptor<ImageStylePreset>())
+        let names = Set(presets.map(\.name))
+        #expect(names.contains(ImageStylePresetDefaults.cover.name))
+        #expect(names.contains(ImageStylePresetDefaults.illustration.name))
+        // The user's existing custom preset is preserved, not replaced.
+        #expect(customPreset.styleText == "старый стиль")
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 7)
+
+        let coverCountAfterFirstRun = presets.filter { $0.name == ImageStylePresetDefaults.cover.name }.count
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+        let presetsAfterSecondRun = try context.fetch(FetchDescriptor<ImageStylePreset>())
+        #expect(presetsAfterSecondRun.filter { $0.name == ImageStylePresetDefaults.cover.name }.count == coverCountAfterFirstRun)
     }
 }

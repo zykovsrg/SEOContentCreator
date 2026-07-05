@@ -52,7 +52,7 @@ struct ImageStylePresetEditorView: View {
 
                 HStack {
                     Button("Сохранить") { save() }.buttonStyle(.borderedProminent)
-                    if preset.name == ImageStylePresetDefaults.name {
+                    if matchingDefault != nil {
                         Button("Сбросить к стандартному") { resetToDefault() }
                     }
                     Spacer()
@@ -64,6 +64,10 @@ struct ImageStylePresetEditorView: View {
             .padding()
         }
         .onAppear(perform: load)
+    }
+
+    private var matchingDefault: ImageStylePresetDefault? {
+        ImageStylePresetDefaults.matching(name: preset.name)
     }
 
     private func load() {
@@ -83,8 +87,10 @@ struct ImageStylePresetEditorView: View {
     }
 
     private func resetToDefault() {
-        styleText = ImageStylePresetDefaults.styleText
-        name = ImageStylePresetDefaults.name
+        guard let def = matchingDefault else { return }
+        styleText = def.styleText
+        name = def.name
+        size = def.size
         save()
         savedNote = "Сброшено к стандартному"
     }

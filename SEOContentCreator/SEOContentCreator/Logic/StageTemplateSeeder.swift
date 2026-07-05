@@ -3,7 +3,7 @@ import SwiftData
 
 enum StageTemplateSeeder {
     static let templatesDefaultsVersionKey = "templatesDefaultsVersion"
-    private static let currentTemplatesDefaultsVersion = 6
+    private static let currentTemplatesDefaultsVersion = 7
 
     @MainActor
     static func seedIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
@@ -64,7 +64,9 @@ enum StageTemplateSeeder {
     private static func seedImageStylePresetIfNeeded(in context: ModelContext) {
         let existing = (try? context.fetch(FetchDescriptor<ImageStylePreset>())) ?? []
         guard existing.isEmpty else { return }
-        context.insert(ImageStylePresetDefaults.makeDefault())
+        for preset in ImageStylePresetDefaults.makeDefaults() {
+            context.insert(preset)
+        }
     }
 
     @MainActor
@@ -119,6 +121,14 @@ enum StageTemplateSeeder {
            let def = SkillPresetDefaults.all.first(where: { $0.key == "shorten" }) {
             let nextOrder = (presets.map(\.order).max() ?? -1) + 1
             context.insert(SkillPresetDefaults.make(def, order: nextOrder))
+        }
+
+        // ImageStylePreset seeds only when the whole table is empty (seedImageStylePresetIfNeeded),
+        // so installs that already have a preset never get new named defaults without this step.
+        let stylePresets = (try? context.fetch(FetchDescriptor<ImageStylePreset>())) ?? []
+        let existingStylePresetNames = Set(stylePresets.map(\.name))
+        for def in ImageStylePresetDefaults.all where !existingStylePresetNames.contains(def.name) {
+            context.insert(ImageStylePreset(name: def.name, styleText: def.styleText, size: def.size))
         }
         defaults.set(currentTemplatesDefaultsVersion, forKey: templatesDefaultsVersionKey)
     }
