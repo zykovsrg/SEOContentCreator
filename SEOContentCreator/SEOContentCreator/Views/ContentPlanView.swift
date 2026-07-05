@@ -25,6 +25,14 @@ struct ContentPlanView: View {
 
     private var planTable: some View {
         Table(visibleTopics, selection: $selection) {
+            TableColumn("ID") { topic in
+                TextField("", text: Binding(
+                    get: { topic.externalID },
+                    set: { topic.externalID = $0 }
+                ))
+                .textFieldStyle(.plain)
+            }
+            .width(60)
             TableColumn("Тема") { Text($0.title) }
             TableColumn("Тип") { Text($0.articleType.title) }
             TableColumn("Направление") { Text($0.direction?.title ?? "—") }
