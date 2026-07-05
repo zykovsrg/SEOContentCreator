@@ -50,4 +50,51 @@ struct DocsRequestBuilderTests {
         let insert = reqs.dropFirst().first?["insertText"] as? [String: Any]
         #expect((insert?["text"] as? String) == "Новый текст\n")
     }
+
+    @Test func commercialSegmentBecomesTable() {
+        let segments = [
+            DocSegment(isCommercial: false, blocks: [
+                DocBlock(style: .normal, listType: nil, text: "До", boldRanges: [])
+            ]),
+            DocSegment(isCommercial: true, blocks: [
+                DocBlock(style: .normal, listType: nil, text: "Блок", boldRanges: [])
+            ]),
+            DocSegment(isCommercial: false, blocks: [
+                DocBlock(style: .normal, listType: nil, text: "После", boldRanges: [])
+            ])
+        ]
+        let reqs = DocsRequestBuilder.build(segments: segments)
+
+        // "До" — plain paragraph starting at index 1.
+        let firstInsert = reqs[0]["insertText"] as? [String: Any]
+        #expect((firstInsert?["text"] as? String) == "До\n")
+        #expect(((firstInsert?["location"] as? [String: Any])?["index"] as? Int) == 1)
+
+        // Table inserted right after "До" ends (index 1 + len("До") + 1 = 4).
+        let table = reqs[2]["insertTable"] as? [String: Any]
+        #expect(((table?["location"] as? [String: Any])?["index"] as? Int) == 4)
+        #expect(table?["rows"] as? Int == 1)
+        #expect(table?["columns"] as? Int == 1)
+
+        // Cell content starts at table index (4) + tableCellContentOffset (4) = 8.
+        let cellInsert = reqs[3]["insertText"] as? [String: Any]
+        #expect((cellInsert?["text"] as? String) == "Блок\n")
+        #expect(((cellInsert?["location"] as? [String: Any])?["index"] as? Int) == 8)
+
+        // "После" continues after the cell's content (8 + len("Блок") + 1 = 13)
+        // plus tableClosingOffset (2) = 15.
+        let lastInsert = reqs.last { ($0["insertText"] as? [String: Any])?["text"] as? String == "После\n" }
+        let lastInsertBody = lastInsert?["insertText"] as? [String: Any]
+        #expect(((lastInsertBody?["location"] as? [String: Any])?["index"] as? Int) == 15)
+    }
+
+    @Test func buildBlocksStillDelegatesToSingleNonCommercialSegment() {
+        let blocks = [DocBlock(style: .heading1, listType: nil, text: "Заголовок", boldRanges: [])]
+        let viaBlocks = DocsRequestBuilder.build(blocks: blocks)
+        let viaSegments = DocsRequestBuilder.build(segments: [DocSegment(isCommercial: false, blocks: blocks)])
+        #expect(viaBlocks.count == viaSegments.count)
+        let a = viaBlocks.first?["insertText"] as? [String: Any]
+        let b = viaSegments.first?["insertText"] as? [String: Any]
+        #expect((a?["text"] as? String) == (b?["text"] as? String))
+    }
 }
