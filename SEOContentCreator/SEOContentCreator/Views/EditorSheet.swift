@@ -27,6 +27,7 @@ struct EditorSheet: View {
     @State private var fragmentComment = ""
     @State private var selectedSkillID: UUID?
     @State private var editor = FragmentEditor.live()
+    @State private var commercialBlockRequestID = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -37,7 +38,7 @@ struct EditorSheet: View {
                     ProgressView().controlSize(.small)
                 }
             }
-            Text("Правка сохранится как новая версия и станет текущей, когда нажмёте «Сохранить». Выделите фрагмент и нажмите «Переписать», чтобы перегенерировать его через ИИ. Cmd+B — жирный, Cmd+I — курсив, Cmd+Option+1/2/3 — заголовок.")
+            Text("Правка сохранится как новая версия и станет текущей, когда нажмёте «Сохранить». Выделите фрагмент и нажмите «Переписать», чтобы перегенерировать его через ИИ. Cmd+B — жирный, Cmd+I — курсив, Cmd+Option+1/2/3 — заголовок, Cmd+Shift+K — коммерческий блок (в рамке при публикации в Google Docs).")
                 .font(.caption).foregroundStyle(.secondary)
 
             if let error = editor.lastErrorMessage {
@@ -77,6 +78,8 @@ struct EditorSheet: View {
                 Spacer()
                 Button("Перегенерировать выделенное") { showRegenerateCard = true }
                     .disabled(!canTriggerRegenerate)
+                Button("Отметить как коммерческий блок") { commercialBlockRequestID += 1 }
+                    .disabled(!canTriggerRegenerate)
                 Button("Сохранить", action: save)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!hasChanges)
@@ -100,7 +103,8 @@ struct EditorSheet: View {
                     selectedRange = range
                     selectionRect = rect
                 },
-                highlightRange: highlightRange
+                highlightRange: highlightRange,
+                commercialBlockRequestID: commercialBlockRequestID
             )
             .frame(minWidth: 500, minHeight: 300)
             .border(Color.secondary.opacity(0.3))
