@@ -9,9 +9,11 @@ import AppKit
 /// display-only and never touch the stored string.
 ///
 /// Shortcuts: Cmd+B bold (`**..**`), Cmd+I italic (`_.._`),
-/// Cmd+Option+1/2/3 heading level 1/2/3 (`#`/`##`/`###` on the current line).
-/// Cmd+1..3 are intentionally avoided — macOS reserves them for window tab
-/// switching, which would swallow the key event before the text view sees it.
+/// Cmd+Option+1/2/3 heading level 1/2/3 (`#`/`##`/`###` on the current line),
+/// Cmd+Shift+K wraps the selection in `[[БЛОК]]`/`[[/БЛОК]]` markers (see
+/// `CommercialBlockSplitter`). Cmd+1..3 are intentionally avoided — macOS
+/// reserves them for window tab switching, which would swallow the key event
+/// before the text view sees it.
 struct MarkdownTextEditor: NSViewRepresentable {
     @Binding var text: String
     var font: NSFont = .systemFont(ofSize: 14)
@@ -26,6 +28,11 @@ struct MarkdownTextEditor: NSViewRepresentable {
     /// When non-nil, this range gets a temporary highlighted background — used
     /// to mark a freshly regenerated fragment awaiting accept/reject.
     var highlightRange: NSRange?
+    /// Bump this (e.g. `+= 1`) to programmatically wrap the current selection
+    /// in `[[БЛОК]]`/`[[/БЛОК]]` markers from SwiftUI, without going through
+    /// the Cmd+Shift+K keyboard shortcut — e.g. a toolbar button in
+    /// `EditorSheet`. Any change in value triggers the wrap exactly once.
+    var commercialBlockRequestID: Int = 0
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = MarkdownEditorTextView()
@@ -53,7 +60,7 @@ struct MarkdownTextEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let textView = nsView.documentView as? NSTextView else { return }
+        guard let textView = nsView.documentView as? MarkdownEditorTextView else { return }
         if textView.string != text {
             textView.string = text
         }
@@ -64,6 +71,10 @@ struct MarkdownTextEditor: NSViewRepresentable {
             textView.isEditable = isEditable
         }
         applyHighlight(to: textView)
+        if commercialBlockRequestID != context.coordinator.lastCommercialBlockRequestID {
+            context.coordinator.lastCommercialBlockRequestID = commercialBlockRequestID
+            textView.wrapCommercialBlock()
+        }
     }
 
     private func applyHighlight(to textView: NSTextView) {
@@ -87,6 +98,7 @@ struct MarkdownTextEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
         var onSelectionChange: (NSRange, CGRect?) -> Void
+        var lastCommercialBlockRequestID = 0
 
         init(text: Binding<String>, onSelectionChange: @escaping (NSRange, CGRect?) -> Void) {
             self.text = text
@@ -131,6 +143,11 @@ final class MarkdownEditorTextView: NSTextView {
                 case "3": setHeading(level: 3); return
                 default: break
                 }
+            } else if event.modifierFlags.contains(.shift) {
+                switch chars {
+                case "K", "k": wrapCommercialBlock(); return
+                default: break
+                }
             } else {
                 switch chars {
                 case "b": wrapSelection(prefix: "**", suffix: "**"); return
@@ -140,6 +157,14 @@ final class MarkdownEditorTextView: NSTextView {
             }
         }
         super.keyDown(with: event)
+    }
+
+    /// Wraps the current selection in `[[БЛОК]]`/`[[/БЛОК]]` marker lines,
+    /// identifying a commercial block for `CommercialBlockSplitter` at
+    /// publish time. Reachable via Cmd+Shift+K or programmatically via
+    /// `MarkdownTextEditor.commercialBlockRequestID`.
+    func wrapCommercialBlock() {
+        wrapSelection(prefix: "[[БЛОК]]\n", suffix: "\n[[/БЛОК]]")
     }
 
     /// Wraps the current selection in `prefix`/`suffix`. With no selection,
