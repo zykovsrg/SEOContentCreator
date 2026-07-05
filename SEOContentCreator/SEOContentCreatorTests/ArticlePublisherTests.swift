@@ -134,4 +134,22 @@ struct ArticlePublisherTests {
         let insertedText = fake.batched.first?.1.first?["insertText"] as? [String: Any]
         #expect((insertedText?["text"] as? String)?.contains("SEO H1") == true)
     }
+
+    @Test func publishWrapsCommercialBlockInTable() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context, "Обычный текст.\n\n[[БЛОК]]\nКоммерческий текст.\n[[/БЛОК]]\n\nЕщё текст.")
+        let fake = FakeDocsClient()
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "f")
+
+        await publisher.publish(topic: topic, mode: .newDocument, in: context)
+
+        #expect(publisher.lastErrorMessage == nil)
+        let requests = fake.batched.first?.1 ?? []
+        let hasTable = requests.contains { $0["insertTable"] != nil }
+        #expect(hasTable)
+        let insertedTexts = requests.compactMap { ($0["insertText"] as? [String: Any])?["text"] as? String }
+        #expect(insertedTexts.contains { $0.contains("Коммерческий текст.") })
+        #expect(!insertedTexts.contains { $0.contains("[[БЛОК]]") })
+        #expect(!insertedTexts.contains { $0.contains("[[/БЛОК]]") })
+    }
 }

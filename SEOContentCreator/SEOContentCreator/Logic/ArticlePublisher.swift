@@ -45,8 +45,11 @@ final class ArticlePublisher {
         }
         do {
             _ = try await tokenProvider()
-            let blocks = MarkdownDocParser.parse(Self.normalizeHeading(text: version.text, h1: version.h1))
-            let requests = DocsRequestBuilder.build(blocks: blocks)
+            let normalizedText = Self.normalizeHeading(text: version.text, h1: version.h1)
+            let segments = CommercialBlockSplitter.split(normalizedText).map { segment in
+                DocSegment(isCommercial: segment.isCommercial, blocks: MarkdownDocParser.parse(segment.text))
+            }
+            let requests = DocsRequestBuilder.build(segments: segments)
 
             let docTitle = PublishTitleBuilder.title(externalID: topic.externalID, topicTitle: topic.title)
             let docID: String
@@ -65,7 +68,7 @@ final class ArticlePublisher {
                 }
                 docID = existing
                 let endIndex = try await docs.documentBodyEndIndex(docID: docID)
-                let replacementRequests = DocsRequestBuilder.buildReplacingBody(blocks: blocks, existingBodyEndIndex: endIndex)
+                let replacementRequests = DocsRequestBuilder.buildReplacingBody(segments: segments, existingBodyEndIndex: endIndex)
                 try await fill(docID: docID, requests: replacementRequests)
                 record(topic: topic, docID: docID, mode: mode, in: context)
                 return
