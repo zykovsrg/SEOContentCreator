@@ -237,18 +237,33 @@ struct TopicWorkspaceView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
             Button { onBack() } label: { Label("Контент-план", systemImage: "chevron.left") }
+                .help("Контент-план")
         }
-        ToolbarItem { Button { showSemantics = true } label: { Label("Семантика", systemImage: "list.bullet") } }
-        ToolbarItem { Button { showVersions = true } label: { Label("Версии", systemImage: "clock.arrow.circlepath") } }
-        ToolbarItem { Button { showLog = true } label: { Label("Лог", systemImage: "doc.text") } }
-        ToolbarItem { Button { showHints = true } label: { Label("Подсказки", systemImage: "text.magnifyingglass") } }
+        ToolbarItem {
+            Button { showSemantics = true } label: { Label("Семантика", systemImage: "list.bullet") }
+                .help("Семантика")
+        }
+        ToolbarItem {
+            Button { showVersions = true } label: { Label("Версии", systemImage: "clock.arrow.circlepath") }
+                .help("Версии")
+        }
+        ToolbarItem {
+            Button { showLog = true } label: { Label("Лог", systemImage: "doc.text") }
+                .help("Лог")
+        }
+        ToolbarItem {
+            Button { showHints = true } label: { Label("Подсказки", systemImage: "text.magnifyingglass") }
+                .help("Подсказки")
+        }
         ToolbarItem {
             Button { showEditor = true } label: { Label("Редактор", systemImage: "pencil") }
                 .disabled(topic.currentVersion == nil)
+                .help("Редактор")
         }
         ToolbarItem {
             Button { showImages = true } label: { Label("Изображения", systemImage: "photo.on.rectangle") }
                 .disabled(!canGenerateImages)
+                .help("Изображения")
         }
         ToolbarItem {
             Button {
@@ -256,11 +271,13 @@ struct TopicWorkspaceView: View {
             } label: {
                 Label("Опубликовать", systemImage: "paperplane")
             }
+            .help("Опубликовать")
         }
         ToolbarItem {
             Button { showPromptAnalysis = true } label: {
                 Label("Рекомендации по промтам", systemImage: "lightbulb")
             }
+            .help("Рекомендации по промтам")
         }
     }
 
