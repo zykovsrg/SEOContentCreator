@@ -15,10 +15,9 @@ struct TopicWorkspaceView: View {
     @State private var rejectedRemarkIDs: Set<UUID> = []
     @State private var redoingRemarkIDs: Set<UUID> = []
     @State private var highlightedQuote: String?
-    @State private var showVersions = false
-    @State private var showLog = false
+    @State private var showInspector = true
+    @State private var inspectorTab: InspectorTab = .remarks
     @State private var showProductBlocks = false
-    @State private var showSemantics = false
     @State private var showStructure = false
     @State private var showHints = false
     @State private var showEditor = false
@@ -28,110 +27,34 @@ struct TopicWorkspaceView: View {
     @State private var showPromptAnalysis = false
     @State private var checkedWithNoRemarks = false
 
+    enum InspectorTab: String, CaseIterable, Identifiable {
+        case remarks, versions, semantics, log
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .remarks:   return "Замечания"
+            case .versions:  return "Версии"
+            case .semantics: return "Семантика"
+            case .log:       return "Лог"
+            }
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            header
+        HStack(spacing: 0) {
+            StageRailView(selectedStage: $selectedStage, topic: topic)
             Divider()
-            StageBarView(selectedStage: $selectedStage, topic: topic)
-                .padding(.vertical, 8)
-            Divider()
-            if let error = executor?.lastErrorMessage {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.octagon.fill").foregroundStyle(.red)
-                    Text(error).font(.callout)
-                    Spacer()
-                    Button("Скрыть") { executor?.lastErrorMessage = nil }
-                }
-                .padding(8)
-                .background(Color.red.opacity(0.12))
-                Divider()
-            }
-            if let warning = executor?.lastWarningMessage {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                    Text(warning).font(.callout)
-                    Spacer()
-                    Button("Скрыть") { executor?.lastWarningMessage = nil }
-                }
-                .padding(8)
-                .background(Color.orange.opacity(0.12))
-                Divider()
-            }
-            if isReviewing {
-                HStack(spacing: 0) {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            HighlightedText(text: workingCopy, highlight: highlightedQuote)
-                                .frame(maxWidth: .infinity, alignment: .leading).padding()
-                        }
-                        .onChange(of: highlightedQuote) { _, _ in
-                            guard let index = highlightedParagraphIndex else { return }
-                            withAnimation { proxy.scrollTo(index, anchor: .center) }
-                        }
-                    }
-                    Divider()
-                    RemarksPanelView(
-                        remarks: executor?.remarks ?? [],
-                        acceptedIDs: acceptedRemarkIDs,
-                        rejectedIDs: rejectedRemarkIDs,
-                        redoingIDs: redoingRemarkIDs,
-                        onAccept: {
-                            acceptedRemarkIDs.insert($0.id); rejectedRemarkIDs.remove($0.id)
-                            RemarkPersistence.updateStatus(remarkID: $0.id, status: .accepted,
-                                                           jobID: executor?.lastRemarksJobID, topic: topic)
-                        },
-                        onReject: {
-                            rejectedRemarkIDs.insert($0.id); acceptedRemarkIDs.remove($0.id)
-                            RemarkPersistence.updateStatus(remarkID: $0.id, status: .rejected,
-                                                           jobID: executor?.lastRemarksJobID, topic: topic)
-                        },
-                        onSelect: { highlightedQuote = $0.quote },
-                        onRedo: { redoRemark($0, comment: $1) }
-                    )
-                    .frame(width: 380)
-                }
-                Divider()
-                HStack {
-                    Spacer()
-                    Button("Отклонить всё", role: .destructive) { endReview() }
-                    Button("Готово") { finishReview() }.keyboardShortcut(.defaultAction)
-                }
-                .padding(8)
-            } else {
-                if isComparing {
-                    SideBySideView(
-                        leftText: comparisonText ?? leftText,
-                        rightText: rightText,
-                        isStreaming: executor?.isRunning ?? false
-                    )
-                } else {
-                    SingleVersionView(
-                        title: "Текущая версия",
-                        text: comparisonText ?? leftText,
-                        banner: singleColumnBanner
-                    )
-                }
-                if pendingVersion != nil {
-                    Divider()
-                    AcceptRejectBar(
-                        canAct: !(executor?.isRunning ?? false),
-                        onAcceptAll: acceptAll,
-                        onAcceptPartial: { showPartialAccept = true },
-                        onReject: reject
-                    )
-                }
-            }
+            workColumn
         }
         .navigationTitle(topic.title)
         .toolbar { toolbarContent }
-        .sheet(isPresented: $showVersions) {
-            VersionLaneView(topic: topic) { comparisonText = $0.text }
+        .inspector(isPresented: $showInspector) {
+            inspectorPanel
+                .inspectorColumnWidth(min: 300, ideal: 360, max: 460)
         }
-        .sheet(isPresented: $showLog) { JobLogView(topic: topic) }
         .sheet(isPresented: $showProductBlocks) {
             ProductBlocksSheet { runStage(.productBlocks, blocks: $0) }
         }
-        .sheet(isPresented: $showSemantics) { SemanticsEditorSheet(topic: topic) }
         .sheet(isPresented: $showStructure) { StructureEditorSheet(topic: topic) }
         .sheet(isPresented: $showHints) { SoftHintsSheet(topic: topic) }
         .sheet(isPresented: $showEditor) { EditorSheet(topic: topic) }
@@ -155,6 +78,151 @@ struct TopicWorkspaceView: View {
                 executor = .live(model: model)
                 restoreReviewIfNeeded()
             }
+        }
+    }
+
+    /// Central working column: header, banners, then either the review view or
+    /// the version view. The stage checklist lives to its left; the reference
+    /// panels (versions / log / semantics / remarks) live in the inspector.
+    private var workColumn: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            errorBanner
+            warningBanner
+            workContent
+        }
+    }
+
+    @ViewBuilder
+    private var errorBanner: some View {
+        if let error = executor?.lastErrorMessage {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.octagon.fill").foregroundStyle(.red)
+                Text(error).font(.callout)
+                Spacer()
+                Button("Скрыть") { executor?.lastErrorMessage = nil }
+            }
+            .padding(8)
+            .background(Color.red.opacity(0.12))
+            Divider()
+        }
+    }
+
+    @ViewBuilder
+    private var warningBanner: some View {
+        if let warning = executor?.lastWarningMessage {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text(warning).font(.callout)
+                Spacer()
+                Button("Скрыть") { executor?.lastWarningMessage = nil }
+            }
+            .padding(8)
+            .background(Color.orange.opacity(0.12))
+            Divider()
+        }
+    }
+
+    @ViewBuilder
+    private var workContent: some View {
+        if isReviewing {
+            reviewColumn
+        } else {
+            if isComparing {
+                SideBySideView(
+                    leftText: comparisonText ?? leftText,
+                    rightText: rightText,
+                    isStreaming: executor?.isRunning ?? false
+                )
+            } else {
+                SingleVersionView(
+                    title: "Текущая версия",
+                    text: comparisonText ?? leftText,
+                    banner: singleColumnBanner
+                )
+            }
+            if pendingVersion != nil {
+                Divider()
+                AcceptRejectBar(
+                    canAct: !(executor?.isRunning ?? false),
+                    onAcceptAll: acceptAll,
+                    onAcceptPartial: { showPartialAccept = true },
+                    onReject: reject
+                )
+            }
+        }
+    }
+
+    /// Reviewing a checking stage: the working copy with accepted remarks
+    /// applied, plus the finish/discard bar. Remarks themselves are in the
+    /// inspector's "Замечания" tab.
+    private var reviewColumn: some View {
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    HighlightedText(text: workingCopy, highlight: highlightedQuote)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding()
+                }
+                .onChange(of: highlightedQuote) { _, _ in
+                    guard let index = highlightedParagraphIndex else { return }
+                    withAnimation { proxy.scrollTo(index, anchor: .center) }
+                }
+            }
+            Divider()
+            HStack {
+                Spacer()
+                Button("Отклонить всё", role: .destructive) { endReview() }
+                Button("Готово") { finishReview() }.keyboardShortcut(.defaultAction)
+            }
+            .padding(8)
+        }
+    }
+
+    @ViewBuilder
+    private var inspectorPanel: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $inspectorTab) {
+                ForEach(InspectorTab.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(8)
+            Divider()
+            switch inspectorTab {
+            case .remarks:   remarksTab
+            case .versions:  VersionLaneView(topic: topic) { comparisonText = $0.text }
+            case .semantics: SemanticsEditorSheet(topic: topic)
+            case .log:       JobLogView(topic: topic)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var remarksTab: some View {
+        if isReviewing {
+            RemarksPanelView(
+                remarks: executor?.remarks ?? [],
+                acceptedIDs: acceptedRemarkIDs,
+                rejectedIDs: rejectedRemarkIDs,
+                redoingIDs: redoingRemarkIDs,
+                onAccept: {
+                    acceptedRemarkIDs.insert($0.id); rejectedRemarkIDs.remove($0.id)
+                    RemarkPersistence.updateStatus(remarkID: $0.id, status: .accepted,
+                                                   jobID: executor?.lastRemarksJobID, topic: topic)
+                },
+                onReject: {
+                    rejectedRemarkIDs.insert($0.id); acceptedRemarkIDs.remove($0.id)
+                    RemarkPersistence.updateStatus(remarkID: $0.id, status: .rejected,
+                                                   jobID: executor?.lastRemarksJobID, topic: topic)
+                },
+                onSelect: { highlightedQuote = $0.quote },
+                onRedo: { redoRemark($0, comment: $1) }
+            )
+        } else {
+            ContentUnavailableView("Нет замечаний",
+                                   systemImage: "checkmark.circle",
+                                   description: Text("Запустите проверяющий этап (SEO, фактчекинг, вычитка), чтобы получить замечания."))
         }
     }
 
@@ -240,18 +308,6 @@ struct TopicWorkspaceView: View {
                 .help("Контент-план")
         }
         ToolbarItem {
-            Button { showSemantics = true } label: { Label("Семантика", systemImage: "list.bullet") }
-                .help("Семантика")
-        }
-        ToolbarItem {
-            Button { showVersions = true } label: { Label("Версии", systemImage: "clock.arrow.circlepath") }
-                .help("Версии")
-        }
-        ToolbarItem {
-            Button { showLog = true } label: { Label("Лог", systemImage: "doc.text") }
-                .help("Лог")
-        }
-        ToolbarItem {
             Button { showHints = true } label: { Label("Подсказки", systemImage: "text.magnifyingglass") }
                 .help("Подсказки")
         }
@@ -278,6 +334,12 @@ struct TopicWorkspaceView: View {
                 Label("Рекомендации по промтам", systemImage: "lightbulb")
             }
             .help("Рекомендации по промтам")
+        }
+        ToolbarItem {
+            Button { showInspector.toggle() } label: {
+                Label("Инспектор", systemImage: "sidebar.trailing")
+            }
+            .help("Показать/скрыть инспектор")
         }
     }
 
@@ -317,6 +379,10 @@ struct TopicWorkspaceView: View {
                                    currentText: current, selectedBlocks: blocks,
                                    modelName: model, in: context)
             pendingVersionID = executor.lastResultVersionID
+            if !executor.remarks.isEmpty {
+                inspectorTab = .remarks
+                showInspector = true
+            }
             if stage.kind == .checking && executor.remarks.isEmpty && executor.lastErrorMessage == nil {
                 checkedWithNoRemarks = true
             }
