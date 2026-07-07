@@ -78,7 +78,12 @@ struct OpenAIClient {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    var request = URLRequest(url: endpoint)
+                    // Reasoning models (GPT-5.x / o-series) can spend well over a
+                    // minute "thinking" before the first streamed byte arrives — most
+                    // visible on the last, largest stages (final review). URLSession's
+                    // default 60s request timeout would abort with "The request timed
+                    // out." before any data flows, so match the image client's 300s.
+                    var request = URLRequest(url: endpoint, timeoutInterval: 300)
                     request.httpMethod = "POST"
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")

@@ -46,7 +46,7 @@ struct TemplatesMigrationV3Tests {
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
 
         #expect(oldDraft.userPromptTemplate == StageTemplateDefaults.content(for: .draft).userPromptTemplate)
-        #expect(oldProductBlocks.userPromptTemplate == "правленный productBlocks")
+        #expect(oldProductBlocks.userPromptTemplate == StageTemplateDefaults.content(for: .productBlocks).userPromptTemplate)
 
         let blocks = try context.fetch(FetchDescriptor<ContextBlock>())
         let policy = blocks.first { $0.key == "editorialPolicy" }
@@ -126,5 +126,40 @@ struct TemplatesMigrationV3Tests {
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
 
         #expect(draft?.userPromptTemplate == "правка пользователя после миграции")
+    }
+
+    @Test func addsReaderWorldPresetForExistingInstallsWithoutIt() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+        context.insert(SkillPreset(name: "Мой скилл", prompt: "x", roleKey: "editor", order: 0))
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        let presets = try context.fetch(FetchDescriptor<SkillPreset>())
+        #expect(presets.contains { $0.defaultKey == "readerWorld" })
+    }
+
+    @Test func doesNotDuplicateManuallyCreatedReaderWorldPreset() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+        // Created by hand in the app before it became a factory default:
+        // same name, defaultKey still nil until SkillPresetSeeder backfills it.
+        context.insert(SkillPreset(name: "Мир читателя", prompt: "x", roleKey: "editor", order: 0))
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        let presets = try context.fetch(FetchDescriptor<SkillPreset>())
+        #expect(presets.filter { $0.name == "Мир читателя" }.count == 1)
+    }
+
+    @Test func imagePromptTemplatesAreRefreshedToDefaults() throws {
+        let context = try makeContext()
+        let defaults = makeDefaults()
+        let oldCover = ImagePromptTemplate(kind: .cover, userPromptTemplate: "старый промт обложки")
+        context.insert(oldCover)
+
+        StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
+
+        #expect(oldCover.userPromptTemplate == ImagePromptDefaults.content(for: .cover))
     }
 }

@@ -3,7 +3,7 @@ import SwiftData
 
 enum StageTemplateSeeder {
     static let templatesDefaultsVersionKey = "templatesDefaultsVersion"
-    private static let currentTemplatesDefaultsVersion = 7
+    private static let currentTemplatesDefaultsVersion = 8
 
     @MainActor
     static func seedIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
@@ -80,6 +80,8 @@ enum StageTemplateSeeder {
         let cascadeStages: Set<String> = [
             PipelineStage.structure.rawValue,
             PipelineStage.draft.rawValue,
+            PipelineStage.productBlocks.rawValue,
+            PipelineStage.semanticsInText.rawValue,
             PipelineStage.factCheck.rawValue,
             PipelineStage.finalReview.rawValue,
             PipelineStage.seoCheck.rawValue
@@ -97,7 +99,7 @@ enum StageTemplateSeeder {
             template.updatedAt = .now
         }
 
-        let migratedBlockKeys: Set<String> = ["editorialPolicy", "sources"]
+        let migratedBlockKeys: Set<String> = ["editorialPolicy", "sources", "seoGuidelines"]
         let blocks = (try? context.fetch(FetchDescriptor<ContextBlock>())) ?? []
         for block in blocks where migratedBlockKeys.contains(block.key) {
             if let def = ContextBlockDefaults.defaultForKey(block.key) {
@@ -106,9 +108,10 @@ enum StageTemplateSeeder {
         }
 
         let roles = (try? context.fetch(FetchDescriptor<AIRole>())) ?? []
-        if let author = roles.first(where: { $0.key == "author" }),
-           let def = RoleDefaults.defaultForKey("author") {
-            author.mandate = def.mandate
+        for role in roles {
+            if let def = RoleDefaults.defaultForKey(role.key) {
+                role.mandate = def.mandate
+            }
         }
         if !roles.isEmpty, !roles.contains(where: { $0.key == "analyst" }),
            let def = RoleDefaults.defaultForKey("analyst") {
@@ -121,6 +124,23 @@ enum StageTemplateSeeder {
            let def = SkillPresetDefaults.all.first(where: { $0.key == "shorten" }) {
             let nextOrder = (presets.map(\.order).max() ?? -1) + 1
             context.insert(SkillPresetDefaults.make(def, order: nextOrder))
+        }
+        // The name check also covers a manually created "Мир читателя" preset
+        // (defaultKey nil until SkillPresetSeeder.backfillDefaultKeys runs).
+        if !presets.isEmpty,
+           !presets.contains(where: { $0.defaultKey == "readerWorld" || $0.name == "Мир читателя" }),
+           let def = SkillPresetDefaults.all.first(where: { $0.key == "readerWorld" }) {
+            let nextOrder = (presets.map(\.order).max() ?? -1) + 1
+            context.insert(SkillPresetDefaults.make(def, order: nextOrder))
+        }
+
+        // Image prompt templates are seeded per kind but were never migrated,
+        // so installs older than the glass-style flow still run pre-glass prompts.
+        let imagePrompts = (try? context.fetch(FetchDescriptor<ImagePromptTemplate>())) ?? []
+        for template in imagePrompts {
+            guard let kind = template.kind else { continue }
+            template.userPromptTemplate = ImagePromptDefaults.content(for: kind)
+            template.updatedAt = .now
         }
 
         // ImageStylePreset seeds only when the whole table is empty (seedImageStylePresetIfNeeded),
@@ -140,7 +160,8 @@ enum StageTemplateSeeder {
             userPromptTemplate: c.userPromptTemplate,
             modelName: c.modelName,
             temperature: c.temperature,
-            maxTokens: c.maxTokens
+            maxTokens: c.maxTokens,
+            reasoningEffort: c.reasoningEffort
         )
     }
 }

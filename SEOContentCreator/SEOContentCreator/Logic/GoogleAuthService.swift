@@ -12,6 +12,7 @@ final class GoogleAuthService {
         case cancelled
         case tokenExchangeFailed
         case listenerFailed(String)
+        case browserOpenFailed(String)
         var errorDescription: String? {
             switch self {
             case .noClientCredentials: return "Укажите Client ID и Client Secret Google в Настройках."
@@ -19,6 +20,7 @@ final class GoogleAuthService {
             case .cancelled: return "Вход в Google отменён."
             case .tokenExchangeFailed: return "Не удалось получить токен Google."
             case .listenerFailed(let reason): return "Не удалось открыть локальный порт для входа: \(reason)"
+            case .browserOpenFailed(let reason): return "Не удалось открыть браузер для входа: \(reason)"
             }
         }
     }
@@ -122,9 +124,23 @@ final class GoogleAuthService {
         let listener = try LoopbackListener()
         let redirect = "http://127.0.0.1:\(listener.port)"
         let authURL = Self.buildAuthURL(clientID: id, redirectURI: redirect, codeChallenge: challenge)
-        NSWorkspace.shared.open(authURL)
+        try await openInBrowser(authURL)
         let code = try await listener.waitForCode()
         try await exchangeCode(code, verifier: verifier, redirectURI: redirect)
+    }
+
+    /// Открывает системный браузер на URL входа Google.
+    ///
+    /// Используем современный async-вариант `open(_:configuration:)`, а не
+    /// устаревший `open(_ url:) -> Bool`: на свежих macOS устаревший вызов может
+    /// молча ничего не делать, из-за чего вход «зависал» без единого сообщения.
+    /// Здесь любая неудача превращается в понятную ошибку.
+    private func openInBrowser(_ url: URL) async throws {
+        do {
+            _ = try await NSWorkspace.shared.open(url, configuration: NSWorkspace.OpenConfiguration())
+        } catch {
+            throw AuthError.browserOpenFailed(error.localizedDescription)
+        }
     }
 }
 

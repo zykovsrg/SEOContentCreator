@@ -7,9 +7,17 @@ struct StageTemplateDefaultsTests {
         for stage in PipelineStage.allCases where stage.kind != .action {
             let c = StageTemplateDefaults.content(for: stage)
             #expect(!c.userPromptTemplate.isEmpty)
+            guard stage != .finalReview else { continue }
             #expect(c.modelName == "gpt-4.1")
             #expect(c.maxTokens == 8000)
         }
+    }
+
+    @Test func finalReviewUsesReasoningModel() {
+        let c = StageTemplateDefaults.content(for: .finalReview)
+        #expect(c.modelName == "gpt-5.5")
+        #expect(c.maxTokens == 11000)
+        #expect(c.reasoningEffort == "high")
     }
 
     @Test func checkingStagesUseLowerTemperature() {

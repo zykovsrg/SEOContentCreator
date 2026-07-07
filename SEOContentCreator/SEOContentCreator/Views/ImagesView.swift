@@ -71,6 +71,11 @@ struct ImagesView: View {
                 ImageGenerationSheet(topic: topic, mode: .refine(source: image))
             }
         }
+        .alert("Ошибка", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
+            Button("OK", role: .cancel) { exportError = nil }
+        } message: {
+            Text(exportError ?? "")
+        }
     }
 
     @ViewBuilder
@@ -113,12 +118,29 @@ struct ImagesView: View {
         .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.05)))
     }
 
+    @State private var exportError: String?
+
     private func export(_ image: GeneratedImage) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType.png]
         panel.nameFieldStringValue = "\(image.role.rawValue)-\(image.uuid.uuidString.prefix(8)).png"
-        if panel.runModal() == .OK, let url = panel.url {
-            try? image.data.write(to: url)
+        let data = image.data
+        let finish: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let url = panel.url else { return }
+            do {
+                try data.write(to: url)
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } catch {
+                exportError = "Не удалось сохранить файл: \(error.localizedDescription)"
+            }
+        }
+        // Внутри SwiftUI-sheet системное окно сохранения нужно показывать как
+        // sheet текущего окна: старый `runModal()` изнутри sheet на macOS часто
+        // не отображается вовсе.
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window, completionHandler: finish)
+        } else {
+            finish(panel.runModal())
         }
     }
 

@@ -32,7 +32,7 @@ struct TemplateEditorView: View {
                 Stepper("Температура: \(temperature, specifier: "%.1f")",
                         value: $temperature, in: 0...1, step: 0.1)
                     .frame(maxWidth: 360, alignment: .leading)
-                Stepper("Max tokens: \(maxTokens)", value: $maxTokens, in: 1000...16000, step: 1000)
+                Stepper("Max tokens: \(maxTokens)", value: $maxTokens, in: 1000...32000, step: 1000)
                     .frame(maxWidth: 360, alignment: .leading)
 
                 if OpenAIClient.usesMaxCompletionTokens(model: settingsModel) {

@@ -14,9 +14,10 @@ struct VersionSourceFragmentTests {
 }
 
 struct SkillPresetDefaultsTests {
-    @Test func providesFiveStarterSkillsIncludingShorten() {
-        #expect(SkillPresetDefaults.all.count == 5)
+    @Test func providesStarterSkillsIncludingShortenAndReaderWorld() {
+        #expect(SkillPresetDefaults.all.count == 6)
         #expect(SkillPresetDefaults.all.contains { $0.key == "shorten" })
+        #expect(SkillPresetDefaults.all.contains { $0.key == "readerWorld" })
     }
 
     @Test func everyDefaultHasNamePromptAndKnownRole() {

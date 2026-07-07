@@ -90,9 +90,8 @@ struct StageTemplateSeederTests {
         #expect(old.modelName == "gpt-4o")
         #expect(old.temperature == 0.2)
         #expect(old.maxTokens == 4000)
-        // productBlocks is not part of the cascade, so its custom content survives migration.
-        #expect(oldProductBlocks.userPromptTemplate == "Пользовательский productBlocks")
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 7)
+        #expect(oldProductBlocks.userPromptTemplate == StageTemplateDefaults.content(for: .productBlocks).userPromptTemplate)
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 8)
 
         old.userPromptTemplate = "Ручная правка после миграции"
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
@@ -112,7 +111,7 @@ struct StageTemplateSeederTests {
 
         let roles = try context.fetch(FetchDescriptor<AIRole>())
         #expect(roles.contains { $0.key == "analyst" })
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 7)
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 8)
     }
 
     @Test func migrationAddsGlassStylePresetsToPreExistingInstallationsWithoutThem() throws {
@@ -133,7 +132,7 @@ struct StageTemplateSeederTests {
         #expect(names.contains(ImageStylePresetDefaults.illustration.name))
         // The user's existing custom preset is preserved, not replaced.
         #expect(customPreset.styleText == "старый стиль")
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 7)
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 8)
 
         let coverCountAfterFirstRun = presets.filter { $0.name == ImageStylePresetDefaults.cover.name }.count
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
