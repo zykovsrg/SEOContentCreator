@@ -15,6 +15,17 @@ struct ContentPlanView: View {
 
     private var visibleTopics: [Topic] { filter.apply(to: topics) }
 
+    private func stageStates(for topic: Topic) -> [(stage: PipelineStage, state: StageState)] {
+        let hasImages = !topic.images.filter { !$0.isArchived }.isEmpty
+        let hasRecs = !topic.promptRecommendations.isEmpty
+        return StagePipeline.states { stage in
+            StageProgress.isCompleted(
+                stage, versions: topic.versions, structureText: topic.structureText,
+                hasImages: hasImages, hasPromptRecommendations: hasRecs
+            )
+        }
+    }
+
     var body: some View {
         if let opened {
             TopicWorkspaceView(topic: opened, onBack: { self.opened = nil })
@@ -36,7 +47,14 @@ struct ContentPlanView: View {
             TableColumn("Тема") { Text($0.title) }
             TableColumn("Тип") { Text($0.articleType.title) }
             TableColumn("Направление") { Text($0.direction?.title ?? "—") }
-            TableColumn("Статус") { Text(TopicStatus.compute(for: $0).label) }
+            TableColumn("Этапы") { topic in
+                StageProgressDots(states: stageStates(for: topic).map(\.state))
+            }
+            .width(110)
+            TableColumn("Статус") { topic in
+                let status = TopicStatus.compute(for: topic)
+                StatusPill(label: status.label, tone: status.tone)
+            }
             TableColumn("Токены") { Text($0.totalTokenCost > 0 ? "\($0.totalTokenCost)" : "—") }
         }
         .contextMenu(forSelectionType: Topic.ID.self) { ids in
