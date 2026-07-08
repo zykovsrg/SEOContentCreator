@@ -24,12 +24,18 @@ struct StageRailView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Этапы").font(.subheadline).fontWeight(.semibold)
-                Text(headerHint).font(.caption2).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Этапы")
+                    .font(.headline)
+                Text(headerHint)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
-            .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 4)
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 10)
 
             ForEach(StagePipeline.workflow) { stage in
                 Button { selectedStage = stage } label: {
@@ -39,7 +45,7 @@ struct StageRailView: View {
             }
             Spacer()
         }
-        .frame(width: 200)
+        .frame(width: 250)
     }
 
     private var headerHint: String {
@@ -52,20 +58,22 @@ struct StageRailView: View {
     @ViewBuilder
     private func row(for stage: PipelineStage) -> some View {
         let selected = selectedStage == stage
-        HStack(alignment: .top, spacing: 9) {
+        HStack(alignment: .top, spacing: 12) {
             marker(for: stage)
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(stage.title)
-                    .font(.callout)
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(selected ? Color.accentColor : .primary)
                 Text(agentName(for: stage))
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10).padding(.vertical, 6)
-        .background(selected ? Color.accentColor.opacity(0.12) : .clear,
-                    in: RoundedRectangle(cornerRadius: 7))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .background(selected ? Color.rowHighlight : .clear,
+                    in: RoundedRectangle(cornerRadius: 9))
         .contentShape(Rectangle())
     }
 
@@ -73,15 +81,18 @@ struct StageRailView: View {
     private func marker(for stage: PipelineStage) -> some View {
         if isCompleted(stage) {
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green).font(.body)
+                .foregroundStyle(.green)
+                .font(.title3)
         } else if stage == nextStage {
             Image(systemName: "circle.fill")
-                .foregroundStyle(Color.accentColor).font(.caption)
-                .frame(width: 16, height: 16)
+                .foregroundStyle(Color.accentColor)
+                .font(.caption)
+                .frame(width: 22, height: 22)
         } else {
             Image(systemName: "circle")
-                .foregroundStyle(Color.secondary.opacity(0.5)).font(.caption)
-                .frame(width: 16, height: 16)
+                .foregroundStyle(Color.secondary.opacity(0.45))
+                .font(.title3)
+                .frame(width: 22, height: 22)
         }
     }
 

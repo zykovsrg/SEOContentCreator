@@ -130,8 +130,9 @@ struct SingleVersionView: View {
                 ScrollView {
                     MarkdownBlocksView(text: text)
                         .frame(maxWidth: readingWidth, alignment: .leading)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 22)
                 }
             } else {
                 ContentUnavailableView("Нет текущей версии", systemImage: "doc")

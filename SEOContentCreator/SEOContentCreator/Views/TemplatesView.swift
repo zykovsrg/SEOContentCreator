@@ -27,6 +27,8 @@ struct TemplatesView: View {
     @State private var category: TemplateCategory = .stagePrompts
     @State private var search = ""
     @State private var path: [TemplateSelection] = []
+    @State private var hoveredSelection: TemplateSelection?
+    @State private var selectedSelection: TemplateSelection?
 
     private var sortedTemplates: [StageTemplate] {
         templates.sorted { lhs, rhs in
@@ -94,12 +96,11 @@ struct TemplatesView: View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 header
-                categoryChipsRow
-                Divider()
+                categoryTabsRow
                 templateList
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .panelCard()
+            .panelCard(cornerRadius: 12)
             .padding(10)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.pageBackground)
@@ -114,12 +115,29 @@ struct TemplatesView: View {
         HStack(spacing: 12) {
             Text("Шаблоны").font(.title2).bold()
             Spacer()
-            TextField("Поиск", text: $search)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 220)
+            searchField
             addMenu
         }
-        .padding()
+        .padding(.horizontal, 24)
+        .padding(.top, 22)
+        .padding(.bottom, 18)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Поиск...", text: $search)
+                .textFieldStyle(.plain)
+        }
+        .font(.headline)
+        .padding(.horizontal, 12)
+        .frame(minWidth: 190, idealWidth: 300, maxWidth: 300, minHeight: 44)
+        .background(Color.selectedControlSurface, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.hairline.opacity(0.65), lineWidth: 1)
+        )
     }
 
     private var addMenu: some View {
@@ -144,44 +162,74 @@ struct TemplatesView: View {
                 context.insert(phrase); category = .forbidden; path.append(.forbiddenPhrase(phrase.uuid))
             }
         } label: {
-            Label("Добавить", systemImage: "plus")
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                Text("Добавить")
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .opacity(0.75)
+            }
+                .font(.headline)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .frame(height: 44)
+                .background(Color.brandAccent, in: RoundedRectangle(cornerRadius: 8))
         }
-        .menuStyle(.button)
-        .buttonStyle(.borderedProminent)
+        .menuStyle(.borderlessButton)
+        .buttonStyle(.plain)
         .fixedSize()
     }
 
-    private var categoryChipsRow: some View {
-        HStack(spacing: 6) {
-            ForEach(TemplateCategory.allCases) { cat in
-                categoryChip(cat)
+    private var categoryTabsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 0) {
+                ForEach(TemplateCategory.allCases) { cat in
+                    categoryTab(cat)
+                }
             }
-            Spacer()
+            .padding(3)
+            .background(Color.controlSurface, in: RoundedRectangle(cornerRadius: 9))
         }
-        .padding(.horizontal).padding(.bottom, 10)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 14)
     }
 
     private var templateList: some View {
-        List {
-            if search.isEmpty {
-                categoryRows
-            } else {
-                searchRows
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                if search.isEmpty {
+                    categoryRows
+                } else {
+                    searchRows
+                }
             }
         }
-        .scrollContentBackground(.hidden)
+        .background(Color.selectedControlSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.hairline.opacity(0.70), lineWidth: 1)
+        )
+        .padding(.horizontal, 24)
+        .padding(.bottom, 24)
     }
 
-    private func categoryChip(_ cat: TemplateCategory) -> some View {
+    private func categoryTab(_ cat: TemplateCategory) -> some View {
         let selected = category == cat
         return Button { category = cat } label: {
             Text(cat.title)
-                .font(.callout).fontWeight(.medium)
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(selected ? AnyShapeStyle(Color.accentColor)
-                                     : AnyShapeStyle(Color.secondary.opacity(0.12)),
-                            in: Capsule())
-                .foregroundStyle(selected ? Color.white : Color.primary)
+                .font(.headline)
+                .lineLimit(1)
+                .frame(minWidth: 116)
+                .padding(.horizontal, 12)
+                .frame(height: 42)
+                .background(selected ? Color.selectedControlSurface : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 7))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .strokeBorder(selected ? Color.hairline.opacity(0.70) : Color.clear, lineWidth: 1)
+                )
+                .foregroundStyle(selected ? Color.primary : Color.secondary)
         }
         .buttonStyle(.plain)
     }
@@ -191,82 +239,120 @@ struct TemplatesView: View {
         switch category {
         case .stagePrompts:
             ForEach(sortedTemplates) { t in
-                NavigationLink(value: TemplateSelection.stage(t.uuid)) {
-                    stageRow(t)
-                }
+                rowButton(
+                    value: .stage(t.uuid),
+                    title: t.stage?.title ?? t.stageRaw,
+                    subtitle: t.stage?.agentName,
+                    chip: TemplateChipText.chip(model: t.modelName,
+                                                maxTokens: t.maxTokens,
+                                                reasoning: t.reasoningEffort)
+                )
             }
         case .roles:
             ForEach(sortedRoles) { role in
-                NavigationLink(role.name, value: TemplateSelection.role(role.uuid))
+                rowButton(value: .role(role.uuid), title: role.name, subtitle: "\(role.blockKeys.count) блоков")
             }
         case .editorial:
             ForEach(sortedBlocks) { block in
-                NavigationLink(block.title, value: TemplateSelection.block(block.uuid))
+                rowButton(value: .block(block.uuid), title: block.title, subtitle: "Контекст")
             }
             ForEach(editorDictionaries) { dict in
-                NavigationLink("Словарь правок", value: TemplateSelection.editorDictionary(dict.uuid))
+                rowButton(value: .editorDictionary(dict.uuid), title: "Словарь правок", subtitle: "Редполитика")
             }
         case .images:
             ForEach(sortedImagePrompts) { template in
-                NavigationLink("Промт: \(template.kind?.title ?? template.kindRaw)",
-                               value: TemplateSelection.imagePrompt(template.uuid))
+                rowButton(
+                    value: .imagePrompt(template.uuid),
+                    title: template.kind?.title ?? template.kindRaw,
+                    subtitle: "Промт изображения"
+                )
             }
             ForEach(sortedImagePresets) { preset in
-                NavigationLink("Пресет: \(preset.name)", value: TemplateSelection.imagePreset(preset.uuid))
+                rowButton(value: .imagePreset(preset.uuid), title: preset.name, subtitle: "Пресет")
             }
         case .skills:
             ForEach(sortedSkills) { skill in
-                NavigationLink(skill.name, value: TemplateSelection.skill(skill.uuid))
+                rowButton(value: .skill(skill.uuid), title: skill.name, subtitle: "Скилл")
             }
         case .forbidden:
             ForEach(sortedForbiddenPhrases) { phrase in
-                NavigationLink(value: TemplateSelection.forbiddenPhrase(phrase.uuid)) {
-                    Text(phrase.phrase).lineLimit(1)
-                }
+                rowButton(value: .forbiddenPhrase(phrase.uuid), title: phrase.phrase, subtitle: phrase.replacement)
             }
         }
     }
 
-    /// Full-width stage-prompt row: title + agent name on the left, model chip
-    /// on the right (matches the mockup).
-    private func stageRow(_ t: StageTemplate) -> some View {
-        HStack(spacing: 8) {
-            Text(t.stage?.title ?? t.stageRaw).fontWeight(.medium)
-            if let agent = t.stage?.agentName {
-                Text(agent).font(.callout).foregroundStyle(.secondary)
+    private func rowButton(value: TemplateSelection, title: String, subtitle: String? = nil, chip: String? = nil) -> some View {
+        Button {
+            selectedSelection = value
+            path.append(value)
+        } label: {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .frame(minWidth: 0, alignment: .leading)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 16)
+                if let chip {
+                    MetaChip(text: chip)
+                }
             }
-            Spacer()
-            MetaChip(text: TemplateChipText.chip(model: t.modelName,
-                                                 maxTokens: t.maxTokens,
-                                                 reasoning: t.reasoningEffort))
+            .padding(.horizontal, 22)
+            .frame(height: 62)
+            .contentShape(Rectangle())
+            .background(rowBackground(for: value))
+            .overlay(alignment: .bottom) {
+                Color.hairline.opacity(0.55).frame(height: 1)
+            }
         }
+        .buttonStyle(.plain)
+        .onHover { isHovered in
+            hoveredSelection = isHovered ? value : nil
+        }
+    }
+
+    private func rowBackground(for value: TemplateSelection) -> Color {
+        if selectedSelection == value || hoveredSelection == value {
+            return Color.rowHighlight
+        }
+        return Color.clear
     }
 
     @ViewBuilder
     private var searchRows: some View {
         let q = search.lowercased()
         ForEach(sortedTemplates.filter { ($0.stage?.title ?? $0.stageRaw).lowercased().contains(q) }) { t in
-            NavigationLink(value: TemplateSelection.stage(t.uuid)) { stageRow(t) }
+            rowButton(
+                value: .stage(t.uuid),
+                title: t.stage?.title ?? t.stageRaw,
+                subtitle: t.stage?.agentName,
+                chip: TemplateChipText.chip(model: t.modelName,
+                                            maxTokens: t.maxTokens,
+                                            reasoning: t.reasoningEffort)
+            )
         }
         ForEach(sortedRoles.filter { $0.name.lowercased().contains(q) }) { role in
-            NavigationLink(role.name, value: TemplateSelection.role(role.uuid))
+            rowButton(value: .role(role.uuid), title: role.name, subtitle: "\(role.blockKeys.count) блоков")
         }
         ForEach(sortedBlocks.filter { $0.title.lowercased().contains(q) }) { block in
-            NavigationLink(block.title, value: TemplateSelection.block(block.uuid))
+            rowButton(value: .block(block.uuid), title: block.title, subtitle: "Контекст")
         }
         ForEach(sortedSkills.filter { $0.name.lowercased().contains(q) }) { skill in
-            NavigationLink(skill.name, value: TemplateSelection.skill(skill.uuid))
+            rowButton(value: .skill(skill.uuid), title: skill.name, subtitle: "Скилл")
         }
         ForEach(sortedProductBlocks.filter { $0.name.lowercased().contains(q) }) { block in
-            NavigationLink(block.name, value: TemplateSelection.productBlock(block.uuid))
+            rowButton(value: .productBlock(block.uuid), title: block.name, subtitle: "Продуктовый блок")
         }
         ForEach(sortedForbiddenPhrases.filter { $0.phrase.lowercased().contains(q) }) { phrase in
-            NavigationLink(value: TemplateSelection.forbiddenPhrase(phrase.uuid)) {
-                Text(phrase.phrase).lineLimit(1)
-            }
+            rowButton(value: .forbiddenPhrase(phrase.uuid), title: phrase.phrase, subtitle: phrase.replacement)
         }
         ForEach(editorDictionaries.filter { _ in "словарь правок".contains(q) }) { dict in
-            NavigationLink("Словарь правок", value: TemplateSelection.editorDictionary(dict.uuid))
+            rowButton(value: .editorDictionary(dict.uuid), title: "Словарь правок", subtitle: "Редполитика")
         }
     }
 

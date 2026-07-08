@@ -28,11 +28,11 @@ struct KnowledgeBaseView: View {
     var body: some View {
         HStack(spacing: 10) {
             treePanel
-                .frame(width: 360)
-                .panelCard()
+                .frame(width: 390)
+                .panelCard(cornerRadius: 12)
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .panelCard()
+                .panelCard(cornerRadius: 12)
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -45,24 +45,25 @@ struct KnowledgeBaseView: View {
             HStack(spacing: 10) {
                 Text("База знаний").font(.title2).bold()
                 Text("\(allNodes.count) узлов")
-                    .font(.callout).foregroundStyle(.secondary)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Color.secondary.opacity(0.12), in: Capsule())
+                    .font(.callout)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(Color.controlSurface, in: Capsule())
                 Spacer()
                 addNodeMenu
             }
-            .padding()
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 12)
 
-            TextField("Поиск по справочнику", text: $search)
-                .textFieldStyle(.roundedBorder)
-                .padding(.horizontal)
-                .padding(.bottom, 8)
+            searchField
 
             typeFilters
-                .padding(.horizontal)
+                .padding(.horizontal, 18)
                 .padding(.bottom, 12)
 
-            Divider()
+            Color.hairline.opacity(0.65).frame(height: 1)
             List(selection: $selection) {
                 if isFiltering {
                     ForEach(searchResults) { node in
@@ -82,6 +83,25 @@ struct KnowledgeBaseView: View {
         }
     }
 
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Поиск по справочнику", text: $search)
+                .textFieldStyle(.plain)
+        }
+        .font(.headline)
+        .padding(.horizontal, 12)
+        .frame(height: 40)
+        .background(Color.selectedControlSurface, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.hairline.opacity(0.65), lineWidth: 1)
+        )
+        .padding(.horizontal, 18)
+        .padding(.bottom, 10)
+    }
+
     private var typeFilters: some View {
         FlowLayout(spacing: 6) {
             Button {
@@ -90,7 +110,7 @@ struct KnowledgeBaseView: View {
                 Text("Все")
                     .font(.callout).fontWeight(.semibold)
                     .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(selectedTypes.isEmpty ? Color.accentColor : Color.secondary.opacity(0.12), in: Capsule())
+                    .background(selectedTypes.isEmpty ? Color.accentColor : Color.controlSurface, in: Capsule())
                     .foregroundStyle(selectedTypes.isEmpty ? .white : .primary)
             }
             .buttonStyle(.plain)
@@ -106,7 +126,7 @@ struct KnowledgeBaseView: View {
                     Text(type.title)
                         .font(.callout).fontWeight(.semibold)
                         .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(selectedTypes.contains(type) ? nodeColor(type) : Color.secondary.opacity(0.12), in: Capsule())
+                        .background(selectedTypes.contains(type) ? nodeColor(type) : Color.controlSurface, in: Capsule())
                         .foregroundStyle(selectedTypes.contains(type) ? .white : .secondary)
                 }
                 .buttonStyle(.plain)
@@ -120,10 +140,21 @@ struct KnowledgeBaseView: View {
                 Button(type.title) { addRoot(type: type) }
             }
         } label: {
-            Label("Узел", systemImage: "plus")
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                Text("Узел")
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .opacity(0.75)
+            }
+            .font(.headline)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(height: 36)
+            .background(Color.brandAccent, in: RoundedRectangle(cornerRadius: 8))
         }
-        .menuStyle(.button)
-        .buttonStyle(.borderedProminent)
+        .menuStyle(.borderlessButton)
+        .buttonStyle(.plain)
         .fixedSize()
     }
 
@@ -139,7 +170,8 @@ struct KnowledgeBaseView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 3)
+        .font(.headline)
+        .padding(.vertical, 5)
     }
 
     @ViewBuilder
@@ -180,6 +212,7 @@ private struct NodeDetailView: View {
     var onDelete: () -> Void
 
     @State private var confirmDelete = false
+    @State private var saveError: String?
 
     private var usageTopics: [Topic] {
         topics.filter { topic in
@@ -202,11 +235,19 @@ private struct NodeDetailView: View {
                     usedInSection
                     childrenSection
                 }
-                .padding(22)
+                .padding(28)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Divider()
+            Color.hairline.opacity(0.65).frame(height: 1)
             bottomBar
+        }
+        .alert("Не удалось сохранить", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
+            Button("Понятно", role: .cancel) {}
+        } message: {
+            Text(saveError ?? "")
         }
         .confirmationDialog("Удалить узел базы знаний?", isPresented: $confirmDelete) {
             Button("Удалить", role: .destructive) {
@@ -225,6 +266,7 @@ private struct NodeDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(pathText)
                 .font(.callout)
+                .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
@@ -238,7 +280,7 @@ private struct NodeDetailView: View {
                     Label("Используется в \(usageTopics.count) темах", systemImage: "smallcircle.filled.circle")
                         .font(.callout).fontWeight(.semibold)
                         .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        .background(Color.rowHighlight, in: Capsule())
                         .foregroundStyle(Color.accentColor)
                 }
                 typeMenu
@@ -257,8 +299,8 @@ private struct NodeDetailView: View {
                 Text(node.nodeType.title)
                     .font(.callout).fontWeight(.semibold)
             }
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(nodeColor(node.nodeType).opacity(0.14), in: Capsule())
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(nodeColor(node.nodeType).opacity(0.16), in: Capsule())
             .foregroundStyle(nodeColor(node.nodeType))
         }
         .buttonStyle(.plain)
@@ -270,8 +312,13 @@ private struct NodeDetailView: View {
             TextField("Что важно знать об этом узле", text: $node.content, axis: .vertical)
                 .lineLimit(4...10)
                 .textFieldStyle(.plain)
-                .padding(14)
-                .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                .font(.title3)
+                .padding(18)
+                .background(Color.controlSurface, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color.hairline.opacity(0.55), lineWidth: 1)
+                )
         }
     }
 
@@ -281,9 +328,10 @@ private struct NodeDetailView: View {
             if usageTopics.isEmpty {
                 Text("Пока не привязан к темам")
                     .foregroundStyle(.secondary)
-                    .padding(14)
+                    .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08)))
+                    .background(Color.selectedControlSurface, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.hairline.opacity(0.55)))
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(usageTopics.enumerated()), id: \.element.id) { index, topic in
@@ -294,11 +342,14 @@ private struct NodeDetailView: View {
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(.horizontal, 14).padding(.vertical, 10)
-                        if index < usageTopics.count - 1 { Divider() }
+                        .padding(.horizontal, 18).padding(.vertical, 13)
+                        if index < usageTopics.count - 1 {
+                            Color.hairline.opacity(0.45).frame(height: 1)
+                        }
                     }
                 }
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08)))
+                .background(Color.selectedControlSurface, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.hairline.opacity(0.55)))
             }
         }
     }
@@ -316,8 +367,10 @@ private struct NodeDetailView: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    if index < node.children.count - 1 { Divider() }
+                    .padding(.horizontal, 18).padding(.vertical, 13)
+                    if index < node.children.count - 1 {
+                        Color.hairline.opacity(0.45).frame(height: 1)
+                    }
                 }
                 Button {
                     addChild()
@@ -327,21 +380,48 @@ private struct NodeDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.accentColor)
-                .padding(.horizontal, 14).padding(.vertical, 10)
+                .font(.headline)
+                .padding(.horizontal, 18).padding(.vertical, 13)
             }
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08)))
+            .background(Color.selectedControlSurface, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.hairline.opacity(0.55)))
         }
     }
 
     private var bottomBar: some View {
-        HStack {
-            Button("Удалить узел", role: .destructive) { confirmDelete = true }
-                .buttonStyle(.bordered)
+        HStack(spacing: 12) {
+            Button(role: .destructive) { confirmDelete = true } label: {
+                Text("Удалить узел")
+                    .font(.headline)
+                    .padding(.horizontal, 18)
+                    .frame(height: 44)
+                    .background(Color.red.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.red)
             Spacer()
-            Button("Сохранить") { }
-                .buttonStyle(.borderedProminent)
+            Button("Отменить") {
+                context.rollback()
+            }
+            .font(.headline)
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            Button("Сохранить") {
+                save()
+            }
+            .font(.headline)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
         .padding(16)
+    }
+
+    private func save() {
+        do {
+            try context.save()
+        } catch {
+            saveError = error.localizedDescription
+        }
     }
 
     private func addChild() {

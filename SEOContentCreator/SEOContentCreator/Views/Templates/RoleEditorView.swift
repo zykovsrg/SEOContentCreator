@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct RoleEditorView: View {
@@ -8,45 +9,148 @@ struct RoleEditorView: View {
     @State private var mandate = ""
     @State private var selectedBlockKeys: Set<String> = []
     @State private var savedNote: String?
+    @State private var selectedRange = NSRange(location: 0, length: 0)
+    @State private var insertionToken = ""
+    @State private var insertionRequestID = 0
 
     var body: some View {
+        HStack(spacing: 10) {
+            editorPanel
+                .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
+                .panelCard()
+            sidePanel
+                .frame(width: 360)
+                .frame(maxHeight: .infinity)
+                .panelCard()
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.pageBackground)
+        .navigationTitle(name.isEmpty ? role.name : name)
+        .onAppear(perform: load)
+    }
+
+    private var editorPanel: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            PromptTemplateTextEditor(
+                text: $mandate,
+                selectedRange: $selectedRange,
+                insertionToken: insertionToken,
+                insertionRequestID: insertionRequestID
+            )
+            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            .padding(18)
+            Divider()
+            bottomBar
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Шаблоны › Роли › \(name.isEmpty ? role.name : name)")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            HStack(spacing: 10) {
+                Text("Роль")
+                    .font(.title)
+                    .fontWeight(.bold)
+                Text("версия \(role.version)")
+                    .font(.callout)
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(Color.controlSurface, in: Capsule())
+                    .foregroundStyle(.secondary)
+            }
+
+            TextField("Имя", text: $name)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 460)
+
+            Text("Установка роли задаёт общий характер ответа. Контекстные блоки добавляются отдельно справа.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var sidePanel: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(role.name).font(.title2).bold()
-                Text("Версия роли: \(role.version)")
-                    .font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 18) {
+                blocksSection
+                Divider()
+                stagesSection
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 
-                TextField("Имя", text: $name)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 420)
-
-                Text("Установка роли").font(.headline)
-                TextEditor(text: $mandate)
-                    .frame(minHeight: 180)
-                    .border(.gray.opacity(0.3))
-
-                Text("Использует блоки").font(.headline)
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(blocks) { block in
-                        Toggle(block.title, isOn: binding(for: block.key))
+    private var blocksSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            EditorPanelTitle("Использует блоки")
+            ForEach(blocks) { block in
+                Toggle(isOn: binding(for: block.key)) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(block.title)
+                            .font(.callout.weight(.semibold))
+                        Text(block.key)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
-
-                Text("Отвечает за этапы").font(.headline)
-                Text(stageTitles.isEmpty ? "Нет закреплённых этапов" : stageTitles.joined(separator: ", "))
-                    .foregroundStyle(.secondary)
-
-                HStack {
-                    Button("Сохранить") { save() }.buttonStyle(.borderedProminent)
-                    Button("Сбросить к стандартному") { resetToDefault() }
-                    Spacer()
-                    if let savedNote { Text(savedNote).font(.caption).foregroundStyle(.green) }
-                }
-                .padding(.top, 4)
+                .toggleStyle(.checkbox)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.controlSurface, in: RoundedRectangle(cornerRadius: 8))
             }
-            .padding()
+            Text("Выбранные блоки добавляются к роли при генерации.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .onAppear(perform: load)
+    }
+
+    private var stagesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            EditorPanelTitle("Отвечает за этапы")
+            if stageTitles.isEmpty {
+                Text("Нет закреплённых этапов")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(stageTitles, id: \.self) { title in
+                        Text(title)
+                            .font(.callout.weight(.semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
+            }
+        }
+    }
+
+    private var bottomBar: some View {
+        HStack(spacing: 12) {
+            Button("Сбросить к стандартному") { resetToDefault() }
+                .foregroundStyle(.secondary)
+            Spacer()
+            if let savedNote {
+                Text(savedNote)
+                    .font(.callout)
+                    .foregroundStyle(.green)
+            }
+            Button("Сохранить") { save() }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(14)
     }
 
     private var stageTitles: [String] {

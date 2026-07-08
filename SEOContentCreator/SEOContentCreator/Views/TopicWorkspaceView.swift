@@ -42,16 +42,32 @@ struct TopicWorkspaceView: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            StageRailView(selectedStage: $selectedStage, topic: topic)
-                .panelCard()
-            workColumn
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .panelCard()
-            if showInspector {
-                inspectorPanel
-                    .frame(width: 340)
-                    .panelCard()
+        Group {
+            if showEditor {
+                TopicEditorView(topic: topic) {
+                    showEditor = false
+                }
+            } else {
+                VStack(spacing: 0) {
+                    HStack(spacing: 10) {
+                        StageRailView(selectedStage: $selectedStage, topic: topic)
+                            .panelCard()
+                        workColumn
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .panelCard()
+                        if showInspector {
+                            inspectorPanel
+                                .frame(width: 360)
+                                .frame(maxHeight: .infinity)
+                                .panelCard()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    Divider()
+                        .padding(.top, 10)
+                    bottomBar
+                }
             }
         }
         .padding(10)
@@ -64,7 +80,6 @@ struct TopicWorkspaceView: View {
         }
         .sheet(isPresented: $showStructure) { StructureEditorSheet(topic: topic) }
         .sheet(isPresented: $showHints) { SoftHintsSheet(topic: topic) }
-        .sheet(isPresented: $showEditor) { EditorSheet(topic: topic) }
         .sheet(isPresented: $showImages) { ImagesView(topic: topic) }
         .sheet(isPresented: $showPublish) {
             PublishSheet(topic: topic)
@@ -99,8 +114,6 @@ struct TopicWorkspaceView: View {
             warningBanner
             contentArea
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Divider()
-            bottomBar
         }
     }
 
@@ -169,23 +182,28 @@ struct TopicWorkspaceView: View {
     /// a freshly generated version awaiting accept, or the normal run bar.
     @ViewBuilder
     private var bottomBar: some View {
-        if isReviewing {
-            HStack {
-                Spacer()
-                Button("Отклонить всё", role: .destructive) { endReview() }
-                Button("Готово") { finishReview() }.keyboardShortcut(.defaultAction)
+        Group {
+            if isReviewing {
+                HStack {
+                    Spacer()
+                    Button("Отклонить всё", role: .destructive) { endReview() }
+                    Button("Готово") { finishReview() }.keyboardShortcut(.defaultAction)
+                }
+            } else if pendingVersion != nil {
+                AcceptRejectBar(
+                    canAct: !(executor?.isRunning ?? false),
+                    onAcceptAll: acceptAll,
+                    onAcceptPartial: { showPartialAccept = true },
+                    onReject: reject
+                )
+            } else {
+                stageActionBar
             }
-            .padding(8)
-        } else if pendingVersion != nil {
-            AcceptRejectBar(
-                canAct: !(executor?.isRunning ?? false),
-                onAcceptAll: acceptAll,
-                onAcceptPartial: { showPartialAccept = true },
-                onReject: reject
-            )
-        } else {
-            stageActionBar
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(Color.panelSurface)
     }
 
     /// Normal run bar: what will run (stage + model) on the left, the primary
@@ -199,6 +217,7 @@ struct TopicWorkspaceView: View {
                 .layoutPriority(1)
             Spacer(minLength: 8)
             Button("Опубликовать") { showPublish = true }
+                .buttonStyle(.bordered)
             if executor?.isRunning ?? false {
                 Button(role: .destructive, action: { executor?.cancel() }) {
                     Label("Стоп", systemImage: "stop.fill")
@@ -210,7 +229,6 @@ struct TopicWorkspaceView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
-        .padding(10)
     }
 
     private var stageRunSummary: String {
@@ -235,6 +253,7 @@ struct TopicWorkspaceView: View {
             case .log:       JobLogView(topic: topic)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     /// Text tabs with a teal underline on the active one (matches the mockup,
@@ -357,10 +376,13 @@ struct TopicWorkspaceView: View {
                 inspectorTab = .versions
                 showInspector = true
             }
+            .buttonStyle(.bordered)
             Button("Редактор") { showEditor = true }
                 .disabled(topic.currentVersion == nil)
+                .buttonStyle(.bordered)
         }
-        .padding()
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
     }
 
     private func versionLabel(_ version: ArticleVersion) -> String {

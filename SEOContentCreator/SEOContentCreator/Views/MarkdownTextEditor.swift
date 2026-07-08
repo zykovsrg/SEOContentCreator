@@ -33,6 +33,8 @@ struct MarkdownTextEditor: NSViewRepresentable {
     /// the Cmd+Shift+K keyboard shortcut — e.g. a toolbar button in
     /// `EditorSheet`. Any change in value triggers the wrap exactly once.
     var commercialBlockRequestID: Int = 0
+    var commandRequestID: Int = 0
+    var command: MarkdownEditorCommand = .none
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = MarkdownEditorTextView()
@@ -75,6 +77,10 @@ struct MarkdownTextEditor: NSViewRepresentable {
             context.coordinator.lastCommercialBlockRequestID = commercialBlockRequestID
             textView.wrapCommercialBlock()
         }
+        if commandRequestID != context.coordinator.lastCommandRequestID {
+            context.coordinator.lastCommandRequestID = commandRequestID
+            textView.apply(command)
+        }
     }
 
     private func applyHighlight(to textView: NSTextView) {
@@ -99,6 +105,7 @@ struct MarkdownTextEditor: NSViewRepresentable {
         var text: Binding<String>
         var onSelectionChange: (NSRange, CGRect?) -> Void
         var lastCommercialBlockRequestID = 0
+        var lastCommandRequestID = 0
 
         init(text: Binding<String>, onSelectionChange: @escaping (NSRange, CGRect?) -> Void) {
             self.text = text
@@ -129,6 +136,14 @@ struct MarkdownTextEditor: NSViewRepresentable {
             onSelectionChange(range, rectInScrollView)
         }
     }
+}
+
+enum MarkdownEditorCommand: Equatable {
+    case none
+    case bold
+    case italic
+    case heading(Int)
+    case bulletList
 }
 
 /// Handles the Markdown keyboard shortcuts directly at the AppKit level, so
@@ -167,6 +182,16 @@ final class MarkdownEditorTextView: NSTextView {
         wrapSelection(prefix: "[[БЛОК]]\n", suffix: "\n[[/БЛОК]]")
     }
 
+    func apply(_ command: MarkdownEditorCommand) {
+        switch command {
+        case .none: break
+        case .bold: wrapSelection(prefix: "**", suffix: "**")
+        case .italic: wrapSelection(prefix: "_", suffix: "_")
+        case .heading(let level): setHeading(level: level)
+        case .bulletList: toggleBulletList()
+        }
+    }
+
     /// Wraps the current selection in `prefix`/`suffix`. With no selection,
     /// inserts an empty pair and places the cursor between them.
     private func wrapSelection(prefix: String, suffix: String) {
@@ -200,5 +225,21 @@ final class MarkdownEditorTextView: NSTextView {
         replaceCharacters(in: lineRange, with: newLine)
         didChangeText()
         setSelectedRange(NSRange(location: lineRange.location + (newLine as NSString).length, length: 0))
+    }
+
+    private func toggleBulletList() {
+        let ns = string as NSString
+        let lineRange = ns.lineRange(for: selectedRange())
+        let text = ns.substring(with: lineRange)
+        let lines = text.components(separatedBy: "\n")
+        let transformed = lines.map { line -> String in
+            guard !line.isEmpty else { return line }
+            if line.hasPrefix("- ") { return String(line.dropFirst(2)) }
+            return "- " + line
+        }.joined(separator: "\n")
+        guard shouldChangeText(in: lineRange, replacementString: transformed) else { return }
+        replaceCharacters(in: lineRange, with: transformed)
+        didChangeText()
+        setSelectedRange(NSRange(location: lineRange.location + (transformed as NSString).length, length: 0))
     }
 }
