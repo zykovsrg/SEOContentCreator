@@ -12,9 +12,9 @@ enum StatusTone: Equatable {
 extension TopicStatus {
     var tone: StatusTone {
         switch self {
-        case .idea:      return .neutral
-        case .ready:     return .active
-        case .published: return .positive
+        case .brief:      return .neutral
+        case .inProgress: return .active
+        case .done, .published: return .positive
         }
     }
 }

@@ -31,6 +31,9 @@ struct TemplatesView: View {
     private var sortedTemplates: [StageTemplate] {
         templates.sorted { lhs, rhs in
             order(lhs.stageRaw) < order(rhs.stageRaw)
+        }.filter { template in
+            guard let stage = template.stage else { return true }
+            return stage.kind != .analysis
         }
     }
 
@@ -69,7 +72,10 @@ struct TemplatesView: View {
     }
 
     private func order(_ raw: String) -> Int {
-        PipelineStage.allCases.firstIndex { $0.rawValue == raw } ?? Int.max
+        if let workflowIndex = StagePipeline.workflow.firstIndex(where: { $0.rawValue == raw }) {
+            return workflowIndex
+        }
+        return PipelineStage.allCases.firstIndex { $0.rawValue == raw } ?? Int.max
     }
 
     private func roleOrder(_ key: String) -> Int {

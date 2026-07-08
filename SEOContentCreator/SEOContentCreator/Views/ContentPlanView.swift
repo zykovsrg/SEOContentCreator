@@ -8,7 +8,6 @@ struct ContentPlanView: View {
     @State private var filter = ContentPlanFilter()
     @State private var selection: Topic.ID?
     @State private var showingBrief = false
-    @State private var showingQuickCheck = false
     @State private var editingTopic: Topic?
     @State private var opened: Topic?
     @State private var topicPendingDeletion: Topic?
@@ -42,8 +41,8 @@ struct ContentPlanView: View {
                 .padding(.horizontal, 8).padding(.vertical, 3)
                 .background(Color.secondary.opacity(0.12), in: Capsule())
             Spacer()
-            TextField("Поиск по темам", text: $filter.searchText)
-                .textFieldStyle(.roundedBorder).frame(width: 200)
+            TextField("Поиск по темам...", text: $filter.searchText)
+                .textFieldStyle(.roundedBorder).frame(width: 230)
             Picker("Тип", selection: $filter.type) {
                 Text("Все типы").tag(ArticleType?.none)
                 ForEach(ArticleType.allCases) { Text($0.title).tag(ArticleType?.some($0)) }
@@ -63,9 +62,8 @@ struct ContentPlanView: View {
     private enum Col {
         static let id: CGFloat = 50
         static let type: CGFloat = 110
-        static let direction: CGFloat = 160
-        static let stages: CGFloat = 110
-        static let status: CGFloat = 150
+        static let stages: CGFloat = 150
+        static let status: CGFloat = 190
         static let tokens: CGFloat = 80
     }
 
@@ -74,7 +72,6 @@ struct ContentPlanView: View {
             Text("ID").frame(width: Col.id, alignment: .leading)
             Text("Тема").frame(maxWidth: .infinity, alignment: .leading)
             Text("Тип").frame(width: Col.type, alignment: .leading)
-            Text("Направление").frame(width: Col.direction, alignment: .leading)
             Text("Этапы").frame(width: Col.stages, alignment: .leading)
             Text("Статус").frame(width: Col.status, alignment: .leading)
             Text("Токены").frame(width: Col.tokens, alignment: .trailing)
@@ -94,11 +91,10 @@ struct ContentPlanView: View {
             .textFieldStyle(.plain)
             .frame(width: Col.id, alignment: .leading)
             Text(topic.title).lineLimit(1)
+                .fontWeight(.semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(topic.articleType.title).lineLimit(1)
                 .frame(width: Col.type, alignment: .leading)
-            Text(topic.direction?.title ?? "—").lineLimit(1)
-                .frame(width: Col.direction, alignment: .leading)
             StageProgressDots(states: stageStates(for: topic).map(\.state))
                 .frame(width: Col.stages, alignment: .leading)
             StatusPill(label: status.label, tone: status.tone)
@@ -145,16 +141,10 @@ struct ContentPlanView: View {
                 } label: { Label("Открыть", systemImage: "arrow.right.circle") }
                 .disabled(selection == nil)
             }
-            ToolbarItem {
-                Button { showingQuickCheck = true } label: {
-                    Label("Быстрая проверка", systemImage: "checkmark.circle")
-                }
-            }
         }
         .navigationTitle("Контент-план")
         .sheet(isPresented: $showingBrief) { BriefView(topic: nil) }
         .sheet(item: $editingTopic) { BriefView(topic: $0) }
-        .sheet(isPresented: $showingQuickCheck) { QuickCheckSheet() }
         .confirmationDialog("Удалить тему?", isPresented: Binding(
             get: { topicPendingDeletion != nil },
             set: { if !$0 { topicPendingDeletion = nil } }

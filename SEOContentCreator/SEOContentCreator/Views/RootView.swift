@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppKit
 
 struct RootView: View {
     @Environment(\.modelContext) private var context
@@ -7,22 +8,36 @@ struct RootView: View {
 
     private var groups: [(name: String, sections: [AppSection])] {
         [
-            ("Работа", [.contentPlan]),
+            ("Работа", [.contentPlan, .quickCheck]),
             ("Знания", [.templates, .knowledgeBase])
         ]
     }
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $selection) {
-                ForEach(groups, id: \.name) { group in
-                    Section(group.name) {
-                        ForEach(group.sections) { section in
-                            Label(section.title, systemImage: section.systemImage)
-                                .tag(section)
+            VStack(spacing: 0) {
+                List(selection: $selection) {
+                    ForEach(groups, id: \.name) { group in
+                        Section(group.name) {
+                            ForEach(group.sections) { section in
+                                Label(section.title, systemImage: section.systemImage)
+                                    .tag(section)
+                            }
                         }
                     }
                 }
+                .listStyle(.sidebar)
+
+                Divider().padding(.horizontal, 12)
+                Button {
+                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                } label: {
+                    Label("Настройки", systemImage: "gearshape")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
             .navigationTitle("SEO Content Creator")
@@ -30,6 +45,7 @@ struct RootView: View {
         } detail: {
             switch selection ?? .contentPlan {
             case .contentPlan:   ContentPlanView()
+            case .quickCheck:    QuickCheckView()
             case .templates:     TemplatesView()
             case .knowledgeBase: KnowledgeBaseView()
             }

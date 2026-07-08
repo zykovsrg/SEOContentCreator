@@ -31,7 +31,7 @@ struct StageRailView: View {
             }
             .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 4)
 
-            ForEach(PipelineStage.allCases) { stage in
+            ForEach(StagePipeline.workflow) { stage in
                 Button { selectedStage = stage } label: {
                     row(for: stage)
                 }

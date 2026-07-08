@@ -16,11 +16,11 @@ enum TemplateCategory: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .stagePrompts: return "Промты этапов"
-        case .roles:        return "ИИ-роли"
+        case .roles:        return "Роли"
         case .editorial:    return "Редполитика"
         case .images:       return "Изображения"
         case .skills:       return "Скиллы"
-        case .forbidden:    return "Запрещённые фразы"
+        case .forbidden:    return "Фразы"
         }
     }
 }

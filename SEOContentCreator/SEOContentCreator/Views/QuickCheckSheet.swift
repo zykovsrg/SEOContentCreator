@@ -2,6 +2,8 @@ import SwiftUI
 import SwiftData
 
 struct QuickCheckSheet: View {
+    let showsCloseButton: Bool
+
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @AppStorage("openAIModel") private var model = "gpt-4.1"
@@ -31,6 +33,10 @@ struct QuickCheckSheet: View {
         return RemarkApplier.apply(base: inputText, accepted: accepted)
     }
 
+    init(showsCloseButton: Bool = true) {
+        self.showsCloseButton = showsCloseButton
+    }
+
     private var highlightedParagraphIndex: Int? {
         guard let highlightedQuote, !highlightedQuote.isEmpty,
               let range = inputText.range(of: highlightedQuote)
@@ -43,7 +49,9 @@ struct QuickCheckSheet: View {
             HStack {
                 Text("Быстрая проверка").font(.title2).bold()
                 Spacer()
-                Button("Закрыть") { dismiss() }
+                if showsCloseButton {
+                    Button("Закрыть") { dismiss() }
+                }
             }
 
             Picker("Проверка", selection: $selectedStage) {

@@ -35,4 +35,14 @@ struct KnowledgeNodeHierarchyTests {
         #expect(parent.childrenOrNil?.count == 1)
         #expect(parent.children.first?.title == "Новый узел")
     }
+
+    @Test func pathReturnsRootToSelectedNode() {
+        let root = KnowledgeNode(title: "Детская лор-хирургия", type: .direction)
+        let child = root.addChild(title: "Синий лазер", type: .advantage)
+        let grandchild = child.addChild(title: "Длина волны 445 нм", type: .fact)
+
+        #expect(KnowledgeNodePath.path(for: grandchild).map(\.title) == [
+            "Детская лор-хирургия", "Синий лазер", "Длина волны 445 нм"
+        ])
+    }
 }

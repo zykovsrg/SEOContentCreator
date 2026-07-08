@@ -8,42 +8,28 @@ struct KnowledgeBaseView: View {
 
     @State private var selection: KnowledgeNode?
     @State private var search = ""
+    @State private var selectedTypes: Set<NodeType> = []
 
     private var roots: [KnowledgeNode] {
         allNodes.filter { $0.parent == nil }
     }
 
+    private var isFiltering: Bool {
+        !search.isEmpty || !selectedTypes.isEmpty
+    }
+
     private var searchResults: [KnowledgeNode] {
-        var f = KnowledgeTreeFilter()
-        f.searchText = search
-        return f.apply(to: allNodes)
+        var filter = KnowledgeTreeFilter()
+        filter.searchText = search
+        filter.types = selectedTypes
+        return filter.apply(to: allNodes)
     }
 
     var body: some View {
         HStack(spacing: 10) {
-            VStack(spacing: 0) {
-                TextField("Поиск по справочнику", text: $search)
-                    .textFieldStyle(.roundedBorder)
-                    .padding(8)
-                List(selection: $selection) {
-                    if search.isEmpty {
-                        ForEach(roots) { root in
-                            OutlineGroup(root, children: \.childrenOrNil) { node in
-                                Label(node.title, systemImage: icon(for: node.nodeType))
-                                    .tag(node)
-                            }
-                        }
-                    } else {
-                        ForEach(searchResults) { node in
-                            Label(node.title, systemImage: icon(for: node.nodeType))
-                                .tag(node)
-                        }
-                    }
-                }
-                .scrollContentBackground(.hidden)
-            }
-            .frame(width: 280)
-            .panelCard()
+            treePanel
+                .frame(width: 360)
+                .panelCard()
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .panelCard()
@@ -52,38 +38,120 @@ struct KnowledgeBaseView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.pageBackground)
         .navigationTitle("База знаний")
-        .toolbar {
-            ToolbarItem {
-                Menu {
-                    ForEach(NodeType.allCases) { type in
-                        Button(type.title) { addRoot(type: type) }
+    }
+
+    private var treePanel: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text("База знаний").font(.title2).bold()
+                Text("\(allNodes.count) узлов")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(Color.secondary.opacity(0.12), in: Capsule())
+                Spacer()
+                addNodeMenu
+            }
+            .padding()
+
+            TextField("Поиск по справочнику", text: $search)
+                .textFieldStyle(.roundedBorder)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+
+            typeFilters
+                .padding(.horizontal)
+                .padding(.bottom, 12)
+
+            Divider()
+            List(selection: $selection) {
+                if isFiltering {
+                    ForEach(searchResults) { node in
+                        treeRow(node)
+                            .tag(node)
                     }
-                } label: {
-                    Label("Узел", systemImage: "plus")
+                } else {
+                    ForEach(roots) { root in
+                        OutlineGroup(root, children: \.childrenOrNil) { node in
+                            treeRow(node)
+                                .tag(node)
+                        }
+                    }
                 }
             }
+            .scrollContentBackground(.hidden)
         }
+    }
+
+    private var typeFilters: some View {
+        FlowLayout(spacing: 6) {
+            Button {
+                selectedTypes.removeAll()
+            } label: {
+                Text("Все")
+                    .font(.callout).fontWeight(.semibold)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(selectedTypes.isEmpty ? Color.accentColor : Color.secondary.opacity(0.12), in: Capsule())
+                    .foregroundStyle(selectedTypes.isEmpty ? .white : .primary)
+            }
+            .buttonStyle(.plain)
+
+            ForEach([NodeType.advantage, .fact, .doctor, .source], id: \.self) { type in
+                Button {
+                    if selectedTypes.contains(type) {
+                        selectedTypes.remove(type)
+                    } else {
+                        selectedTypes.insert(type)
+                    }
+                } label: {
+                    Text(type.title)
+                        .font(.callout).fontWeight(.semibold)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(selectedTypes.contains(type) ? nodeColor(type) : Color.secondary.opacity(0.12), in: Capsule())
+                        .foregroundStyle(selectedTypes.contains(type) ? .white : .secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var addNodeMenu: some View {
+        Menu {
+            ForEach(NodeType.allCases) { type in
+                Button(type.title) { addRoot(type: type) }
+            }
+        } label: {
+            Label("Узел", systemImage: "plus")
+        }
+        .menuStyle(.button)
+        .buttonStyle(.borderedProminent)
+        .fixedSize()
+    }
+
+    private func treeRow(_ node: KnowledgeNode) -> some View {
+        HStack(spacing: 8) {
+            NodeTypeBadge(type: node.nodeType)
+            Text(node.title)
+                .lineLimit(1)
+            Spacer()
+            if node.parent == nil, !node.children.isEmpty {
+                Text("\(node.children.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 3)
     }
 
     @ViewBuilder
     private var detail: some View {
         if let node = selection {
-            NodeDetailView(node: node, topics: topics)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            NodeDetailView(node: node, topics: topics) {
+                selection = nil
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ContentUnavailableView("Выберите узел", systemImage: "books.vertical")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    private func icon(for type: NodeType) -> String {
-        switch type {
-        case .direction: return "stethoscope"
-        case .doctor:    return "person"
-        case .advantage: return "star"
-        case .fact:      return "checkmark.seal"
-        case .source:    return "link"
-        case .folder:    return "folder"
         }
     }
 
@@ -109,42 +177,243 @@ private struct NodeDetailView: View {
     @Environment(\.modelContext) private var context
     @Bindable var node: KnowledgeNode
     let topics: [Topic]
+    var onDelete: () -> Void
+
     @State private var confirmDelete = false
 
-    private var usageCount: Int {
-        KnowledgeNodeUsage.count(for: node, in: topics)
+    private var usageTopics: [Topic] {
+        topics.filter { topic in
+            topic.direction === node
+                || topic.doctor === node
+                || topic.attachedNodes.contains(where: { $0 === node })
+        }
+    }
+
+    private var pathText: String {
+        KnowledgeNodePath.path(for: node).map(\.title).joined(separator: " › ")
     }
 
     var body: some View {
-        Form {
-            TextField("Заголовок", text: $node.title)
-            LabeledContent("Тип") {
-                Menu(node.nodeType.title) {
-                    ForEach(NodeType.allCases) { type in
-                        Button(type.title) { node.nodeType = type }
-                    }
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    contentSection
+                    usedInSection
+                    childrenSection
                 }
+                .padding(22)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            TextField("Содержимое", text: $node.content, axis: .vertical).lineLimit(3...8)
-            Section("Действия") {
-                Button("Добавить подузел") { addChild() }
-                Button("Удалить", role: .destructive) { confirmDelete = true }
-            }
+            Divider()
+            bottomBar
         }
-        .formStyle(.grouped)
-        .navigationTitle(node.title)
         .confirmationDialog("Удалить узел базы знаний?", isPresented: $confirmDelete) {
-            Button("Удалить", role: .destructive) { context.delete(node) }
+            Button("Удалить", role: .destructive) {
+                onDelete()
+                context.delete(node)
+            }
             Button("Отмена", role: .cancel) {}
         } message: {
-            Text(usageCount > 0
-                 ? "Этот узел используется в \(usageCount) темах. После удаления брифы и промты могут потерять часть контекста."
-                 : "Узел будет удалён из базы знаний.")
+            Text(usageTopics.isEmpty
+                 ? "Узел будет удалён из базы знаний."
+                 : "Этот узел используется в \(usageTopics.count) темах. После удаления брифы и промты могут потерять часть контекста.")
         }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(pathText)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            HStack(alignment: .top, spacing: 12) {
+                TextField("Название узла", text: $node.title)
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .textFieldStyle(.plain)
+                Spacer()
+                if !usageTopics.isEmpty {
+                    Label("Используется в \(usageTopics.count) темах", systemImage: "smallcircle.filled.circle")
+                        .font(.callout).fontWeight(.semibold)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        .foregroundStyle(Color.accentColor)
+                }
+                typeMenu
+            }
+        }
+    }
+
+    private var typeMenu: some View {
+        Menu {
+            ForEach(NodeType.allCases) { type in
+                Button(type.title) { node.nodeType = type }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                NodeTypeBadge(type: node.nodeType)
+                Text(node.nodeType.title)
+                    .font(.callout).fontWeight(.semibold)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(nodeColor(node.nodeType).opacity(0.14), in: Capsule())
+            .foregroundStyle(nodeColor(node.nodeType))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var contentSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Содержимое")
+            TextField("Что важно знать об этом узле", text: $node.content, axis: .vertical)
+                .lineLimit(4...10)
+                .textFieldStyle(.plain)
+                .padding(14)
+                .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    private var usedInSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Где используется")
+            if usageTopics.isEmpty {
+                Text("Пока не привязан к темам")
+                    .foregroundStyle(.secondary)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08)))
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(usageTopics.enumerated()), id: \.element.id) { index, topic in
+                        HStack {
+                            Text(topic.title).lineLimit(1)
+                            Spacer()
+                            Text("\(topic.articleType.title) · \(TopicStatus.compute(for: topic).label)")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        if index < usageTopics.count - 1 { Divider() }
+                    }
+                }
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08)))
+            }
+        }
+    }
+
+    private var childrenSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Подузлы")
+            VStack(spacing: 0) {
+                ForEach(Array(node.children.enumerated()), id: \.element.id) { index, child in
+                    HStack {
+                        NodeTypeBadge(type: child.nodeType)
+                        Text(child.title).lineLimit(1)
+                        Spacer()
+                        Text(child.nodeType.title)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    if index < node.children.count - 1 { Divider() }
+                }
+                Button {
+                    addChild()
+                } label: {
+                    Label("Добавить подузел", systemImage: "plus")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                .padding(.horizontal, 14).padding(.vertical, 10)
+            }
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08)))
+        }
+    }
+
+    private var bottomBar: some View {
+        HStack {
+            Button("Удалить узел", role: .destructive) { confirmDelete = true }
+                .buttonStyle(.bordered)
+            Spacer()
+            Button("Сохранить") { }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(16)
     }
 
     private func addChild() {
         let child = node.addChild(title: "Новый узел", type: .fact)
         context.insert(child)
+    }
+}
+
+private struct NodeTypeBadge: View {
+    let type: NodeType
+
+    var body: some View {
+        Text(shortTitle)
+            .font(.caption2)
+            .fontWeight(.bold)
+            .frame(width: 20, height: 20)
+            .background(nodeColor(type), in: RoundedRectangle(cornerRadius: 5))
+            .foregroundStyle(.white)
+    }
+
+    private var shortTitle: String {
+        switch type {
+        case .direction: return "Н"
+        case .doctor:    return "В"
+        case .advantage: return "П"
+        case .fact:      return "Ф"
+        case .source:    return "И"
+        case .folder:    return "Р"
+        }
+    }
+}
+
+private struct SectionTitle: View {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(.caption)
+            .fontWeight(.bold)
+            .tracking(1.4)
+            .foregroundStyle(.secondary)
+    }
+}
+
+private func nodeColor(_ type: NodeType) -> Color {
+    switch type {
+    case .direction: return Color.accentColor
+    case .doctor:    return .purple
+    case .advantage: return .orange
+    case .fact:      return .green
+    case .source:    return .secondary
+    case .folder:    return .blue
+    }
+}
+
+private struct FlowLayout<Content: View>: View {
+    let spacing: CGFloat
+    let content: Content
+
+    init(spacing: CGFloat, @ViewBuilder content: () -> Content) {
+        self.spacing = spacing
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(spacing: spacing) {
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
