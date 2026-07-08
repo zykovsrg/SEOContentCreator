@@ -20,7 +20,7 @@ struct KnowledgeBaseView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 10) {
             VStack(spacing: 0) {
                 TextField("Поиск по справочнику", text: $search)
                     .textFieldStyle(.roundedBorder)
@@ -40,12 +40,17 @@ struct KnowledgeBaseView: View {
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
             .frame(width: 280)
-            .background(Color.panelFill)
-            Divider()
+            .panelCard()
             detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .panelCard()
         }
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.pageBackground)
         .navigationTitle("База знаний")
         .toolbar {
             ToolbarItem {

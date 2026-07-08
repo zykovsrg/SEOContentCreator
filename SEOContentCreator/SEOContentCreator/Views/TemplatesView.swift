@@ -92,6 +92,11 @@ struct TemplatesView: View {
                 Divider()
                 templateList
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .panelCard()
+            .padding(10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.pageBackground)
             .navigationTitle("Шаблоны")
             .navigationDestination(for: TemplateSelection.self) { sel in
                 editorView(for: sel)
@@ -162,6 +167,7 @@ struct TemplatesView: View {
                 searchRows
             }
         }
+        .scrollContentBackground(.hidden)
     }
 
     private func categoryChip(_ cat: TemplateCategory) -> some View {

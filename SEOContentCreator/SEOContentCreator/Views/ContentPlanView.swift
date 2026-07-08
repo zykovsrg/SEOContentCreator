@@ -57,6 +57,7 @@ struct ContentPlanView: View {
             }
             TableColumn("Токены") { Text($0.totalTokenCost > 0 ? "\($0.totalTokenCost)" : "—") }
         }
+        .scrollContentBackground(.hidden)
         .contextMenu(forSelectionType: Topic.ID.self) { ids in
             if let id = ids.first, let t = topics.first(where: { $0.id == id }) {
                 Button("Открыть") { opened = t }
@@ -66,6 +67,10 @@ struct ContentPlanView: View {
         } primaryAction: { ids in
             if let id = ids.first, let t = topics.first(where: { $0.id == id }) { opened = t }
         }
+        .panelCard()
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.pageBackground)
         .searchable(text: $filter.searchText, prompt: "Поиск по темам")
         .toolbar {
             ToolbarItem {

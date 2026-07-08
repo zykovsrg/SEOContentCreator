@@ -42,18 +42,23 @@ struct TopicWorkspaceView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 10) {
             StageRailView(selectedStage: $selectedStage, topic: topic)
-                .background(Color.panelFill)
-            Divider()
+                .panelCard()
             workColumn
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .panelCard()
+            if showInspector {
+                inspectorPanel
+                    .frame(width: 340)
+                    .panelCard()
+            }
         }
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.pageBackground)
         .navigationTitle(topic.title)
         .toolbar { toolbarContent }
-        .inspector(isPresented: $showInspector) {
-            inspectorPanel
-                .inspectorColumnWidth(min: 300, ideal: 360, max: 460)
-        }
         .sheet(isPresented: $showProductBlocks) {
             ProductBlocksSheet { runStage(.productBlocks, blocks: $0) }
         }

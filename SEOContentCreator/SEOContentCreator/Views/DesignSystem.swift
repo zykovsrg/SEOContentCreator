@@ -16,6 +16,34 @@ extension Color {
 
     /// Subtle panel fill for rails and inspector chrome.
     static let panelFill = Color(nsColor: .underPageBackgroundColor)
+
+    /// Darker "page" behind the floating panels (mockup look).
+    static let pageBackground = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.075, green: 0.090, blue: 0.098, alpha: 1)   // #131717
+            : NSColor(srgbRed: 0.914, green: 0.929, blue: 0.937, alpha: 1)   // #E9EDEF
+    })
+
+    /// The floating panel surface (slightly lighter than the page).
+    static let panelSurface = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.122, green: 0.149, blue: 0.157, alpha: 1)   // #1F2628
+            : NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
+    })
+}
+
+extension View {
+    /// Wraps content as a floating rounded panel on the page background,
+    /// matching the mockup's inset-card layout.
+    func panelCard(cornerRadius: CGFloat = 12) -> some View {
+        self
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .background(Color.panelSurface, in: RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+            )
+    }
 }
 
 extension StatusTone {
