@@ -91,7 +91,10 @@ struct TopicWorkspaceView: View {
             Divider()
             errorBanner
             warningBanner
-            workContent
+            contentArea
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Divider()
+            bottomBar
         }
     }
 
@@ -125,41 +128,11 @@ struct TopicWorkspaceView: View {
         }
     }
 
+    /// The document/comparison/review body — no action bars (those live in
+    /// `bottomBar` so the layout matches the mockup's fixed bottom action row).
     @ViewBuilder
-    private var workContent: some View {
+    private var contentArea: some View {
         if isReviewing {
-            reviewColumn
-        } else {
-            if isComparing {
-                SideBySideView(
-                    leftText: comparisonText ?? leftText,
-                    rightText: rightText,
-                    isStreaming: executor?.isRunning ?? false
-                )
-            } else {
-                SingleVersionView(
-                    title: "Текущая версия",
-                    text: comparisonText ?? leftText,
-                    banner: singleColumnBanner
-                )
-            }
-            if pendingVersion != nil {
-                Divider()
-                AcceptRejectBar(
-                    canAct: !(executor?.isRunning ?? false),
-                    onAcceptAll: acceptAll,
-                    onAcceptPartial: { showPartialAccept = true },
-                    onReject: reject
-                )
-            }
-        }
-    }
-
-    /// Reviewing a checking stage: the working copy with accepted remarks
-    /// applied, plus the finish/discard bar. Remarks themselves are in the
-    /// inspector's "Замечания" tab.
-    private var reviewColumn: some View {
-        VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
                     HighlightedText(text: workingCopy, highlight: highlightedQuote)
@@ -170,14 +143,66 @@ struct TopicWorkspaceView: View {
                     withAnimation { proxy.scrollTo(index, anchor: .center) }
                 }
             }
-            Divider()
+        } else if isComparing {
+            SideBySideView(
+                leftText: comparisonText ?? leftText,
+                rightText: rightText,
+                isStreaming: executor?.isRunning ?? false
+            )
+        } else {
+            SingleVersionView(
+                title: "Текущая версия",
+                text: comparisonText ?? leftText,
+                banner: singleColumnBanner,
+                showsTitle: false
+            )
+        }
+    }
+
+    /// Fixed bottom action row. Its content depends on state: reviewing remarks,
+    /// a freshly generated version awaiting accept, or the normal run bar.
+    @ViewBuilder
+    private var bottomBar: some View {
+        if isReviewing {
             HStack {
                 Spacer()
                 Button("Отклонить всё", role: .destructive) { endReview() }
                 Button("Готово") { finishReview() }.keyboardShortcut(.defaultAction)
             }
             .padding(8)
+        } else if pendingVersion != nil {
+            AcceptRejectBar(
+                canAct: !(executor?.isRunning ?? false),
+                onAcceptAll: acceptAll,
+                onAcceptPartial: { showPartialAccept = true },
+                onReject: reject
+            )
+        } else {
+            stageActionBar
         }
+    }
+
+    /// Normal run bar: what will run (stage + model) on the left, the primary
+    /// "Запустить этап" (or "Стоп" while running) plus "Опубликовать" on the right.
+    private var stageActionBar: some View {
+        HStack(spacing: 10) {
+            Text("Этап «\(selectedStage.title)» · модель \(model)")
+                .font(.callout).foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer()
+            Button("Опубликовать") { showPublish = true }
+            if executor?.isRunning ?? false {
+                Button(role: .destructive, action: { executor?.cancel() }) {
+                    Label("Стоп", systemImage: "stop.fill")
+                }
+            } else {
+                Button(action: runSelectedStage) {
+                    Label("Запустить этап", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(10)
     }
 
     @ViewBuilder
@@ -282,26 +307,28 @@ struct TopicWorkspaceView: View {
         return TextParagraphs.index(of: range.lowerBound, in: TextParagraphs.ranges(in: workingCopy))
     }
 
+    /// Top bar over the document: "Текущая версия" + version pill on the left,
+    /// compare / editor actions on the right (matches the mockup).
     private var header: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(topic.title).font(.headline)
-                Text("\(topic.articleType.title) · \(topic.direction?.title ?? "—")")
-                    .font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            Text("Текущая версия").font(.headline)
+            if let version = topic.currentVersion {
+                MetaChip(text: versionLabel(version))
             }
             Spacer()
-            if executor?.isRunning ?? false {
-                Button(role: .destructive, action: { executor?.cancel() }) {
-                    Label("Стоп", systemImage: "stop.fill")
-                }
-            } else {
-                Button(action: runSelectedStage) {
-                    Label("Запустить: \(selectedStage.title)", systemImage: "play.fill")
-                }
-                .buttonStyle(.borderedProminent)
+            Button("Сравнить версии") {
+                inspectorTab = .versions
+                showInspector = true
             }
+            Button("Редактор") { showEditor = true }
+                .disabled(topic.currentVersion == nil)
         }
         .padding()
+    }
+
+    private func versionLabel(_ version: ArticleVersion) -> String {
+        let stage = PipelineStage(rawValue: version.stageRaw)?.title ?? version.stageRaw
+        return "этап: \(stage)"
     }
 
     @ToolbarContentBuilder

@@ -10,8 +10,8 @@ extension Color {
     static let brandAccent = Color(nsColor: NSColor(name: nil) { appearance in
         let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         return isDark
-            ? NSColor(srgbRed: 0.298, green: 0.769, blue: 0.808, alpha: 1)  // #4CC4CE
-            : NSColor(srgbRed: 0.055, green: 0.486, blue: 0.525, alpha: 1)  // #0E7C86
+            ? NSColor(srgbRed: 0.176, green: 0.831, blue: 0.749, alpha: 1)  // #2DD4BF
+            : NSColor(srgbRed: 0.051, green: 0.580, blue: 0.533, alpha: 1)  // #0D9488
     })
 
     /// Subtle panel fill for rails and inspector chrome.

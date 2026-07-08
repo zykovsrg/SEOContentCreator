@@ -111,13 +111,17 @@ struct SingleVersionView: View {
     var title: String
     var text: String?
     var banner: Banner?
+    /// Hidden when the workspace draws its own "Текущая версия" header bar.
+    var showsTitle: Bool = true
 
     private let readingWidth: CGFloat = 760
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ColumnTitle(title)
-            Divider()
+            if showsTitle {
+                ColumnTitle(title)
+                Divider()
+            }
             if let banner {
                 bannerView(banner)
                 Divider()
