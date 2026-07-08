@@ -25,8 +25,8 @@ final class GoogleAuthService {
         }
     }
 
-    static let scopes = ["https://www.googleapis.com/auth/documents",
-                         "https://www.googleapis.com/auth/drive.file"]
+    nonisolated static let scopes = ["https://www.googleapis.com/auth/documents",
+                                     "https://www.googleapis.com/auth/drive.file"]
 
     var lastErrorMessage: String?
     var isSignedIn: Bool { GoogleCredentialStore.isSignedIn }
@@ -145,7 +145,7 @@ final class GoogleAuthService {
 }
 
 extension Data {
-    func base64URLEncodedString() -> String {
+    nonisolated func base64URLEncodedString() -> String {
         base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")

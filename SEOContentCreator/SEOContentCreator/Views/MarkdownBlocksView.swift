@@ -68,25 +68,29 @@ struct MarkdownBlocksView: View {
         case .numbered: prefix = "\(number ?? 1).  "
         case nil:       prefix = ""
         }
-        return Text(prefix) + styledText(block)
+        return Text("\(prefix)\(styledText(block))")
     }
 
+    /// Builds bold/non-bold runs as a single `AttributedString` instead of
+    /// concatenating `Text` values with `+` (deprecated in macOS 26).
     private func styledText(_ block: DocBlock) -> Text {
         guard !block.boldRanges.isEmpty else { return Text(block.text) }
         let chars = Array(block.text)
-        var result = Text("")
+        var attributed = AttributedString()
         var cursor = 0
         for range in block.boldRanges.sorted(by: { $0.lowerBound < $1.lowerBound }) {
             if range.lowerBound > cursor {
-                result = result + Text(String(chars[cursor..<range.lowerBound]))
+                attributed += AttributedString(String(chars[cursor..<range.lowerBound]))
             }
-            result = result + Text(String(chars[range.lowerBound..<range.upperBound])).bold()
+            var bold = AttributedString(String(chars[range.lowerBound..<range.upperBound]))
+            bold.inlinePresentationIntent = .stronglyEmphasized
+            attributed += bold
             cursor = range.upperBound
         }
         if cursor < chars.count {
-            result = result + Text(String(chars[cursor...]))
+            attributed += AttributedString(String(chars[cursor...]))
         }
-        return result
+        return Text(attributed)
     }
 
     private func font(for style: DocParagraphStyle) -> Font {
