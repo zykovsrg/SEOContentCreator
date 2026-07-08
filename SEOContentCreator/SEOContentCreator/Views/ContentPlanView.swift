@@ -34,8 +34,34 @@ struct ContentPlanView: View {
         }
     }
 
+    private var planHeader: some View {
+        HStack(spacing: 12) {
+            Text("Контент-план").font(.title2).bold()
+            Text("\(visibleTopics.count) тем")
+                .font(.callout).foregroundStyle(.secondary)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Color.secondary.opacity(0.12), in: Capsule())
+            Spacer()
+            TextField("Поиск по темам", text: $filter.searchText)
+                .textFieldStyle(.roundedBorder).frame(width: 200)
+            Picker("Тип", selection: $filter.type) {
+                Text("Все типы").tag(ArticleType?.none)
+                ForEach(ArticleType.allCases) { Text($0.title).tag(ArticleType?.some($0)) }
+            }
+            .labelsHidden().fixedSize()
+            Button { showingBrief = true } label: {
+                Label("Новая тема", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
+    }
+
     private var planTable: some View {
-        Table(visibleTopics, selection: $selection) {
+        VStack(spacing: 0) {
+            planHeader
+            Divider()
+            Table(visibleTopics, selection: $selection) {
             TableColumn("ID") { topic in
                 TextField("", text: Binding(
                     get: { topic.externalID },
@@ -67,11 +93,11 @@ struct ContentPlanView: View {
         } primaryAction: { ids in
             if let id = ids.first, let t = topics.first(where: { $0.id == id }) { opened = t }
         }
+        }
         .panelCard()
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.pageBackground)
-        .searchable(text: $filter.searchText, prompt: "Поиск по темам")
         .toolbar {
             ToolbarItem {
                 Button {
@@ -80,18 +106,9 @@ struct ContentPlanView: View {
                 .disabled(selection == nil)
             }
             ToolbarItem {
-                Picker("Тип", selection: $filter.type) {
-                    Text("Все типы").tag(ArticleType?.none)
-                    ForEach(ArticleType.allCases) { Text($0.title).tag(ArticleType?.some($0)) }
-                }
-            }
-            ToolbarItem {
                 Button { showingQuickCheck = true } label: {
                     Label("Быстрая проверка", systemImage: "checkmark.circle")
                 }
-            }
-            ToolbarItem {
-                Button { showingBrief = true } label: { Label("Новая тема", systemImage: "plus") }
             }
         }
         .navigationTitle("Контент-план")
