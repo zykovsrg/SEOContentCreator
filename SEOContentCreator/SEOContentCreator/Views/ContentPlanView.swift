@@ -57,42 +57,82 @@ struct ContentPlanView: View {
         .padding()
     }
 
+    /// Column widths shared between the header row and each data row, so a
+    /// custom `List` (no filler "zebra" rows past the data, unlike `Table`)
+    /// still reads as an aligned table like the mockup.
+    private enum Col {
+        static let id: CGFloat = 50
+        static let type: CGFloat = 110
+        static let direction: CGFloat = 160
+        static let stages: CGFloat = 110
+        static let status: CGFloat = 150
+        static let tokens: CGFloat = 80
+    }
+
+    private var planTableHeader: some View {
+        HStack(spacing: 12) {
+            Text("ID").frame(width: Col.id, alignment: .leading)
+            Text("Тема").frame(maxWidth: .infinity, alignment: .leading)
+            Text("Тип").frame(width: Col.type, alignment: .leading)
+            Text("Направление").frame(width: Col.direction, alignment: .leading)
+            Text("Этапы").frame(width: Col.stages, alignment: .leading)
+            Text("Статус").frame(width: Col.status, alignment: .leading)
+            Text("Токены").frame(width: Col.tokens, alignment: .trailing)
+        }
+        .font(.caption).foregroundStyle(.secondary)
+        .padding(.horizontal, 16).padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private func planRow(_ topic: Topic) -> some View {
+        let status = TopicStatus.compute(for: topic)
+        HStack(spacing: 12) {
+            TextField("", text: Binding(
+                get: { topic.externalID },
+                set: { topic.externalID = $0 }
+            ))
+            .textFieldStyle(.plain)
+            .frame(width: Col.id, alignment: .leading)
+            Text(topic.title).lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(topic.articleType.title).lineLimit(1)
+                .frame(width: Col.type, alignment: .leading)
+            Text(topic.direction?.title ?? "—").lineLimit(1)
+                .frame(width: Col.direction, alignment: .leading)
+            StageProgressDots(states: stageStates(for: topic).map(\.state))
+                .frame(width: Col.stages, alignment: .leading)
+            StatusPill(label: status.label, tone: status.tone)
+                .frame(width: Col.status, alignment: .leading)
+            Text(topic.totalTokenCost > 0 ? "\(topic.totalTokenCost)" : "—")
+                .frame(width: Col.tokens, alignment: .trailing)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .tag(topic.id)
+    }
+
     private var planTable: some View {
         VStack(spacing: 0) {
             planHeader
             Divider()
-            Table(visibleTopics, selection: $selection) {
-            TableColumn("ID") { topic in
-                TextField("", text: Binding(
-                    get: { topic.externalID },
-                    set: { topic.externalID = $0 }
-                ))
-                .textFieldStyle(.plain)
+            planTableHeader
+            Divider()
+            List(selection: $selection) {
+                ForEach(visibleTopics) { topic in
+                    planRow(topic)
+                }
             }
-            .width(60)
-            TableColumn("Тема") { Text($0.title) }
-            TableColumn("Тип") { Text($0.articleType.title) }
-            TableColumn("Направление") { Text($0.direction?.title ?? "—") }
-            TableColumn("Этапы") { topic in
-                StageProgressDots(states: stageStates(for: topic).map(\.state))
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .contextMenu(forSelectionType: Topic.ID.self) { ids in
+                if let id = ids.first, let t = topics.first(where: { $0.id == id }) {
+                    Button("Открыть") { opened = t }
+                    Button("Редактировать") { editingTopic = t }
+                    Button("Удалить", role: .destructive) { topicPendingDeletion = t }
+                }
+            } primaryAction: { ids in
+                if let id = ids.first, let t = topics.first(where: { $0.id == id }) { opened = t }
             }
-            .width(110)
-            TableColumn("Статус") { topic in
-                let status = TopicStatus.compute(for: topic)
-                StatusPill(label: status.label, tone: status.tone)
-            }
-            TableColumn("Токены") { Text($0.totalTokenCost > 0 ? "\($0.totalTokenCost)" : "—") }
-        }
-        .scrollContentBackground(.hidden)
-        .contextMenu(forSelectionType: Topic.ID.self) { ids in
-            if let id = ids.first, let t = topics.first(where: { $0.id == id }) {
-                Button("Открыть") { opened = t }
-                Button("Редактировать") { editingTopic = t }
-                Button("Удалить", role: .destructive) { topicPendingDeletion = t }
-            }
-        } primaryAction: { ids in
-            if let id = ids.first, let t = topics.first(where: { $0.id == id }) { opened = t }
-        }
         }
         .panelCard()
         .padding(10)

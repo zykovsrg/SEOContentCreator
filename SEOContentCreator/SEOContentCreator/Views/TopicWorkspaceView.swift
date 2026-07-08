@@ -195,7 +195,9 @@ struct TopicWorkspaceView: View {
             Text(stageRunSummary)
                 .font(.callout).foregroundStyle(.secondary)
                 .lineLimit(1)
-            Spacer()
+                .minimumScaleFactor(0.75)
+                .layoutPriority(1)
+            Spacer(minLength: 8)
             Button("Опубликовать") { showPublish = true }
             if executor?.isRunning ?? false {
                 Button(role: .destructive, action: { executor?.cancel() }) {
@@ -214,9 +216,9 @@ struct TopicWorkspaceView: View {
     private var stageRunSummary: String {
         let template = stageTemplates.first { $0.stageRaw == selectedStage.rawValue }
         let modelName = template?.modelName ?? model
-        var summary = "Этап «\(selectedStage.title)» · модель \(modelName)"
+        var summary = "Этап «\(selectedStage.title)» · \(modelName)"
         if let tokens = template?.maxTokens {
-            summary += " · ~\(tokens) токенов"
+            summary += " · ~\(TemplateChipText.tokens(tokens))"
         }
         return summary
     }
