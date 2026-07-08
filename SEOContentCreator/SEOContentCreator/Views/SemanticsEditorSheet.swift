@@ -2,7 +2,6 @@ import SwiftData
 import SwiftUI
 
 struct SemanticsEditorSheet: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Bindable var topic: Topic
     @Query(filter: #Predicate<PublishedSitePage> { $0.siteHost == "hadassah.moscow" })
@@ -53,36 +52,45 @@ struct SemanticsEditorSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Семантика").font(.headline)
-                Spacer()
+
                 Picker("Фильтр", selection: $filter) {
                     ForEach(SemanticFilter.allCases) { item in
                         Text(item.label).tag(item)
                     }
                 }
-                .pickerStyle(.menu)
-                Button("Обновить страницы сайта") { refreshSitePages() }
-                    .disabled(isRefreshingPages)
-                Button("Сбор агентом") { showAgent = true }
-            }
+                .pickerStyle(.menu).labelsHidden().fixedSize()
 
-            HStack {
-                TextField("Добавить запрос вручную", text: $newKeywordText)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { addManualKeyword() }
-                Button("Добавить") { addManualKeyword() }
-                    .disabled(newKeywordText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                HStack(spacing: 8) {
+                    Button("Обновить страницы сайта") { refreshSitePages() }
+                        .disabled(isRefreshingPages)
+                        .controlSize(.small)
+                    Button("Сбор агентом") { showAgent = true }
+                        .controlSize(.small)
+                }
+
+                HStack {
+                    TextField("Добавить запрос вручную", text: $newKeywordText)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { addManualKeyword() }
+                    Button("Добавить") { addManualKeyword() }
+                        .disabled(newKeywordText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .controlSize(.small)
+                }
                 Button("Вставить список...") {
                     bulkKeywordText = ""
                     showBulkAdd = true
                 }
-            }
+                .controlSize(.small)
 
-            if let message {
-                Text(message).font(.callout).foregroundStyle(.secondary)
+                if let message {
+                    Text(message).font(.callout).foregroundStyle(.secondary)
+                }
             }
+            .padding(12)
+            Divider()
 
             Table(visibleKeywords, selection: $selectedIDs) {
                 TableColumn("Запрос") { Text($0.text) }
@@ -96,20 +104,22 @@ struct SemanticsEditorSheet: View {
                         .lineLimit(1)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            HStack {
+            Divider()
+            VStack(alignment: .leading, spacing: 6) {
                 Button("Принять выбранные") { setDecision(.accepted) }
                     .disabled(selectedIDs.isEmpty)
+                    .controlSize(.small)
                 Button("Отклонить выбранные") { setDecision(.rejected) }
                     .disabled(selectedIDs.isEmpty)
+                    .controlSize(.small)
                 Button("Сделать обязательными") { setDecision(.required) }
                     .disabled(selectedIDs.isEmpty)
-                Spacer()
-                Button("Закрыть") { dismiss() }
+                    .controlSize(.small)
             }
+            .padding(12)
         }
-        .padding()
-        .frame(width: 980, height: 560)
         .onAppear {
             SemanticKeywordBackfill.backfill(topic)
         }

@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct VersionLaneView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Bindable var topic: Topic
     var onCompare: (ArticleVersion) -> Void
@@ -23,42 +22,48 @@ struct VersionLaneView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
                 Picker("Вид", selection: $groupByStage) {
                     Text("По времени").tag(false)
                     Text("По этапам").tag(true)
-                }.pickerStyle(.segmented)
+                }
+                .pickerStyle(.segmented)
                 .disabled(selecting)
 
-                if selecting {
-                    Button("Отмена") { selecting = false; selection = [] }
-                } else {
-                    Button("Сравнить") { selecting = true }
-                }
-            }
-
-            List {
-                if groupByStage {
-                    ForEach(stageGroups, id: \.0) { stage, items in
-                        Section(stage) { ForEach(items) { row($0) } }
+                HStack {
+                    if selecting {
+                        Button("Сравнить выбранные (\(selection.count))") { startCompare() }
+                            .disabled(selection.count != 2)
+                            .controlSize(.small)
+                        Spacer()
+                        Button("Отмена") { selecting = false; selection = [] }
+                            .controlSize(.small)
+                    } else {
+                        Spacer()
+                        Button("Сравнить версии") { selecting = true }
+                            .controlSize(.small)
                     }
-                } else {
-                    ForEach(versions) { row($0) }
                 }
             }
+            .padding(12)
+            Divider()
 
-            HStack {
-                if selecting {
-                    Button("Сравнить выбранные (\(selection.count))") { startCompare() }
-                        .disabled(selection.count != 2)
+            if versions.isEmpty {
+                ContentUnavailableView("Версий пока нет", systemImage: "clock.arrow.circlepath")
+            } else {
+                List {
+                    if groupByStage {
+                        ForEach(stageGroups, id: \.0) { stage, items in
+                            Section(stage) { ForEach(items) { row($0) } }
+                        }
+                    } else {
+                        ForEach(versions) { row($0) }
+                    }
                 }
-                Spacer()
-                Button("Закрыть") { dismiss() }
+                .scrollContentBackground(.hidden)
             }
         }
-        .padding()
-        .frame(width: 520, height: 520)
         .sheet(item: $comparePair) { pair in
             VersionCompareView(versionA: pair.a, versionB: pair.b)
         }
@@ -80,27 +85,36 @@ struct VersionLaneView: View {
     }
 
     private func row(_ v: ArticleVersion) -> some View {
-        HStack {
-            if selecting {
-                // Tap is handled by the row-level gesture below — no separate
-                // gesture here, otherwise a tap on the box toggles twice.
-                let isSelected = selection.contains(v.uuid)
-                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-            }
-            VStack(alignment: .leading) {
-                Text(v.stageTitle).font(.subheadline)
-                Text("\(v.source.title) · \(v.createdAt.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            if topic.currentVersionID == v.uuid {
-                Label("Текущая", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green).labelStyle(.iconOnly)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                if selecting {
+                    // Tap is handled by the row-level gesture below — no separate
+                    // gesture here, otherwise a tap on the box toggles twice.
+                    let isSelected = selection.contains(v.uuid)
+                    Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(v.stageTitle).font(.subheadline)
+                    Text("\(v.source.title) · \(v.createdAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                if topic.currentVersionID == v.uuid {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .help("Текущая версия")
+                }
             }
             if !selecting {
-                Button("Сравнить") { onCompare(v); dismiss() }
-                Button("Сделать текущей") { makeCurrent(v) }
+                HStack(spacing: 8) {
+                    Button("Сравнить") { onCompare(v) }
+                        .controlSize(.small)
+                    Button("Сделать текущей") { makeCurrent(v) }
+                        .controlSize(.small)
+                        .disabled(topic.currentVersionID == v.uuid)
+                    Spacer()
+                }
             }
         }
         .contentShape(Rectangle())

@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct JobLogView: View {
-    @Environment(\.dismiss) private var dismiss
     @Bindable var topic: Topic
 
     private var jobs: [GenerationJob] {
@@ -10,26 +9,30 @@ struct JobLogView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading) {
-            Text("Лог темы").font(.headline)
-            List(jobs) { job in
-                HStack {
-                    icon(for: job.status)
-                    VStack(alignment: .leading) {
-                        Text(job.stageTitle).font(.subheadline)
-                        Text("\(job.agentName) · \(job.modelName) · \(job.startedAt.formatted(date: .abbreviated, time: .shortened))")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if let error = job.errorMessage {
-                            Text(error).font(.caption).foregroundStyle(.red)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Лог темы").font(.headline).padding(12)
+            Divider()
+            if jobs.isEmpty {
+                ContentUnavailableView("Лог пуст", systemImage: "doc.text")
+            } else {
+                List(jobs) { job in
+                    HStack(alignment: .top, spacing: 8) {
+                        icon(for: job.status)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(job.stageTitle).font(.subheadline)
+                            Text("\(job.agentName) · \(job.modelName)")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text(job.startedAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption).foregroundStyle(.secondary)
+                            if let error = job.errorMessage {
+                                Text(error).font(.caption).foregroundStyle(.red)
+                            }
                         }
                     }
-                    Spacer()
                 }
+                .scrollContentBackground(.hidden)
             }
-            HStack { Spacer(); Button("Закрыть") { dismiss() } }
         }
-        .padding()
-        .frame(width: 520, height: 440)
     }
 
     @ViewBuilder private func icon(for status: JobStatus) -> some View {
