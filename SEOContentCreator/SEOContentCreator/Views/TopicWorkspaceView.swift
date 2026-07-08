@@ -6,6 +6,7 @@ struct TopicWorkspaceView: View {
     @Bindable var topic: Topic
     var onBack: () -> Void
 
+    @Query private var stageTemplates: [StageTemplate]
     @AppStorage("openAIModel") private var model = "gpt-4.1"
     @State private var selectedStage: PipelineStage = .structure
     @State private var executor: StageExecutor?
@@ -186,7 +187,7 @@ struct TopicWorkspaceView: View {
     /// "Запустить этап" (or "Стоп" while running) plus "Опубликовать" on the right.
     private var stageActionBar: some View {
         HStack(spacing: 10) {
-            Text("Этап «\(selectedStage.title)» · модель \(model)")
+            Text(stageRunSummary)
                 .font(.callout).foregroundStyle(.secondary)
                 .lineLimit(1)
             Spacer()
@@ -205,15 +206,20 @@ struct TopicWorkspaceView: View {
         .padding(10)
     }
 
+    private var stageRunSummary: String {
+        let template = stageTemplates.first { $0.stageRaw == selectedStage.rawValue }
+        let modelName = template?.modelName ?? model
+        var summary = "Этап «\(selectedStage.title)» · модель \(modelName)"
+        if let tokens = template?.maxTokens {
+            summary += " · ~\(tokens) токенов"
+        }
+        return summary
+    }
+
     @ViewBuilder
     private var inspectorPanel: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $inspectorTab) {
-                ForEach(InspectorTab.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(8)
+            inspectorTabsBar
             Divider()
             switch inspectorTab {
             case .remarks:   remarksTab
@@ -222,6 +228,30 @@ struct TopicWorkspaceView: View {
             case .log:       JobLogView(topic: topic)
             }
         }
+    }
+
+    /// Text tabs with a teal underline on the active one (matches the mockup,
+    /// in place of a segmented control).
+    private var inspectorTabsBar: some View {
+        HStack(spacing: 18) {
+            ForEach(InspectorTab.allCases) { tab in
+                let active = inspectorTab == tab
+                Button { inspectorTab = tab } label: {
+                    Text(tab.title)
+                        .font(.callout).fontWeight(active ? .semibold : .regular)
+                        .foregroundStyle(active ? Color.primary : Color.secondary)
+                        .padding(.bottom, 7)
+                        .overlay(alignment: .bottom) {
+                            Rectangle()
+                                .fill(active ? Color.accentColor : Color.clear)
+                                .frame(height: 2)
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14).padding(.top, 10)
     }
 
     @ViewBuilder

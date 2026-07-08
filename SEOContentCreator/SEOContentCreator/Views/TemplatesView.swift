@@ -134,8 +134,13 @@ struct TemplatesView: View {
             }
         } label: {
             Label("Добавить", systemImage: "plus")
+                .font(.callout).fontWeight(.medium)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14).padding(.vertical, 7)
+                .background(Color.accentColor, in: Capsule())
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize()
     }
 
