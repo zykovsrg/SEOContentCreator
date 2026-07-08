@@ -43,6 +43,7 @@ struct TopicWorkspaceView: View {
     var body: some View {
         HStack(spacing: 0) {
             StageRailView(selectedStage: $selectedStage, topic: topic)
+                .background(Color.panelFill)
             Divider()
             workColumn
         }
@@ -289,14 +290,16 @@ struct TopicWorkspaceView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button(action: runSelectedStage) {
-                Label("Запустить этап", systemImage: "play.fill")
+            if executor?.isRunning ?? false {
+                Button(role: .destructive, action: { executor?.cancel() }) {
+                    Label("Стоп", systemImage: "stop.fill")
+                }
+            } else {
+                Button(action: runSelectedStage) {
+                    Label("Запустить: \(selectedStage.title)", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
             }
-            .disabled(executor?.isRunning ?? false)
-            Button(role: .destructive, action: { executor?.cancel() }) {
-                Label("Стоп", systemImage: "stop.fill")
-            }
-            .disabled(!(executor?.isRunning ?? false))
         }
         .padding()
     }

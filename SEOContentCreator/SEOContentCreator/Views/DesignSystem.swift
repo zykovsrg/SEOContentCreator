@@ -1,5 +1,22 @@
 // DesignSystem.swift
 import SwiftUI
+import AppKit
+
+extension Color {
+    /// Brand teal accent (the mockup's identity). Resolves per appearance so it
+    /// stays legible in light and dark. Applied app-wide via `.tint`, so any
+    /// control using `Color.accentColor` (selection, segmented, dots, buttons)
+    /// follows it automatically.
+    static let brandAccent = Color(nsColor: NSColor(name: nil) { appearance in
+        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        return isDark
+            ? NSColor(srgbRed: 0.298, green: 0.769, blue: 0.808, alpha: 1)  // #4CC4CE
+            : NSColor(srgbRed: 0.055, green: 0.486, blue: 0.525, alpha: 1)  // #0E7C86
+    })
+
+    /// Subtle panel fill for rails and inspector chrome.
+    static let panelFill = Color(nsColor: .underPageBackgroundColor)
+}
 
 extension StatusTone {
     var color: Color {

@@ -183,14 +183,15 @@ struct TemplatesView: View {
 
     private var sidebar: some View {
         VStack(spacing: 0) {
-            Picker("Категория", selection: $category) {
-                ForEach(TemplateCategory.allCases) { cat in
-                    Text(cat.title).tag(cat)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(TemplateCategory.allCases) { cat in
+                        categoryChip(cat)
+                    }
                 }
+                .padding(.horizontal, 8)
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .padding(8)
+            .padding(.vertical, 8)
 
             TextField("Поиск", text: $search)
                 .textFieldStyle(.roundedBorder)
@@ -204,6 +205,20 @@ struct TemplatesView: View {
                 }
             }
         }
+    }
+
+    private func categoryChip(_ cat: TemplateCategory) -> some View {
+        let selected = category == cat
+        return Button { category = cat } label: {
+            Text(cat.title)
+                .font(.caption).fontWeight(.medium)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(selected ? AnyShapeStyle(Color.accentColor)
+                                     : AnyShapeStyle(Color.secondary.opacity(0.12)),
+                            in: Capsule())
+                .foregroundStyle(selected ? Color.white : Color.primary)
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder

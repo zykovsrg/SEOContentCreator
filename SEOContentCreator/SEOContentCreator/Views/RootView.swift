@@ -34,6 +34,7 @@ struct RootView: View {
             case .knowledgeBase: KnowledgeBaseView()
             }
         }
+        .tint(.brandAccent)
         .task {
             StageTemplateSeeder.seedIfNeeded(in: context)
             EditorDictionarySeeder.seedIfNeeded(in: context)

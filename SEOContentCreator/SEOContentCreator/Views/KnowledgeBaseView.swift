@@ -20,41 +20,54 @@ struct KnowledgeBaseView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selection) {
-                if search.isEmpty {
-                    ForEach(roots) { root in
-                        OutlineGroup(root, children: \.childrenOrNil) { node in
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                TextField("Поиск по справочнику", text: $search)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(8)
+                List(selection: $selection) {
+                    if search.isEmpty {
+                        ForEach(roots) { root in
+                            OutlineGroup(root, children: \.childrenOrNil) { node in
+                                Label(node.title, systemImage: icon(for: node.nodeType))
+                                    .tag(node)
+                            }
+                        }
+                    } else {
+                        ForEach(searchResults) { node in
                             Label(node.title, systemImage: icon(for: node.nodeType))
                                 .tag(node)
                         }
                     }
-                } else {
-                    ForEach(searchResults) { node in
-                        Label(node.title, systemImage: icon(for: node.nodeType))
-                            .tag(node)
-                    }
                 }
             }
-            .searchable(text: $search, prompt: "Поиск по справочнику")
-            .toolbar {
-                ToolbarItem {
-                    Menu {
-                        ForEach(NodeType.allCases) { type in
-                            Button(type.title) { addRoot(type: type) }
-                        }
-                    } label: {
-                        Label("Узел", systemImage: "plus")
+            .frame(width: 280)
+            .background(Color.panelFill)
+            Divider()
+            detail
+        }
+        .navigationTitle("База знаний")
+        .toolbar {
+            ToolbarItem {
+                Menu {
+                    ForEach(NodeType.allCases) { type in
+                        Button(type.title) { addRoot(type: type) }
                     }
+                } label: {
+                    Label("Узел", systemImage: "plus")
                 }
             }
-            .navigationTitle("База знаний")
-        } detail: {
-            if let node = selection {
-                NodeDetailView(node: node, topics: topics)
-            } else {
-                ContentUnavailableView("Выберите узел", systemImage: "books.vertical")
-            }
+        }
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        if let node = selection {
+            NodeDetailView(node: node, topics: topics)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ContentUnavailableView("Выберите узел", systemImage: "books.vertical")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
