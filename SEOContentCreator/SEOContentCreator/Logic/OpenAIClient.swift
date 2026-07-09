@@ -66,6 +66,10 @@ struct OpenAIClient {
             || m.hasPrefix("o4") || m == "chat-latest"
     }
 
+    static func supportsTemperature(model: String) -> Bool {
+        !usesMaxCompletionTokens(model: model)
+    }
+
     func streamCompletion(
         apiKey: String,
         system: String,
@@ -104,7 +108,7 @@ struct OpenAIClient {
                         if let reasoningEffort {
                             body["reasoning_effort"] = reasoningEffort
                         }
-                    } else {
+                    } else if Self.supportsTemperature(model: model) {
                         body["temperature"] = temperature
                         body["max_tokens"] = maxTokens
                     }

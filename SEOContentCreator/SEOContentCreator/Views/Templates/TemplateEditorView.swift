@@ -6,6 +6,7 @@ struct TemplateEditorView: View {
     @AppStorage("openAIModel") private var settingsModel = "gpt-4.1"
 
     @State private var user = ""
+    @State private var modelName = ""
     @State private var temperature = 0.6
     @State private var maxTokens = 8000
     /// Empty string = "по умолчанию" (nil, parameter omitted).
@@ -18,6 +19,18 @@ struct TemplateEditorView: View {
 
     private var stage: PipelineStage {
         template.stage ?? .draft
+    }
+
+    private var activeModelName: String {
+        let trimmed = modelName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? settingsModel : trimmed
+    }
+
+    private var normalizedReasoningEffort: String? {
+        guard OpenAIClient.usesMaxCompletionTokens(model: activeModelName),
+              !reasoningEffort.isEmpty
+        else { return nil }
+        return reasoningEffort
     }
 
     var body: some View {
@@ -105,19 +118,34 @@ struct TemplateEditorView: View {
     private var generationSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             TemplatePanelTitle("Параметры генерации")
-            HStack {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Модель")
                     .foregroundStyle(.secondary)
-                Spacer()
-                MetaChip(text: settingsModel)
+                TextField("gpt-5.5", text: $modelName)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.callout, design: .monospaced))
+                    .onChange(of: modelName) { _, _ in
+                        if !OpenAIClient.usesMaxCompletionTokens(model: activeModelName) {
+                            reasoningEffort = ""
+                        }
+                    }
             }
-            Stepper(value: $temperature, in: 0...1, step: 0.1) {
+            if OpenAIClient.supportsTemperature(model: activeModelName) {
+                Stepper(value: $temperature, in: 0...1, step: 0.1) {
+                    HStack {
+                        Text("Температура")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(temperature, format: .number.precision(.fractionLength(1)))
+                            .fontWeight(.semibold)
+                    }
+                }
+            } else {
                 HStack {
                     Text("Температура")
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text(temperature, format: .number.precision(.fractionLength(1)))
-                        .fontWeight(.semibold)
+                    MetaChip(text: "—")
                 }
             }
             Stepper(value: $maxTokens, in: 1000...32000, step: 1000) {
@@ -140,7 +168,7 @@ struct TemplateEditorView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .disabled(!OpenAIClient.usesMaxCompletionTokens(model: settingsModel))
+                .disabled(!OpenAIClient.usesMaxCompletionTokens(model: activeModelName))
             }
         }
     }
@@ -202,6 +230,7 @@ struct TemplateEditorView: View {
 
     private func load() {
         user = template.userPromptTemplate
+        modelName = template.modelName
         temperature = template.temperature
         maxTokens = template.maxTokens
         reasoningEffort = template.reasoningEffort ?? ""
@@ -209,11 +238,11 @@ struct TemplateEditorView: View {
 
     private func save() {
         template.userPromptTemplate = user
+        template.modelName = activeModelName
         template.temperature = temperature
         template.maxTokens = maxTokens
         // Persist only when the model supports it and a level is chosen; otherwise clear it.
-        template.reasoningEffort = (OpenAIClient.usesMaxCompletionTokens(model: settingsModel) && !reasoningEffort.isEmpty)
-            ? reasoningEffort : nil
+        template.reasoningEffort = normalizedReasoningEffort
         template.templateVersion += 1
         template.updatedAt = .now
         savedNote = "Сохранено · версия \(template.templateVersion)"
@@ -224,12 +253,10 @@ struct TemplateEditorView: View {
             stage: stage,
             articleType: template.articleTypeRaw.flatMap(ArticleType.init(rawValue:)),
             userPromptTemplate: user,
-            modelName: settingsModel,
+            modelName: activeModelName,
             temperature: temperature,
             maxTokens: maxTokens,
-            reasoningEffort: (OpenAIClient.usesMaxCompletionTokens(model: settingsModel) && !reasoningEffort.isEmpty)
-                ? reasoningEffort
-                : nil,
+            reasoningEffort: normalizedReasoningEffort,
             templateVersion: template.templateVersion
         )
     }
@@ -237,9 +264,10 @@ struct TemplateEditorView: View {
     private func resetToDefault() {
         let content = StageTemplateDefaults.content(for: stage)
         user = content.userPromptTemplate
+        modelName = content.modelName
         temperature = content.temperature
         maxTokens = content.maxTokens
-        reasoningEffort = ""
+        reasoningEffort = content.reasoningEffort ?? ""
         save()
         savedNote = "Сброшено к стандартному"
     }

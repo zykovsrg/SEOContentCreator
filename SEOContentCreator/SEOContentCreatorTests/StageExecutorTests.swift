@@ -63,12 +63,15 @@ struct StageExecutorTests {
         let template = StageTemplate(stage: .draft, userPromptTemplate: "{{тема}}")
         context.insert(template)
 
+        let firstTokenYielded = AsyncStream<Void>.makeStream()
         // Mirrors OpenAIClient's real stream shape: an inner Task feeding the continuation,
         // cancelled via onTermination when the consumer stops iterating.
         let provider: StageExecutor.StreamProvider = { _, _, _, _, _, _, _ in
             AsyncThrowingStream { continuation in
                 let inner = Task {
                     continuation.yield(.token("Первый токен"))
+                    firstTokenYielded.continuation.yield(())
+                    firstTokenYielded.continuation.finish()
                     do {
                         try await Task.sleep(nanoseconds: 2_000_000_000)
                         continuation.yield(.token("Второй токен"))
@@ -87,9 +90,8 @@ struct StageExecutorTests {
                                    currentText: nil, in: context)
         }
         // Wait for the first token so `execute()` has stored its currentTask before we cancel.
-        while executor.streamingText.isEmpty {
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
+        // Do not wait for `streamingText`: UI updates are intentionally throttled.
+        for await _ in firstTokenYielded.stream { break }
         executor.cancel()
         await execTask.value
 
@@ -272,6 +274,41 @@ struct StageExecutorTests {
         #expect(created?.modelName == "settings-model")
     }
 
+    @Test func executeUsesTemplateModelByDefault() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Тема", articleType: .disease)
+        context.insert(topic)
+        let template = StageTemplate(
+            stage: .draft,
+            userPromptTemplate: "{{тема}}",
+            modelName: "template-model"
+        )
+        context.insert(template)
+
+        var capturedModel = ""
+        let provider: StageExecutor.StreamProvider = { _, _, _, model, _, _, _ in
+            capturedModel = model
+            return AsyncThrowingStream { continuation in
+                continuation.yield(.token("Текст"))
+                continuation.finish()
+            }
+        }
+        let executor = StageExecutor(streamProvider: provider, keyProvider: { "k" })
+
+        await executor.execute(
+            stage: .draft,
+            topic: topic,
+            template: template,
+            currentText: nil,
+            in: context
+        )
+
+        #expect(capturedModel == "template-model")
+        #expect(topic.jobs.first?.modelName == "template-model")
+        let created = topic.versions.first { $0.uuid == executor.lastResultVersionID }
+        #expect(created?.modelName == "template-model")
+    }
+
     @Test func sandboxUsesTemporaryTemplateWithoutPersisting() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Тема", articleType: .disease)
@@ -313,13 +350,12 @@ struct StageExecutorTests {
             topic: topic,
             template: template,
             currentText: topic.currentVersion?.text,
-            modelName: "settings-model",
             in: context
         )
 
         #expect(capturedSystem == "")
         #expect(capturedUser == "UNSAVED Тема / Текущий текст")
-        #expect(capturedModel == "settings-model")
+        #expect(capturedModel == "gpt-5.5")
         #expect(capturedReasoning == "high")
         #expect(executor.streamingText == "Песочный результат")
         #expect(executor.lastErrorMessage == nil)

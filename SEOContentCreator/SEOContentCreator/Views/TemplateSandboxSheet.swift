@@ -166,7 +166,6 @@ struct TemplateSandboxSheet: View {
                 topic: topic,
                 template: template,
                 currentText: topic.currentVersion?.text,
-                modelName: model,
                 in: context
             )
         }

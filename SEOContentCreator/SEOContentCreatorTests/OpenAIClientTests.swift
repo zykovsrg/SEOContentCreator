@@ -170,6 +170,12 @@ struct OpenAIClientTests {
         #expect(!OpenAIClient.usesMaxCompletionTokens(model: "gpt-4o-mini"))
     }
 
+    @Test func temperatureSupportFollowsModelFamily() {
+        #expect(!OpenAIClient.supportsTemperature(model: "gpt-5.5"))
+        #expect(!OpenAIClient.supportsTemperature(model: "o3-mini"))
+        #expect(OpenAIClient.supportsTemperature(model: "gpt-4.1"))
+    }
+
     @Test func omitsTemperatureForNewModels() async throws {
         MockURLProtocol.statusCode = 200
         MockURLProtocol.stubBody = "data: [DONE]\n\n"

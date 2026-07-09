@@ -58,7 +58,7 @@ struct TopicWorkspaceView: View {
                         if showInspector {
                             inspectorPanel
                                 .frame(width: 360)
-                                .frame(maxHeight: .infinity)
+                                .frame(maxHeight: .infinity, alignment: .top)
                                 .panelCard()
                         }
                     }
@@ -214,19 +214,26 @@ struct TopicWorkspaceView: View {
                 .font(.callout).foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-                .layoutPriority(1)
+                .layoutPriority(0)
             Spacer(minLength: 8)
             Button("Опубликовать") { showPublish = true }
                 .buttonStyle(.bordered)
+                .frame(minWidth: 132)
+                .fixedSize(horizontal: true, vertical: false)
             if executor?.isRunning ?? false {
                 Button(role: .destructive, action: { executor?.cancel() }) {
                     Label("Стоп", systemImage: "stop.fill")
                 }
+                .frame(minWidth: 96)
+                .fixedSize(horizontal: true, vertical: false)
             } else {
                 Button(action: runSelectedStage) {
                     Label("Запустить этап", systemImage: "play.fill")
+                        .lineLimit(1)
                 }
                 .buttonStyle(.borderedProminent)
+                .frame(minWidth: 168)
+                .fixedSize(horizontal: true, vertical: false)
             }
         }
     }
@@ -253,7 +260,7 @@ struct TopicWorkspaceView: View {
             case .log:       JobLogView(topic: topic)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     /// Text tabs with a teal underline on the active one (matches the mockup,
@@ -466,7 +473,7 @@ struct TopicWorkspaceView: View {
         Task {
             await executor.execute(stage: stage, topic: topic, template: template,
                                    currentText: current, selectedBlocks: blocks,
-                                   modelName: model, in: context)
+                                   in: context)
             pendingVersionID = executor.lastResultVersionID
             if !executor.remarks.isEmpty {
                 inspectorTab = .remarks

@@ -24,6 +24,27 @@ Resume criteria:
 
 ## Paused tasks
 
+### 2026-07-09 — Inspector layout and bottom action labels
+
+Status: paused
+
+Why paused: пользователь попросил продолжить редизайн и добавить настройки
+модели/мышления для каждого этапа до закрытия предыдущей маленькой правки.
+
+Current state: `TopicWorkspaceView.swift` уже поправлен: правый inspector
+выравнивается сверху и тянется на высоту панели, нижние кнопки резервируют
+ширину для подписей. Build-for-testing, Release build, установка в
+`/Applications` и `codesign --verify` уже проходили успешно.
+
+Relevant files:
+- `SEOContentCreator/SEOContentCreator/Views/TopicWorkspaceView.swift`
+
+Open risks: нужна только финальная визуальная проверка в установленном
+приложении, если пользователь захочет отдельно закрыть эту правку.
+
+Resume criteria: пользователь просит закрыть предыдущую задачу или проверить
+экран работы над темой.
+
 ### 2026-07-04 — Аудит всех LLM-промптов приложения
 
 Status: paused
