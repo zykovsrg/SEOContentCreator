@@ -66,4 +66,26 @@ struct GoogleDocsClientTests {
         let id = try await client().findOrCreateFolder(name: "SEO-статьи клиники")
         #expect(id == "folder-new")
     }
+
+    @Test func multipartBodyHasMetadataAndFileParts() {
+        let body = GoogleDocsClient.multipartBody(
+            metadataJSON: Data("{\"name\":\"x.png\"}".utf8),
+            fileData: Data([0x89, 0x50]),
+            mimeType: "image/png",
+            boundary: "BOUND")
+        let text = String(decoding: body, as: UTF8.self)
+        #expect(text.contains("--BOUND\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{\"name\":\"x.png\"}"))
+        #expect(text.contains("--BOUND\r\nContent-Type: image/png\r\n\r\n"))
+        #expect(text.hasSuffix("\r\n--BOUND--\r\n"))
+    }
+
+    @Test func escapeQueryValueEscapesQuotesAndBackslashes() {
+        #expect(GoogleDocsClient.escapeQueryValue("O'Brien") == "O\\'Brien")
+        #expect(GoogleDocsClient.escapeQueryValue("a\\b") == "a\\\\b")
+        #expect(GoogleDocsClient.escapeQueryValue("обычное имя") == "обычное имя")
+    }
+
+    @Test func folderURLBuildsDriveLink() {
+        #expect(GoogleDocsClient.folderURL(id: "abc123") == "https://drive.google.com/drive/folders/abc123")
+    }
 }
