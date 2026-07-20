@@ -100,7 +100,70 @@ struct GoogleDocsClient {
         "https://docs.google.com/document/d/\(id)/edit"
     }
 
+    /// Escapes a value for use inside single quotes in a Drive `q` query.
+    static func escapeQueryValue(_ value: String) -> String {
+        value.replacingOccurrences(of: "\\", with: "\\\\")
+             .replacingOccurrences(of: "'", with: "\\'")
+    }
+
+    static func folderURL(id: String) -> String {
+        "https://drive.google.com/drive/folders/\(id)"
+    }
+
+    /// Finds or creates a folder INSIDE the given parent (unlike the root-level
+    /// `findOrCreateFolder(name:)` above).
+    func findOrCreateFolder(name: String, parentID: String) async throws -> String {
+        var comps = URLComponents(string: "https://www.googleapis.com/drive/v3/files")!
+        let escaped = Self.escapeQueryValue(name)
+        let q = "mimeType='application/vnd.google-apps.folder' and name='\(escaped)' and '\(parentID)' in parents and trashed=false"
+        comps.queryItems = [URLQueryItem(name: "q", value: q), URLQueryItem(name: "fields", value: "files(id,name)")]
+        let data = try await send(url: comps.url!, method: "GET", json: nil)
+        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let files = obj["files"] as? [[String: Any]],
+           let id = files.first?["id"] as? String {
+            return id
+        }
+        let createURL = URL(string: "https://www.googleapis.com/drive/v3/files")!
+        let created = try await send(url: createURL, method: "POST",
+            json: ["name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parentID]])
+        guard let obj = try? JSONSerialization.jsonObject(with: created) as? [String: Any],
+              let id = obj["id"] as? String else { throw DocsError.badResponse }
+        return id
+    }
+
+    /// Multipart body for `uploadType=multipart` (metadata JSON + file bytes).
+    static func multipartBody(metadataJSON: Data, fileData: Data, mimeType: String, boundary: String) -> Data {
+        var body = Data()
+        func add(_ s: String) { body.append(Data(s.utf8)) }
+        add("--\(boundary)\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n")
+        body.append(metadataJSON)
+        add("\r\n--\(boundary)\r\nContent-Type: \(mimeType)\r\n\r\n")
+        body.append(fileData)
+        add("\r\n--\(boundary)--\r\n")
+        return body
+    }
+
+    /// Uploads a file into the given folder. Returns the created file's ID.
+    func uploadFile(name: String, data: Data, mimeType: String, parentID: String) async throws -> String {
+        let url = URL(string: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id")!
+        let boundary = "seo-content-creator-\(UUID().uuidString)"
+        let metadata = try JSONSerialization.data(withJSONObject: ["name": name, "parents": [parentID]])
+        let body = Self.multipartBody(metadataJSON: metadata, fileData: data, mimeType: mimeType, boundary: boundary)
+        let response = try await send(url: url, method: "POST", body: body,
+                                      contentType: "multipart/related; boundary=\(boundary)")
+        guard let obj = try? JSONSerialization.jsonObject(with: response) as? [String: Any],
+              let id = obj["id"] as? String else { throw DocsError.badResponse }
+        return id
+    }
+
     private func send(url: URL, method: String, json: [String: Any]?) async throws -> Data {
+        var body: Data?
+        if let json { body = try JSONSerialization.data(withJSONObject: json) }
+        return try await send(url: url, method: method, body: body,
+                              contentType: json == nil ? nil : "application/json")
+    }
+
+    private func send(url: URL, method: String, body: Data?, contentType: String?) async throws -> Data {
         var lastError: Error = DocsError.badResponse
         for attempt in 0..<maxAttempts {
             do {
@@ -108,10 +171,8 @@ struct GoogleDocsClient {
                 var req = URLRequest(url: url)
                 req.httpMethod = method
                 req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                if let json {
-                    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    req.httpBody = try JSONSerialization.data(withJSONObject: json)
-                }
+                if let contentType { req.setValue(contentType, forHTTPHeaderField: "Content-Type") }
+                req.httpBody = body
                 let (data, resp) = try await session.data(for: req)
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
                 switch code {

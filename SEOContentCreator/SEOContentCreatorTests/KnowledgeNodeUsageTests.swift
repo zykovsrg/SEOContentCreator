@@ -15,4 +15,11 @@ struct KnowledgeNodeUsageTests {
         #expect(KnowledgeNodeUsage.count(for: doctor, in: [a, b, c]) == 1)
         #expect(KnowledgeNodeUsage.count(for: fact, in: [a, b, c]) == 1)
     }
+
+    @Test func countsAdditionalDirections() throws {
+        let node = KnowledgeNode(title: "Андрология", type: .direction)
+        let topic = Topic(title: "Тема", articleType: .info)
+        topic.additionalDirections = [node]
+        #expect(KnowledgeNodeUsage.count(for: node, in: [topic]) == 1)
+    }
 }

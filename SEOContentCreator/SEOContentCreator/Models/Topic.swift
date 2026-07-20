@@ -16,11 +16,17 @@ final class Topic {
     var publishedAt: Date?
     var currentVersionID: UUID?
     var coverImageID: UUID?
+    /// Ссылка на подпапку Google Drive с иллюстрациями этой статьи.
+    /// Появляется после первой публикации с загрузкой картинок.
+    var illustrationsFolderURL: String?
     var semantics: [String]
     var structureText: String = ""
 
     @Relationship(deleteRule: .nullify, inverse: \KnowledgeNode.topicsUsingAsDirection) var direction: KnowledgeNode?
     @Relationship(deleteRule: .nullify, inverse: \KnowledgeNode.topicsUsingAsDoctor) var doctor: KnowledgeNode?
+    /// Дополнительные направления для раздела «Техническая информация».
+    /// Основное `direction` остаётся единственным источником для промтов.
+    @Relationship var additionalDirections: [KnowledgeNode] = []
     @Relationship var attachedNodes: [KnowledgeNode]
     @Relationship(deleteRule: .cascade, inverse: \ArticleVersion.topic)
     var versions: [ArticleVersion]
@@ -51,6 +57,7 @@ final class Topic {
         self.direction = direction
         self.doctor = doctor
         self.attachedNodes = []
+        self.additionalDirections = []
         self.semantics = []
         self.structureText = ""
         self.versions = []
