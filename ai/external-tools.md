@@ -34,6 +34,50 @@ Work can continue. UI/frontend design guidance is unavailable until the skill is
 
 Install only after explicit user confirmation.
 
+### impeccable
+
+Type: optional project skill
+
+Source:
+https://github.com/pbakaus/impeccable/tree/main/.agents/skills/impeccable
+
+Purpose:
+Systematic UI design, critique, polish, accessibility, responsive behavior, and
+design anti-pattern detection. The installed package includes the focused
+`animate` workflow.
+
+How to check:
+- project skill file: `ai/skills/impeccable/SKILL.md`
+- animate router: `ai/skills/animate/SKILL.md`
+
+### theme-factory
+
+Type: optional project skill
+
+Source:
+https://github.com/anthropics/skills/tree/main/skills/theme-factory
+
+Purpose:
+Apply a consistent palette and font system to slides, documents, reports, and
+web artifacts, or create a new theme when the presets do not fit.
+
+How to check:
+- project skill file: `ai/skills/theme-factory/SKILL.md`
+
+### design-motion-principles
+
+Type: optional project skill
+
+Source:
+https://github.com/kylezantos/design-motion-principles/tree/main/skills/design-motion-principles
+
+Purpose:
+Create purposeful interface motion or audit existing animations through
+context-aware motion-design principles, accessibility, and performance checks.
+
+How to check:
+- project skill file: `ai/skills/design-motion-principles/SKILL.md`
+
 ## Expected external skills and tools
 
 These tools should be installed when available.
@@ -82,6 +126,29 @@ How to check:
 Missing means:
 Work can continue, but extra context-engineering skills are unavailable.
 
+### playwright-mcp
+
+Type: external MCP browser automation tool
+
+Source:
+https://github.com/microsoft/playwright-mcp
+
+Purpose:
+Browser interaction, live UI verification, accessibility snapshots, and
+screenshot feedback loops.
+
+Expected: yes, if supported by the current agent harness.
+
+How to check:
+- inspect the current agent's available MCP/browser tools for Playwright;
+- inspect configured MCP servers, for example with the harness MCP listing;
+- do not run an installer merely to test availability;
+- if the harness configuration cannot be inspected, report `not confirmed`.
+
+Missing means:
+Work can continue, but live browser verification may require a different
+available browser tool or manual checks.
+
 ## Controlled external methodologies
 
 These tools may be installed and checked, but they must not become the default workflow.
@@ -91,7 +158,7 @@ These tools may be installed and checked, but they must not become the default w
 Type: full external development methodology
 
 Status:
-Expected to be installed when available. Required for bugs and complex tasks when available.
+Critical plugin: installation is strongly recommended for every project. Required for bugs and complex tasks when available.
 
 Purpose:
 Spec-first planning, TDD-first development, subagent-driven development, stronger verification, and branch-finishing workflows.
@@ -138,7 +205,7 @@ How to check:
 - if unsure, report `not confirmed`
 
 Missing means:
-Simple work can continue. For bugs and complex tasks, stop and ask whether to install/configure Superpowers or continue with a manual fallback.
+Simple work can continue. For bugs and complex tasks, stop, recommend installing Superpowers as the preferred option, and continue with a manual fallback only if the user declines.
 
 ## Reporting format
 

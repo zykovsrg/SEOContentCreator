@@ -11,7 +11,7 @@ Do not load them by default; open them only when the task needs those details.
 
 - Talk to the user in Russian, assuming they are new to IT. Explain technical terms simply.
 - Keep persistent AI-facing instructions in English.
-- Prefer minimal diffs, clean architecture, and confirmed scope.
+- Prefer minimal diffs, clean architecture, and confirmed scope; a request beyond the recorded Done criteria is a different task until the user confirms otherwise.
 - Capture useful out-of-scope ideas as future task candidates.
 - Do not mix refactoring with bug work unless explicitly asked.
 - Explain risks before changing storage, data model, dependencies, or architecture.
@@ -64,6 +64,7 @@ project `ai/skills/*/SKILL.md` before using that workflow.
 
 Common triggers:
 
+- start: ai/skills/start-screen/SKILL.md
 - environment check: `ai/skills/environment-check/SKILL.md`, `ai/external-tools.md`
 - new task/change: `ai/skills/task-intake/SKILL.md`
 - task switching: `ai/skills/task-switch/SKILL.md`, `ai/current-task.md`, `ai/paused-tasks.md`
@@ -73,10 +74,11 @@ Common triggers:
 - tests: `ai/skills/write-tests/SKILL.md`
 - UI behavior/layout/interaction: `ai/skills/ui-review/SKILL.md` and usually `write-tests`
 - decorative UI only: `ui-review`; use `write-tests` only if behavior or accessibility may change
+- UI polish/theme/motion: use installed `impeccable`, `theme-factory`, `animate`, or `design-motion-principles` as relevant; use `playwright-mcp` for live browser verification when available
 - bugs, regressions, crashes, performance, or complex work: Superpowers when available
 - architecture change: `ai/skills/architecture-update/SKILL.md`
 
-Extra context only when relevant: project behavior/storage/UI → `ai/project-context.md`; durable invariants → `ai/decisions.md`; workflow ambiguity → `ai/architecture.md`; plan-driven work → relevant `docs/superpowers/*`.
+Extra context only when relevant: project behavior/storage/UI → `ai/project-context.md`; durable invariants → `ai/decisions.md`; workflow ambiguity → `ai/architecture.md`; plan-driven work → relevant `ai/superpowers/*`.
 
 ## Precedence
 

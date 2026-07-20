@@ -43,6 +43,7 @@ Skip only if the user explicitly says not to run `environment-check`.
 Check that these files exist:
 
 - `ai/skills/task-intake/SKILL.md`
+- `ai/skills/start-screen/SKILL.md`
 - `ai/skills/ui-review/SKILL.md`
 - `ai/skills/security-review/SKILL.md`
 - `ai/skills/release-check/SKILL.md`
@@ -75,6 +76,10 @@ Check optional project skills only for presence.
 Currently known optional project skills:
 
 - `ai/skills/frontend-design/SKILL.md`
+- `ai/skills/impeccable/SKILL.md`
+- `ai/skills/theme-factory/SKILL.md`
+- `ai/skills/animate/SKILL.md`
+- `ai/skills/design-motion-principles/SKILL.md`
 
 Missing optional project skills are not blockers.
 
@@ -95,12 +100,34 @@ Check whether expected external skills and tools are available:
 
 - code-review-graph
 - agent-skills-for-context-engineering
+- playwright-mcp
 
 Controlled external methodologies:
 - Superpowers
 
 Do not install missing external tools automatically.
 If a tool cannot be verified, report it as `not confirmed`.
+
+## Architecture version check
+
+Read the installed version from the `Version:` line in `ai/architecture.md`.
+
+When repository access is available, read the current `Version:` line from:
+
+`https://raw.githubusercontent.com/zykovsrg/ai-dev-architecture-template/main/template/ai/architecture.md`
+
+Compare major and minor version numbers numerically. This check is read-only:
+
+- if the repository version is newer, report both versions and offer to preview
+  an update with the documented updater workflow;
+- if both versions match, report that the architecture is current;
+- if the local version is newer (for example while developing the template),
+  report that the local architecture is ahead and do not offer a downgrade;
+- if the repository or network is unavailable, report the latest version as
+  `not confirmed` and continue; this is not a blocker;
+- never download, apply, commit, or push an architecture update automatically.
+
+Run this check once as part of `environment-check`, not before every task.
 
 ## Current and future task snapshot
 
@@ -154,11 +181,12 @@ Return:
 4. Expected external tools present.
 5. Expected external tools missing or not confirmed.
 6. Controlled external methodologies present, missing, or not confirmed.
-7. Current task snapshot.
-8. Future tasks snapshot.
-9. Whether the architecture is ready for the first task or resumed task.
-10. What to restore from the template if something required is missing.
-11. Available next commands and skills.
+7. Local architecture version and latest repository version, or `not confirmed`.
+8. Current task snapshot.
+9. Future tasks snapshot.
+10. Whether the architecture is ready for the first task or resumed task.
+11. What to restore from the template if something required is missing.
+12. Available next commands and skills.
 
 Explain in Russian with simple words.
 
@@ -186,6 +214,7 @@ Include these base options:
 - `security-review` — проверить изменения на риски безопасности.
 - `copy-review` — проверить пользовательские тексты.
 - `future-tasks` — сохранить идею на потом в `ai/future-tasks.md`; отдельного skill нет.
+- `start-screen` — по явному запросу кратко объяснить архитектуру и показать текущую задачу; автоматически не показывается.
 
 If optional project skills are present, add them under:
 
@@ -196,6 +225,10 @@ If optional project skills are present, add them under:
 Example:
 
 - `frontend-design` — UI/frontend/design задачи, если `ai/skills/frontend-design/SKILL.md` установлен.
+- `impeccable` — системная проработка и аудит качества UI.
+- `theme-factory` — выбор или создание согласованной визуальной темы.
+- `animate` — целевая проработка анимаций и микровзаимодействий через Impeccable.
+- `design-motion-principles` — создание и аудит motion-дизайна с учётом контекста.
 
 If expected external tools are present or not confirmed, mention them separately under:
 
@@ -203,7 +236,7 @@ If expected external tools are present or not confirmed, mention them separately
 Внешние tools и methodologies
 ```
 
-For Superpowers, always say that it is controlled and is the expected path for bugs and complex tasks when available.
+For Superpowers, always say that it is a critical plugin (installation strongly recommended), controlled, and the expected path for bugs and complex tasks when available.
 
 ## Rules
 
@@ -215,4 +248,4 @@ For Superpowers, always say that it is controlled and is the expected path for b
 - Do not edit controlled memory files during environment-check.
 - Do not promote, pause, finish, drop, or start tasks during environment-check.
 - Do not activate Superpowers during environment check. Only report whether it is present, missing, or not confirmed.
-- Superpowers is a controlled methodology, not the default workflow.
+- Superpowers is a critical plugin but remains a controlled methodology: recommend installing it when missing, and do not run it as the default workflow for every task.

@@ -1,48 +1,48 @@
-# Архитектура AI-разработки
+# AI Development Architecture
 
-Version: 6.9
+Version: 6.14
 
-Этот файл — справочник по workflow и иерархии правил. Его не нужно загружать для каждой задачи. Читай его только если задача касается workflow, конфликтов правил, architecture-update или если правило неясно.
+This file is the reference for workflows and the rule hierarchy. It does not need to be loaded for every task. Read it only when a task concerns workflows, rule conflicts, architecture-update, or when a rule is unclear.
 
-## Главная идея
+## Main idea
 
-Контекст должен жить в репозитории, а не только в чате.
+Context must live in the repository, not only in the chat.
 
-- Чат — временная рабочая память.
-- `AGENTS.md` и `CLAUDE.md` — короткие входные файлы для AI-агентов.
-- `ai/current-task.md` хранит текущую задачу.
-- `ai/paused-tasks.md` хранит незавершённые задачи, поставленные на паузу через `task-switch`.
-- `ai/future-tasks.md` хранит идеи и будущие задачи, которые не входят в текущий scope.
-- `ai/project-context.md` хранит проектный контекст.
-- `ai/decisions.md` хранит устойчивые решения и инварианты.
-- `ai/changelog.md` хранит последние заметные изменения.
-- `ai/skills/*/SKILL.md` хранит переиспользуемые процедуры.
-- Git хранит полную историю изменений.
+- The chat is temporary working memory.
+- `AGENTS.md` and `CLAUDE.md` are short entry files for AI agents.
+- `ai/current-task.md` holds the current task.
+- `ai/paused-tasks.md` holds unfinished tasks paused through `task-switch`.
+- `ai/future-tasks.md` holds ideas and future tasks outside the current scope.
+- `ai/project-context.md` holds the project context.
+- `ai/decisions.md` holds durable decisions and invariants.
+- `ai/changelog.md` holds recent notable changes.
+- `ai/skills/*/SKILL.md` holds reusable procedures.
+- Git holds the full change history.
 
-Главное правило для идей на потом:
+The main rule for ideas for later:
 
 ```text
 Future tasks are captured, not executed.
 ```
 
-Если во время работы появляется полезная идея вне текущей задачи, агент должен защитить текущий scope: предложить записать идею в `ai/future-tasks.md`, но не реализовывать её без явного promotion.
+If a useful idea outside the current task appears during work, the agent must protect the current scope: propose recording the idea in `ai/future-tasks.md`, but not implement it without explicit promotion.
 
-Главное правило для новой работы:
+The main rule for new work:
 
 ```text
 Every real task goes through task-intake first.
 ```
 
-Если `ai/current-task.md` пустой, новая задача должна быть записана туда до начала работы. Если там уже есть незавершённая задача, агент должен решить, это продолжение или переключение через `task-switch`.
+If `ai/current-task.md` is empty, the new task must be recorded there before work starts. If it already holds an unfinished task, the agent must decide whether this is a continuation or a switch through `task-switch`.
 
-## Режимы работы
+## Work modes
 
 Before starting task work, the agent must explicitly state the mode as `Mode: ...`.
 
-- `implementation` — менять код, проектные файлы, тесты или task memory.
-- `review` — читать файлы, проверять состояние проекта или diff, пересказывать контекст, сообщать о проблемах или предлагать следующий шаг; не редактировать файлы.
-- `task-finish` — проверять завершение задачи и чистить контекст только после подтверждения.
-- `architecture-update` — предлагать изменения архитектуры разработки; менять файлы только после подтверждения.
+- `implementation` — change code, project files, tests, or task memory.
+- `review` — read files, inspect project state or the diff, restate context, report problems, or suggest the next step; do not edit files.
+- `task-finish` — verify task completion and clean up the context only after confirmation.
+- `architecture-update` — propose changes to the development architecture; change files only after confirmation.
 
 If the mode is unclear, the agent must ask or state the assumption before acting.
 
@@ -98,6 +98,16 @@ After `environment-check`, continue in one of the work modes:
 - `architecture-update`
 
 Before the first real task after `environment-check`, run `task-intake`.
+
+### On-demand start screen
+
+The start screen is separate from `environment-check`. Show it only after an explicit user request such as "покажи стартовый экран", "с чего начать", or "как работать с архитектурой". Never show it automatically at a session boundary or during a repeated environment check.
+
+Use `ai/skills/start-screen/SKILL.md`. The screen is read-only, uses plain Russian for a non-developer, stays close to one normal screen, and ends with the current task goal, `Status`, `Stage`, and next step or blocker. It shows skill/tool categories only; the full catalog is a separate request.
+
+### Task boundary
+
+The recorded Done criteria in `ai/current-task.md` define the task boundary. A new request is a different task by default; it continues the current task only if it fits the recorded Done criteria. Extending the boundary requires user confirmation and a written update of `Goal` and `Done criteria` before work starts. Details live in `task-intake` and `task-switch`.
 
 ## Architecture files and task memory
 
@@ -365,6 +375,7 @@ Base skills:
 - `task-switch` — switching between unfinished tasks without losing context; may promote confirmed future tasks into current work.
 - `architecture-update` — updating development architecture after user approval.
 - `environment-check` — checking architecture installation, tool availability, and printing the available next commands/skills menu.
+- `start-screen` — short read-only orientation shown only after an explicit user request.
 
 Use skills by trigger. Do not apply skills from memory. Open the current `ai/skills/*/SKILL.md` before using that workflow.
 
@@ -394,7 +405,7 @@ This architecture no longer includes a local `bugfix-workflow` skill.
 
 For bugs, crashes, regressions, flaky behavior, debug requests, performance investigations, large/vague tasks, major refactors, data model changes, migrations, TDD-heavy tasks, or unclear blast radius, use Superpowers when available.
 
-If Superpowers is missing or not confirmed, the agent must say that the task normally requires Superpowers and ask whether to install/configure it or continue with a manual fallback.
+If Superpowers is missing or not confirmed, the agent must say that the task normally requires Superpowers and recommend installing it as the preferred option; continue with a manual fallback only if the user declines.
 
 Do not pretend there is still a local bugfix workflow. Do not create `CONTEXT.md`, `docs/adr/`, or another parallel documentation system unless the project explicitly requires it.
 
@@ -446,6 +457,10 @@ If the implementation contradicts an active decision, stop and propose `architec
 Optional project skills may be installed only in projects where they are useful. They are not required base skills and must not make `environment-check` fail when absent.
 
 - `frontend-design` — optional project skill for UI composition, visual hierarchy, frontend component design, and UX improvements. Use only for UI/frontend/design tasks when `ai/skills/frontend-design/SKILL.md` is installed. Source URL lives in `ai/external-tools.md`.
+- `impeccable` — optional project skill for systematic UI creation, critique, polish, accessibility, and design anti-pattern checks.
+- `animate` — focused router to Impeccable's canonical animation workflow for purposeful motion and micro-interactions.
+- `theme-factory` — optional project skill for applying or generating consistent visual themes.
+- `design-motion-principles` — optional project skill for context-aware motion creation and animation audits.
 
 External skills and tools do not replace base skills.
 
@@ -453,6 +468,7 @@ Expected external skills/tools:
 
 - `code-review-graph` — main tool for code review and blast-radius analysis when available. Source URL lives in `ai/external-tools.md`.
 - `agent-skills-for-context-engineering` — additional context-engineering skills.
+- `playwright-mcp` — external browser automation MCP for live UI verification and screenshot feedback loops when supported by the harness.
 
 Controlled external methodologies:
 
@@ -511,8 +527,8 @@ Read `ai/architecture.md` only if the task concerns workflow, development archit
 
 For plan-driven or Superpowers tasks, read only relevant files:
 
-- `docs/superpowers/specs/<spec>.md`
-- `docs/superpowers/plans/<plan>.md`
+- `ai/superpowers/specs/<spec>.md`
+- `ai/superpowers/plans/<plan>.md`
 - when needed — this architecture section about plan-driven work.
 
 Do not read `ai/archive/` without a concrete reason.
@@ -616,10 +632,10 @@ Ordinary tasks do not have to use these rules.
 
 ### Source of truth for progress
 
-For plan-driven work, `docs/superpowers/plans/<plan>.md` is the source of truth for execution progress.
+For plan-driven work, `ai/superpowers/plans/<plan>.md` is the source of truth for execution progress.
 
 - Do not use internal TodoWrite, harness task lists, TaskCreate, TaskUpdate, or chat history as the only progress source.
-- After completing each plan task, update the checkbox in `docs/superpowers/plans/<plan>.md`.
+- After completing each plan task, update the checkbox in `ai/superpowers/plans/<plan>.md`.
 - If a plan task is partially done, leave the checkbox empty and add a short `Note:` under the task.
 - If a task is cancelled or moved, mark it with a short `Note:`.
 
@@ -655,7 +671,7 @@ Do not duplicate the same decision in plan notes, `ai/decisions.md`, and `ai/cha
 
 Choice rule:
 
-- `docs/superpowers/plans/<plan>.md` — local reasons inside one plan.
+- `ai/superpowers/plans/<plan>.md` — local reasons inside one plan.
 - `ai/decisions.md` — decisions future agents must remember outside the current plan.
 - `ai/changelog.md` — notable final changes, not every micro-step.
 - `ai/future-tasks.md` — future work that should not expand the current plan unless promoted.
@@ -798,7 +814,7 @@ Monthly:
 
 ## Superpowers gated use
 
-Superpowers may be installed and checked, but it is a controlled external methodology.
+Superpowers is a critical plugin for this architecture: install it whenever possible. It remains a controlled external methodology — it strengthens the process but never overrides the architecture's rules.
 
 Superpowers may be proposed for:
 
@@ -819,7 +835,7 @@ Superpowers should be used for bugs and complex tasks when available. For other 
 - the user explicitly confirms the agent's proposal to use it;
 - `ai/current-task.md` says `Use Superpowers: yes`.
 
-For a bug or complex task, state that Superpowers is the expected path and use it when it is available. If it is unavailable, ask whether to install/configure it or continue manually.
+For a bug or complex task, state that Superpowers is the expected path and use it when it is available. If it is unavailable, recommend installing it as the preferred option, and continue manually only if the user declines.
 
 Do not use Superpowers for:
 
