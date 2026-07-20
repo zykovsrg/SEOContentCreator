@@ -481,6 +481,7 @@ struct TopicWorkspaceView: View {
             }
             if stage.kind == .checking && executor.remarks.isEmpty && executor.lastErrorMessage == nil {
                 checkedWithNoRemarks = true
+                if stage == .finalReview { appendTechInfoIfNeeded() }
             }
             if stage == .promptAnalysis && executor.lastErrorMessage == nil {
                 showPromptAnalysis = true
@@ -533,16 +534,40 @@ struct TopicWorkspaceView: View {
     private func finishReview() {
         let base = reviewBaseText
         let accepted = (executor?.remarks ?? []).filter { acceptedRemarkIDs.contains($0.id) }
-        let result = RemarkApplier.apply(base: base, accepted: accepted)
+        var result = RemarkApplier.apply(base: base, accepted: accepted)
+        if selectedStage == .finalReview {
+            result = TechInfoSectionBuilder.append(to: result, section: TechInfoSectionBuilder.section(for: topic))
+        }
         if result != base {
             let version = ArticleVersion(stage: selectedStage, source: .checkApplied, text: result)
             version.status = .accepted
+            version.h1 = topic.currentVersion?.h1
+            version.seoTitle = topic.currentVersion?.seoTitle
+            version.seoDescription = topic.currentVersion?.seoDescription
             version.topic = topic
             context.insert(version)
             topic.currentVersionID = version.uuid
             topic.updatedAt = .now
         }
         endReview()
+    }
+
+    /// «Финальная вычитка» прошла без замечаний: дописываем раздел
+    /// «Техническая информация» отдельной принятой версией (если его ещё нет).
+    private func appendTechInfoIfNeeded() {
+        guard let current = topic.currentVersion else { return }
+        let appended = TechInfoSectionBuilder.append(
+            to: current.text, section: TechInfoSectionBuilder.section(for: topic))
+        guard appended != current.text else { return }
+        let version = ArticleVersion(stage: .finalReview, source: .checkApplied, text: appended)
+        version.status = .accepted
+        version.h1 = current.h1
+        version.seoTitle = current.seoTitle
+        version.seoDescription = current.seoDescription
+        version.topic = topic
+        context.insert(version)
+        topic.currentVersionID = version.uuid
+        topic.updatedAt = .now
     }
 
     private func redoRemark(_ remark: Remark, comment: String) {
