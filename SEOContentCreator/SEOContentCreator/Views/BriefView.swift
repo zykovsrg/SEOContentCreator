@@ -21,6 +21,8 @@ struct BriefView: View {
     @State private var doctor: KnowledgeNode?
     @State private var volume = ""
     @State private var notes = ""
+    @State private var additionalDirections: [KnowledgeNode] = []
+    @State private var newDirectionTitle = ""
 
     var body: some View {
         Form {
@@ -36,6 +38,24 @@ struct BriefView: View {
             Picker("Врач", selection: $doctor) {
                 Text("Не выбран").tag(KnowledgeNode?.none)
                 ForEach(doctors) { Text($0.title).tag(KnowledgeNode?.some($0)) }
+            }
+            Section("Дополнительные направления") {
+                ForEach(directions) { node in
+                    if node !== direction {
+                        Toggle(node.title, isOn: Binding(
+                            get: { additionalDirections.contains(where: { $0 === node }) },
+                            set: { isOn in
+                                if isOn { additionalDirections.append(node) }
+                                else { additionalDirections.removeAll { $0 === node } }
+                            }
+                        ))
+                    }
+                }
+                HStack {
+                    TextField("Новое направление", text: $newDirectionTitle)
+                    Button("Создать") { createDirection() }
+                        .disabled(newDirectionTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
             }
             TextField("Целевой объём (знаков)", text: $volume)
             TextField("Заметки", text: $notes, axis: .vertical).lineLimit(3...6)
@@ -63,6 +83,16 @@ struct BriefView: View {
         doctor = topic.doctor
         volume = topic.targetVolume.map(String.init) ?? ""
         notes = topic.notes
+        additionalDirections = topic.additionalDirections
+    }
+
+    private func createDirection() {
+        let title = newDirectionTitle.trimmingCharacters(in: .whitespaces)
+        guard !title.isEmpty else { return }
+        let node = KnowledgeNode(title: title, type: .direction)
+        context.insert(node)
+        additionalDirections.append(node)
+        newDirectionTitle = ""
     }
 
     private func save() {
@@ -75,6 +105,7 @@ struct BriefView: View {
             topic.doctor = doctor
             topic.targetVolume = vol
             topic.notes = notes
+            topic.additionalDirections = additionalDirections.filter { $0 !== direction }
             topic.updatedAt = .now
         } else {
             let new = Topic(
@@ -84,6 +115,7 @@ struct BriefView: View {
                 direction: direction, doctor: doctor, notes: notes
             )
             context.insert(new)
+            new.additionalDirections = additionalDirections.filter { $0 !== direction }
         }
         dismiss()
     }
