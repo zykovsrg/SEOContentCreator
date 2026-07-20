@@ -4,6 +4,7 @@ enum KnowledgeNodeUsage {
             topic.direction === node
                 || topic.doctor === node
                 || topic.attachedNodes.contains(where: { $0 === node })
+                || topic.additionalDirections.contains(where: { $0 === node })
         }.count
     }
 }

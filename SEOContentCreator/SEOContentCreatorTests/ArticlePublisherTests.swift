@@ -11,6 +11,10 @@ final class FakeDocsClient: DocsPublishing {
     nonisolated(unsafe) var nextDocID = "doc-new"
     nonisolated(unsafe) var bodyEndIndex = 20
     nonisolated(unsafe) var failBatchUpdate = false
+    nonisolated(unsafe) var subfolders: [(name: String, parentID: String)] = []
+    nonisolated(unsafe) var uploads: [(name: String, parentID: String, byteCount: Int)] = []
+    nonisolated(unsafe) var failUpload = false
+    nonisolated(unsafe) var nextFileIDNumber = 1
 
     func createDocument(title: String) async throws -> String { created.append(title); return nextDocID }
     func batchUpdate(docID: String, requests: [[String: Any]]) async throws {
@@ -20,6 +24,16 @@ final class FakeDocsClient: DocsPublishing {
     func clearBody(docID: String) async throws { cleared.append(docID) }
     func documentBodyEndIndex(docID: String) async throws -> Int { bodyEndIndex }
     func findOrCreateFolder(name: String) async throws -> String { "folder-1" }
+    func findOrCreateFolder(name: String, parentID: String) async throws -> String {
+        subfolders.append((name, parentID))
+        return "sub-\(name)"
+    }
+    func uploadFile(name: String, data: Data, mimeType: String, parentID: String) async throws -> String {
+        if failUpload { throw GoogleDocsClient.DocsError.http(500) }
+        uploads.append((name, parentID, data.count))
+        defer { nextFileIDNumber += 1 }
+        return "file-\(nextFileIDNumber)"
+    }
     func moveToFolder(fileID: String, folderID: String) async throws { moved.append((fileID, folderID)) }
 }
 
@@ -151,5 +165,72 @@ struct ArticlePublisherTests {
         #expect(insertedTexts.contains { $0.contains("Коммерческий текст.") })
         #expect(!insertedTexts.contains { $0.contains("[[БЛОК]]") })
         #expect(!insertedTexts.contains { $0.contains("[[/БЛОК]]") })
+    }
+
+    @Test func publishUploadsSelectedImagesAndSubstitutesLink() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context,
+            "# Заголовок\nТекст.\n\n## Техническая информация\n\nИллюстрации: [появится при публикации]")
+        let img = GeneratedImage(role: .cover, data: Data([1]), promptUsed: "p")
+        img.topic = topic; context.insert(img)
+        let fake = FakeDocsClient()
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, imagesToUpload: [img], in: context)
+
+        #expect(publisher.lastErrorMessage == nil)
+        #expect(fake.uploads.count == 1)
+        #expect(img.driveFileID != nil)
+        #expect(topic.illustrationsFolderURL?.contains("drive.google.com/drive/folders/") == true)
+        // The published body must contain the real link, not the placeholder.
+        let bodyJSON = String(describing: fake.batched.first?.1 ?? [])
+        #expect(bodyJSON.contains("drive.google.com/drive/folders"))
+        #expect(!bodyJSON.contains("[появится при публикации]"))
+    }
+
+    @Test func uploadFailureStillPublishesDocWithWarning() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context, "# Заголовок\nТекст.")
+        let img = GeneratedImage(role: .cover, data: Data([1]), promptUsed: "p")
+        img.topic = topic; context.insert(img)
+        let fake = FakeDocsClient()
+        fake.failUpload = true
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, imagesToUpload: [img], in: context)
+
+        #expect(topic.publications.count == 1)                    // doc still published
+        #expect(publisher.lastErrorMessage?.contains("картинки") == true)  // warning surfaced
+        #expect(img.driveFileID == nil)
+    }
+
+    @Test func uploadFailureAndDocPublishFailureBothSurfaceInError() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context, "# Заголовок\nТекст.")
+        let img = GeneratedImage(role: .cover, data: Data([1]), promptUsed: "p")
+        img.topic = topic; context.insert(img)
+        let fake = FakeDocsClient()
+        fake.failUpload = true
+        fake.failBatchUpdate = true
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, imagesToUpload: [img], in: context)
+
+        #expect(topic.publications.isEmpty)
+        #expect(publisher.lastErrorMessage?.contains("картинки") == true)
+        #expect(publisher.lastErrorMessage?.localizedStandardContains("500") == true)
+    }
+
+    @Test func publishWithoutImagesLeavesPlaceholder() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context,
+            "Текст\n\n## Техническая информация\n\nИллюстрации: [появится при публикации]")
+        let fake = FakeDocsClient()
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, in: context)
+
+        #expect(fake.uploads.isEmpty)
+        #expect(topic.illustrationsFolderURL == nil)
     }
 }

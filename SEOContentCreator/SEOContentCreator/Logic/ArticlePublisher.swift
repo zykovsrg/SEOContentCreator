@@ -7,6 +7,8 @@ protocol DocsPublishing {
     func clearBody(docID: String) async throws
     func documentBodyEndIndex(docID: String) async throws -> Int
     func findOrCreateFolder(name: String) async throws -> String
+    func findOrCreateFolder(name: String, parentID: String) async throws -> String
+    func uploadFile(name: String, data: Data, mimeType: String, parentID: String) async throws -> String
     func moveToFolder(fileID: String, folderID: String) async throws
 }
 
@@ -34,7 +36,8 @@ final class ArticlePublisher {
         return ArticlePublisher(docs: client, tokenProvider: { try await auth.validAccessToken() })
     }
 
-    func publish(topic: Topic, mode: PublishMode, targetDocID: String? = nil, in context: ModelContext) async {
+    func publish(topic: Topic, mode: PublishMode, targetDocID: String? = nil,
+                 imagesToUpload: [GeneratedImage] = [], in context: ModelContext) async {
         isPublishing = true
         lastErrorMessage = nil
         defer { isPublishing = false }
@@ -43,9 +46,33 @@ final class ArticlePublisher {
             lastErrorMessage = "Нет принятой версии текста для публикации."
             return
         }
+        // Объявлена вне do { }, чтобы catch тоже видел предупреждение об
+        // ошибке загрузки картинок и не терял его при ошибке публикации.
+        var uploadWarning: String?
         do {
             _ = try await tokenProvider()
-            let normalizedText = Self.normalizeHeading(text: version.text, h1: version.h1)
+
+            // Картинки грузим ДО документа, чтобы реальная ссылка на папку
+            // попала в текст уже при первой публикации. Ошибка загрузки не
+            // блокирует публикацию документа — только предупреждение в конце.
+            if !imagesToUpload.isEmpty {
+                do {
+                    let result = try await ImageDriveUploader.upload(
+                        images: imagesToUpload, topic: topic,
+                        drive: docs, rootFolderName: folderName)
+                    topic.illustrationsFolderURL = result.folderURL
+                } catch {
+                    let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    uploadWarning = "Документ опубликован, но картинки загрузить не удалось: \(reason)"
+                }
+            }
+
+            var text = version.text
+            if let link = topic.illustrationsFolderURL {
+                text = TechInfoSectionBuilder.substituteIllustrationsLink(in: text, url: link)
+            }
+
+            let normalizedText = Self.normalizeHeading(text: text, h1: version.h1)
             let segments = CommercialBlockSplitter.split(normalizedText).map { segment in
                 DocSegment(isCommercial: segment.isCommercial, blocks: MarkdownDocParser.parse(segment.text))
             }
@@ -64,6 +91,7 @@ final class ArticlePublisher {
                     try await fill(docID: id, requests: requests)
                     try await place(docID: id)
                     record(topic: topic, docID: id, mode: .newDocument, in: context)
+                    lastErrorMessage = uploadWarning
                     return
                 }
                 docID = existing
@@ -71,14 +99,17 @@ final class ArticlePublisher {
                 let replacementRequests = DocsRequestBuilder.buildReplacingBody(segments: segments, existingBodyEndIndex: endIndex)
                 try await fill(docID: docID, requests: replacementRequests)
                 record(topic: topic, docID: docID, mode: mode, in: context)
+                lastErrorMessage = uploadWarning
                 return
             }
 
             try await fill(docID: docID, requests: requests)
             if mode == .newDocument { try await place(docID: docID) }
             record(topic: topic, docID: docID, mode: mode, in: context)
+            lastErrorMessage = uploadWarning
         } catch {
-            lastErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            let docError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            lastErrorMessage = uploadWarning.map { "\($0)\n\(docError)" } ?? docError
         }
     }
 

@@ -12,6 +12,8 @@ final class GeneratedImage {
     var anchorQuote: String?
     var sourceImageID: UUID?
     var modelName: String?
+    /// ID файла на Google Диске после загрузки при публикации; nil — не загружен.
+    var driveFileID: String?
     var createdAt: Date
     var isArchived: Bool
 
@@ -36,6 +38,7 @@ final class GeneratedImage {
         self.anchorQuote = anchorQuote
         self.sourceImageID = sourceImageID
         self.modelName = modelName
+        self.driveFileID = nil
         self.isArchived = false
         self.createdAt = .now
     }

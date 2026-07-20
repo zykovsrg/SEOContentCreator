@@ -9,6 +9,7 @@ struct PublishSheet: View {
     @State private var mode: PublishMode = .newDocument
     @State private var confirmOverwrite = false
     @State private var selectedDocID: String?
+    @State private var selectedImageIDs: Set<UUID> = []
 
     private var hasPrevious: Bool { !topic.publications.isEmpty }
     private var sortedPublications: [ExternalDocument] {
@@ -16,6 +17,9 @@ struct PublishSheet: View {
     }
     private var overwriteTargetID: String? {
         selectedDocID ?? sortedPublications.first?.docID
+    }
+    private var selectableImages: [GeneratedImage] {
+        topic.images.filter { !$0.isArchived }.sorted { $0.createdAt < $1.createdAt }
     }
 
     var body: some View {
@@ -26,10 +30,26 @@ struct PublishSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Документ: \(topic.title)")
                     Text("Папка Google Drive: SEO-статьи клиники").foregroundStyle(.secondary)
+                    if let link = topic.illustrationsFolderURL, let url = URL(string: link) {
+                        Link("Папка иллюстраций на Диске", destination: url).font(.callout)
+                    }
                     if topic.currentVersion == nil {
                         Text("Нет принятой версии текста.").foregroundStyle(.red)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !selectableImages.isEmpty {
+                GroupBox("Картинки на Google Диск") {
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 8)], spacing: 8) {
+                            ForEach(selectableImages, id: \.uuid) { image in
+                                imageCell(image)
+                            }
+                        }
+                    }
+                    .frame(height: 120)
+                }
             }
 
             if hasPrevious {
@@ -77,20 +97,59 @@ struct PublishSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 520, height: 460)
+        .frame(width: 520, height: 600)
         .confirmationDialog("Перезаписать существующий документ?", isPresented: $confirmOverwrite) {
             Button("Перезаписать", role: .destructive) { Task { await doPublish() } }
             Button("Отмена", role: .cancel) {}
         } message: {
             Text("Текущее содержимое документа будет заменено.")
         }
+        .onAppear {
+            if let coverID = topic.coverImageID,
+               selectableImages.contains(where: { $0.uuid == coverID }) {
+                selectedImageIDs = [coverID]
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func imageCell(_ image: GeneratedImage) -> some View {
+        let isSelected = selectedImageIDs.contains(image.uuid)
+        Button {
+            if isSelected { selectedImageIDs.remove(image.uuid) }
+            else { selectedImageIDs.insert(image.uuid) }
+        } label: {
+            VStack(spacing: 2) {
+                ZStack(alignment: .topTrailing) {
+                    if let nsImage = NSImage(data: image.data) {
+                        Image(nsImage: nsImage)
+                            .resizable().scaledToFill()
+                            .frame(width: 80, height: 60).clipped()
+                            .cornerRadius(6)
+                    } else {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(.quaternary).frame(width: 80, height: 60)
+                    }
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                        .padding(2)
+                }
+                .overlay(RoundedRectangle(cornerRadius: 6)
+                    .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 2))
+                Text(image.driveFileID != nil ? "на Диске" : image.role.title)
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func doPublish() async {
+        let images = selectableImages.filter { selectedImageIDs.contains($0.uuid) }
         await publisher.publish(
             topic: topic,
             mode: mode,
             targetDocID: mode == .overwrite ? overwriteTargetID : nil,
+            imagesToUpload: images,
             in: context
         )
         if publisher.lastErrorMessage == nil { dismiss() }
