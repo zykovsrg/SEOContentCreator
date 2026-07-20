@@ -11,6 +11,10 @@ final class FakeDocsClient: DocsPublishing {
     nonisolated(unsafe) var nextDocID = "doc-new"
     nonisolated(unsafe) var bodyEndIndex = 20
     nonisolated(unsafe) var failBatchUpdate = false
+    nonisolated(unsafe) var subfolders: [(name: String, parentID: String)] = []
+    nonisolated(unsafe) var uploads: [(name: String, parentID: String, byteCount: Int)] = []
+    nonisolated(unsafe) var failUpload = false
+    nonisolated(unsafe) var nextFileIDNumber = 1
 
     func createDocument(title: String) async throws -> String { created.append(title); return nextDocID }
     func batchUpdate(docID: String, requests: [[String: Any]]) async throws {
@@ -20,6 +24,16 @@ final class FakeDocsClient: DocsPublishing {
     func clearBody(docID: String) async throws { cleared.append(docID) }
     func documentBodyEndIndex(docID: String) async throws -> Int { bodyEndIndex }
     func findOrCreateFolder(name: String) async throws -> String { "folder-1" }
+    func findOrCreateFolder(name: String, parentID: String) async throws -> String {
+        subfolders.append((name, parentID))
+        return "sub-\(name)"
+    }
+    func uploadFile(name: String, data: Data, mimeType: String, parentID: String) async throws -> String {
+        if failUpload { throw GoogleDocsClient.DocsError.http(500) }
+        uploads.append((name, parentID, data.count))
+        defer { nextFileIDNumber += 1 }
+        return "file-\(nextFileIDNumber)"
+    }
     func moveToFolder(fileID: String, folderID: String) async throws { moved.append((fileID, folderID)) }
 }
 

@@ -7,6 +7,8 @@ protocol DocsPublishing {
     func clearBody(docID: String) async throws
     func documentBodyEndIndex(docID: String) async throws -> Int
     func findOrCreateFolder(name: String) async throws -> String
+    func findOrCreateFolder(name: String, parentID: String) async throws -> String
+    func uploadFile(name: String, data: Data, mimeType: String, parentID: String) async throws -> String
     func moveToFolder(fileID: String, folderID: String) async throws
 }
 
