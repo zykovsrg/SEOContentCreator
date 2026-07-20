@@ -64,7 +64,10 @@ struct BriefView: View {
         .frame(minWidth: 440, minHeight: 380)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Отмена") { dismiss() }
+                Button("Отмена") {
+                    context.rollback()
+                    dismiss()
+                }
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Сохранить") { save() }
