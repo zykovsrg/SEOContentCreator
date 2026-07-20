@@ -46,13 +46,15 @@ final class ArticlePublisher {
             lastErrorMessage = "Нет принятой версии текста для публикации."
             return
         }
+        // Объявлена вне do { }, чтобы catch тоже видел предупреждение об
+        // ошибке загрузки картинок и не терял его при ошибке публикации.
+        var uploadWarning: String?
         do {
             _ = try await tokenProvider()
 
             // Картинки грузим ДО документа, чтобы реальная ссылка на папку
             // попала в текст уже при первой публикации. Ошибка загрузки не
             // блокирует публикацию документа — только предупреждение в конце.
-            var uploadWarning: String?
             if !imagesToUpload.isEmpty {
                 do {
                     let result = try await ImageDriveUploader.upload(
@@ -106,7 +108,8 @@ final class ArticlePublisher {
             record(topic: topic, docID: docID, mode: mode, in: context)
             lastErrorMessage = uploadWarning
         } catch {
-            lastErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            let docError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            lastErrorMessage = uploadWarning.map { "\($0)\n\(docError)" } ?? docError
         }
     }
 

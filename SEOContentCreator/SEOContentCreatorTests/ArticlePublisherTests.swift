@@ -204,6 +204,23 @@ struct ArticlePublisherTests {
         #expect(img.driveFileID == nil)
     }
 
+    @Test func uploadFailureAndDocPublishFailureBothSurfaceInError() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context, "# Заголовок\nТекст.")
+        let img = GeneratedImage(role: .cover, data: Data([1]), promptUsed: "p")
+        img.topic = topic; context.insert(img)
+        let fake = FakeDocsClient()
+        fake.failUpload = true
+        fake.failBatchUpdate = true
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, imagesToUpload: [img], in: context)
+
+        #expect(topic.publications.isEmpty)
+        #expect(publisher.lastErrorMessage?.contains("картинки") == true)
+        #expect(publisher.lastErrorMessage?.localizedStandardContains("500") == true)
+    }
+
     @Test func publishWithoutImagesLeavesPlaceholder() async throws {
         let context = try ctx()
         let topic = topicWithText(context,
