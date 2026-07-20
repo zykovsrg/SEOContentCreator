@@ -166,4 +166,54 @@ struct ArticlePublisherTests {
         #expect(!insertedTexts.contains { $0.contains("[[БЛОК]]") })
         #expect(!insertedTexts.contains { $0.contains("[[/БЛОК]]") })
     }
+
+    @Test func publishUploadsSelectedImagesAndSubstitutesLink() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context,
+            "# Заголовок\nТекст.\n\n## Техническая информация\n\nИллюстрации: [появится при публикации]")
+        let img = GeneratedImage(role: .cover, data: Data([1]), promptUsed: "p")
+        img.topic = topic; context.insert(img)
+        let fake = FakeDocsClient()
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, imagesToUpload: [img], in: context)
+
+        #expect(publisher.lastErrorMessage == nil)
+        #expect(fake.uploads.count == 1)
+        #expect(img.driveFileID != nil)
+        #expect(topic.illustrationsFolderURL?.contains("drive.google.com/drive/folders/") == true)
+        // The published body must contain the real link, not the placeholder.
+        let bodyJSON = String(describing: fake.batched.first?.1 ?? [])
+        #expect(bodyJSON.contains("drive.google.com/drive/folders"))
+        #expect(!bodyJSON.contains("[появится при публикации]"))
+    }
+
+    @Test func uploadFailureStillPublishesDocWithWarning() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context, "# Заголовок\nТекст.")
+        let img = GeneratedImage(role: .cover, data: Data([1]), promptUsed: "p")
+        img.topic = topic; context.insert(img)
+        let fake = FakeDocsClient()
+        fake.failUpload = true
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, imagesToUpload: [img], in: context)
+
+        #expect(topic.publications.count == 1)                    // doc still published
+        #expect(publisher.lastErrorMessage?.contains("картинки") == true)  // warning surfaced
+        #expect(img.driveFileID == nil)
+    }
+
+    @Test func publishWithoutImagesLeavesPlaceholder() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context,
+            "Текст\n\n## Техническая информация\n\nИллюстрации: [появится при публикации]")
+        let fake = FakeDocsClient()
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, in: context)
+
+        #expect(fake.uploads.isEmpty)
+        #expect(topic.illustrationsFolderURL == nil)
+    }
 }
