@@ -67,6 +67,57 @@ struct GoogleDocsClientTests {
         #expect(id == "folder-new")
     }
 
+    @Test func findOrCreateFolderWithParentReturnsExisting() async throws {
+        GoogleMockURLProtocol.queue = [
+            .init(status: 200, body: #"{"files":[{"id":"folder-9","name":"Изображения"}]}"#)
+        ]
+        GoogleMockURLProtocol.requests = []
+        let id = try await client().findOrCreateFolder(name: "Изображения", parentID: "parent-1")
+        #expect(id == "folder-9")
+        let req = try #require(GoogleMockURLProtocol.requests.first)
+        let q = try #require(req.url?.query)
+        #expect(q.contains("'parent-1'%20in%20parents"))
+    }
+
+    @Test func findOrCreateFolderWithParentCreatesWhenMissing() async throws {
+        GoogleMockURLProtocol.queue = [
+            .init(status: 200, body: #"{"files":[]}"#),
+            .init(status: 200, body: #"{"id":"folder-new-nested"}"#)
+        ]
+        GoogleMockURLProtocol.requests = []
+        let id = try await client().findOrCreateFolder(name: "Изображения", parentID: "parent-1")
+        #expect(id == "folder-new-nested")
+        let createReq = try #require(GoogleMockURLProtocol.requests.last)
+        let body = try #require(createReq.httpBody ?? createReq.httpBodyStream.map { stream -> Data in
+            stream.open()
+            defer { stream.close() }
+            var data = Data()
+            let bufferSize = 4096
+            var buffer = [UInt8](repeating: 0, count: bufferSize)
+            while stream.hasBytesAvailable {
+                let read = stream.read(&buffer, maxLength: bufferSize)
+                if read <= 0 { break }
+                data.append(buffer, count: read)
+            }
+            return data
+        })
+        let obj = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let parents = try #require(obj["parents"] as? [String])
+        #expect(parents == ["parent-1"])
+    }
+
+    @Test func uploadFileSendsMultipartRequestAndReturnsID() async throws {
+        GoogleMockURLProtocol.queue = [.init(status: 200, body: #"{"id":"file-123"}"#)]
+        GoogleMockURLProtocol.requests = []
+        let id = try await client().uploadFile(name: "photo.png", data: Data([0x89, 0x50]),
+                                                mimeType: "image/png", parentID: "parent-1")
+        #expect(id == "file-123")
+        let req = try #require(GoogleMockURLProtocol.requests.first)
+        #expect(req.url?.absoluteString == "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id")
+        let contentType = try #require(req.value(forHTTPHeaderField: "Content-Type"))
+        #expect(contentType.hasPrefix("multipart/related; boundary="))
+    }
+
     @Test func multipartBodyHasMetadataAndFileParts() {
         let body = GoogleDocsClient.multipartBody(
             metadataJSON: Data("{\"name\":\"x.png\"}".utf8),
