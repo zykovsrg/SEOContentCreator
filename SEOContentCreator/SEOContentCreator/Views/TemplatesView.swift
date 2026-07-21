@@ -3,8 +3,6 @@ import SwiftData
 
 private enum TemplateSelection: Hashable {
     case stage(UUID)
-    case role(UUID)
-    case block(UUID)
     case imagePrompt(UUID)
     case imagePreset(UUID)
     case editorDictionary(UUID)
@@ -24,7 +22,7 @@ struct TemplatesView: View {
     @Query private var forbiddenPhrases: [ForbiddenPhrase]
     @Query private var skills: [SkillPreset]
     @Query private var productBlocks: [ProductBlock]
-    @State private var category: TemplateCategory = .stagePrompts
+    @State private var category: TemplateCategory = .stages
     @State private var search = ""
     @State private var path: [TemplateSelection] = []
     @State private var hoveredSelection: TemplateSelection?
@@ -237,7 +235,7 @@ struct TemplatesView: View {
     @ViewBuilder
     private var categoryRows: some View {
         switch category {
-        case .stagePrompts:
+        case .stages:
             ForEach(sortedTemplates) { t in
                 rowButton(
                     value: .stage(t.uuid),
@@ -247,17 +245,6 @@ struct TemplatesView: View {
                                                 maxTokens: t.maxTokens,
                                                 reasoning: t.reasoningEffort)
                 )
-            }
-        case .roles:
-            ForEach(sortedRoles) { role in
-                rowButton(value: .role(role.uuid), title: role.name, subtitle: "\(role.blockKeys.count) блоков")
-            }
-        case .editorial:
-            ForEach(sortedBlocks) { block in
-                rowButton(value: .block(block.uuid), title: block.title, subtitle: "Контекст")
-            }
-            ForEach(editorDictionaries) { dict in
-                rowButton(value: .editorDictionary(dict.uuid), title: "Словарь правок", subtitle: "Редполитика")
             }
         case .images:
             ForEach(sortedImagePrompts) { template in
@@ -277,6 +264,9 @@ struct TemplatesView: View {
         case .forbidden:
             ForEach(sortedForbiddenPhrases) { phrase in
                 rowButton(value: .forbiddenPhrase(phrase.uuid), title: phrase.phrase, subtitle: phrase.replacement)
+            }
+            ForEach(editorDictionaries) { dict in
+                rowButton(value: .editorDictionary(dict.uuid), title: "Словарь правок", subtitle: "Редполитика")
             }
         }
     }
@@ -336,12 +326,6 @@ struct TemplatesView: View {
                                             reasoning: t.reasoningEffort)
             )
         }
-        ForEach(sortedRoles.filter { $0.name.lowercased().contains(q) }) { role in
-            rowButton(value: .role(role.uuid), title: role.name, subtitle: "\(role.blockKeys.count) блоков")
-        }
-        ForEach(sortedBlocks.filter { $0.title.lowercased().contains(q) }) { block in
-            rowButton(value: .block(block.uuid), title: block.title, subtitle: "Контекст")
-        }
         ForEach(sortedSkills.filter { $0.name.lowercased().contains(q) }) { skill in
             rowButton(value: .skill(skill.uuid), title: skill.name, subtitle: "Скилл")
         }
@@ -361,15 +345,12 @@ struct TemplatesView: View {
         switch sel {
         case .stage(let id):
             if let t = templates.first(where: { $0.uuid == id }) {
-                TemplateEditorView(template: t)
-            }
-        case .role(let id):
-            if let role = roles.first(where: { $0.uuid == id }) {
-                RoleEditorView(role: role, blocks: sortedBlocks)
-            }
-        case .block(let id):
-            if let block = blocks.first(where: { $0.uuid == id }) {
-                ContextBlockEditorView(block: block, roles: sortedRoles)
+                StagePromptEditorView(
+                    template: t,
+                    role: t.stage.flatMap { stage in sortedRoles.first { $0.key == stage.roleKey } },
+                    blocks: sortedBlocks,
+                    allRoles: sortedRoles
+                )
             }
         case .imagePrompt(let id):
             if let prompt = imagePrompts.first(where: { $0.uuid == id }) {
