@@ -15,6 +15,8 @@ final class FakeDocsClient: DocsPublishing {
     nonisolated(unsafe) var uploads: [(name: String, parentID: String, byteCount: Int)] = []
     nonisolated(unsafe) var failUpload = false
     nonisolated(unsafe) var nextFileIDNumber = 1
+    nonisolated(unsafe) var shared: [(fileID: String, role: String)] = []
+    nonisolated(unsafe) var failShare = false
 
     func createDocument(title: String) async throws -> String { created.append(title); return nextDocID }
     func batchUpdate(docID: String, requests: [[String: Any]]) async throws {
@@ -35,6 +37,10 @@ final class FakeDocsClient: DocsPublishing {
         return "file-\(nextFileIDNumber)"
     }
     func moveToFolder(fileID: String, folderID: String) async throws { moved.append((fileID, folderID)) }
+    func shareWithAnyoneWithLink(fileID: String, role: String) async throws {
+        if failShare { throw GoogleDocsClient.DocsError.http(403) }
+        shared.append((fileID, role))
+    }
 }
 
 @MainActor
@@ -219,6 +225,69 @@ struct ArticlePublisherTests {
         #expect(topic.publications.isEmpty)
         #expect(publisher.lastErrorMessage?.contains("картинки") == true)
         #expect(publisher.lastErrorMessage?.localizedStandardContains("500") == true)
+    }
+
+    @Test func publishOpensLinkAccessForDocument() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context, "# Заголовок\nАбзац.")
+        let fake = FakeDocsClient()
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, in: context)
+
+        #expect(publisher.lastErrorMessage == nil)
+        #expect(fake.shared.contains { $0.fileID == "doc-new" && $0.role == "writer" })
+        #expect(publisher.lastPublishedDocURL?.contains("doc-new") == true)
+    }
+
+    @Test func publishOpensLinkAccessForIllustrationsFolder() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context, "# Заголовок\nТекст.")
+        let img = GeneratedImage(role: .cover, data: Data([1]), promptUsed: "p")
+        img.topic = topic; context.insert(img)
+        let fake = FakeDocsClient()
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, imagesToUpload: [img], in: context)
+
+        #expect(publisher.lastErrorMessage == nil)
+        let folderID = fake.uploads.first?.parentID
+        #expect(folderID != nil)
+        #expect(fake.shared.contains { $0.fileID == folderID && $0.role == "writer" })
+    }
+
+    @Test func republishOpensAccessForFolderFromPreviousPublication() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context, "# Заголовок\nТекст.")
+        topic.illustrationsFolderURL = GoogleDocsClient.folderURL(id: "old-folder")
+        let fake = FakeDocsClient()
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, in: context)
+
+        #expect(fake.uploads.isEmpty)
+        #expect(fake.shared.contains { $0.fileID == "old-folder" })
+    }
+
+    @Test func shareFailureStillPublishesDocumentWithWarning() async throws {
+        let context = try ctx()
+        let topic = topicWithText(context, "# Заголовок\nТекст.")
+        let fake = FakeDocsClient()
+        fake.failShare = true
+        let publisher = ArticlePublisher(docs: fake, tokenProvider: { "t" }, folderName: "SEO-статьи клиники")
+
+        await publisher.publish(topic: topic, mode: .newDocument, in: context)
+
+        #expect(topic.publications.count == 1)
+        #expect(publisher.lastPublishedDocURL != nil)
+        #expect(publisher.lastErrorMessage?.contains("общий доступ") == true)
+    }
+
+    @Test func folderIDParsedBackFromFolderURL() {
+        let url = GoogleDocsClient.folderURL(id: "abc123")
+        #expect(GoogleDocsClient.folderID(fromURL: url) == "abc123")
+        #expect(GoogleDocsClient.folderID(fromURL: "https://drive.google.com/drive/folders/") == nil)
+        #expect(GoogleDocsClient.folderID(fromURL: "https://docs.google.com/document/d/x/edit") == nil)
     }
 
     @Test func publishWithoutImagesLeavesPlaceholder() async throws {

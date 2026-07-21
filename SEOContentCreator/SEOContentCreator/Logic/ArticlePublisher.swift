@@ -10,6 +10,7 @@ protocol DocsPublishing {
     func findOrCreateFolder(name: String, parentID: String) async throws -> String
     func uploadFile(name: String, data: Data, mimeType: String, parentID: String) async throws -> String
     func moveToFolder(fileID: String, folderID: String) async throws
+    func shareWithAnyoneWithLink(fileID: String, role: String) async throws
 }
 
 extension GoogleDocsClient: DocsPublishing {}
@@ -19,6 +20,14 @@ extension GoogleDocsClient: DocsPublishing {}
 final class ArticlePublisher {
     var isPublishing = false
     var lastErrorMessage: String?
+    /// Ссылка на документ последней успешной публикации в этой сессии экрана.
+    /// Экран публикации по ней понимает, что пора показать результат со ссылками.
+    var lastPublishedDocURL: String?
+
+    /// Роль, которую получает любой обладатель ссылки. `writer` выбран
+    /// пользователем: контент-менеджер должна работать с папкой, а не только
+    /// смотреть. Замена на `reader` делает доступ «только просмотр».
+    static let linkShareRole = "writer"
 
     private let docs: DocsPublishing
     private let tokenProvider: () async throws -> String
@@ -40,31 +49,42 @@ final class ArticlePublisher {
                  imagesToUpload: [GeneratedImage] = [], in context: ModelContext) async {
         isPublishing = true
         lastErrorMessage = nil
+        lastPublishedDocURL = nil
         defer { isPublishing = false }
 
         guard let version = topic.currentVersion, !version.text.isEmpty else {
             lastErrorMessage = "Нет принятой версии текста для публикации."
             return
         }
-        // Объявлена вне do { }, чтобы catch тоже видел предупреждение об
-        // ошибке загрузки картинок и не терял его при ошибке публикации.
-        var uploadWarning: String?
+        // Объявлены вне do { }, чтобы catch тоже видел предупреждения о картинках
+        // и об общем доступе и не терял их при ошибке публикации документа.
+        var warnings: [String] = []
         do {
             _ = try await tokenProvider()
 
             // Картинки грузим ДО документа, чтобы реальная ссылка на папку
             // попала в текст уже при первой публикации. Ошибка загрузки не
             // блокирует публикацию документа — только предупреждение в конце.
+            var illustrationsFolderID: String?
             if !imagesToUpload.isEmpty {
                 do {
                     let result = try await ImageDriveUploader.upload(
                         images: imagesToUpload, topic: topic,
                         drive: docs, rootFolderName: folderName)
                     topic.illustrationsFolderURL = result.folderURL
+                    illustrationsFolderID = result.folderID
                 } catch {
-                    let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                    uploadWarning = "Документ опубликован, но картинки загрузить не удалось: \(reason)"
+                    warnings.append("Документ опубликован, но картинки загрузить не удалось: \(Self.reason(error))")
                 }
+            } else if let existing = topic.illustrationsFolderURL {
+                // Тема публиковалась раньше: доступ к её папке всё равно обновляем,
+                // иначе папки статей, опубликованных до появления общего доступа,
+                // остались бы закрытыми навсегда.
+                illustrationsFolderID = GoogleDocsClient.folderID(fromURL: existing)
+            }
+            if let id = illustrationsFolderID,
+               let warning = await shareWarning(fileID: id, target: "к папке с иллюстрациями") {
+                warnings.append(warning)
             }
 
             var text = version.text
@@ -90,27 +110,53 @@ final class ArticlePublisher {
                     let id = try await docs.createDocument(title: docTitle)
                     try await fill(docID: id, requests: requests)
                     try await place(docID: id)
-                    record(topic: topic, docID: id, mode: .newDocument, in: context)
-                    lastErrorMessage = uploadWarning
+                    warnings += await finish(topic: topic, docID: id, mode: .newDocument, in: context)
+                    settle(warnings)
                     return
                 }
                 docID = existing
                 let endIndex = try await docs.documentBodyEndIndex(docID: docID)
                 let replacementRequests = DocsRequestBuilder.buildReplacingBody(segments: segments, existingBodyEndIndex: endIndex)
                 try await fill(docID: docID, requests: replacementRequests)
-                record(topic: topic, docID: docID, mode: mode, in: context)
-                lastErrorMessage = uploadWarning
+                warnings += await finish(topic: topic, docID: docID, mode: mode, in: context)
+                settle(warnings)
                 return
             }
 
             try await fill(docID: docID, requests: requests)
             if mode == .newDocument { try await place(docID: docID) }
-            record(topic: topic, docID: docID, mode: mode, in: context)
-            lastErrorMessage = uploadWarning
+            warnings += await finish(topic: topic, docID: docID, mode: mode, in: context)
+            settle(warnings)
         } catch {
-            let docError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            lastErrorMessage = uploadWarning.map { "\($0)\n\(docError)" } ?? docError
+            warnings.append(Self.reason(error))
+            settle(warnings)
         }
+    }
+
+    /// Открывает доступ к документу и записывает публикацию. Возвращает
+    /// предупреждения: неудачная выдача доступа не отменяет саму публикацию.
+    private func finish(topic: Topic, docID: String, mode: PublishMode,
+                        in context: ModelContext) async -> [String] {
+        let warning = await shareWarning(fileID: docID, target: "к документу")
+        record(topic: topic, docID: docID, mode: mode, in: context)
+        return warning.map { [$0] } ?? []
+    }
+
+    private func shareWarning(fileID: String, target: String) async -> String? {
+        do {
+            try await docs.shareWithAnyoneWithLink(fileID: fileID, role: Self.linkShareRole)
+            return nil
+        } catch {
+            return "Не удалось открыть общий доступ \(target): \(Self.reason(error))"
+        }
+    }
+
+    private func settle(_ warnings: [String]) {
+        lastErrorMessage = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
+    }
+
+    private static func reason(_ error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
     }
 
     private func fill(docID: String, requests: [[String: Any]]) async throws {
@@ -129,6 +175,7 @@ final class ArticlePublisher {
         context.insert(doc)
         topic.externalDocURL = url
         topic.publishedAt = .now
+        lastPublishedDocURL = url
     }
 
     /// Публикуемый документ должен показывать SEO-утверждённый H1 (из этапа

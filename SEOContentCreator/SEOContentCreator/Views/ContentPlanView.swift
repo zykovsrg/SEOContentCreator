@@ -64,6 +64,7 @@ struct ContentPlanView: View {
         static let type: CGFloat = 110
         static let stages: CGFloat = 150
         static let status: CGFloat = 190
+        static let links: CGFloat = 56
         static let tokens: CGFloat = 80
     }
 
@@ -74,6 +75,7 @@ struct ContentPlanView: View {
             Text("Тип").frame(width: Col.type, alignment: .leading)
             Text("Этапы").frame(width: Col.stages, alignment: .leading)
             Text("Статус").frame(width: Col.status, alignment: .leading)
+            Text("Ссылки").frame(width: Col.links, alignment: .leading)
             Text("Токены").frame(width: Col.tokens, alignment: .trailing)
         }
         .font(.caption).foregroundStyle(.secondary)
@@ -99,12 +101,32 @@ struct ContentPlanView: View {
                 .frame(width: Col.stages, alignment: .leading)
             StatusPill(label: status.label, tone: status.tone)
                 .frame(width: Col.status, alignment: .leading)
+            HStack(spacing: 8) {
+                linkIcon(urlString: topic.externalDocURL, systemImage: "doc.text",
+                         help: "Открыть документ статьи")
+                linkIcon(urlString: topic.illustrationsFolderURL, systemImage: "folder",
+                         help: "Открыть папку с иллюстрациями")
+            }
+            .frame(width: Col.links, alignment: .leading)
             Text(topic.totalTokenCost > 0 ? "\(topic.totalTokenCost)" : "—")
                 .frame(width: Col.tokens, alignment: .trailing)
         }
         .padding(.horizontal, 16).padding(.vertical, 8)
         .contentShape(Rectangle())
         .tag(topic.id)
+    }
+
+    /// Ссылка появляется только после публикации, поэтому у неопубликованных тем
+    /// значок остаётся на месте, но приглушён — колонка не «прыгает».
+    @ViewBuilder
+    private func linkIcon(urlString: String?, systemImage: String, help: String) -> some View {
+        if let urlString, let url = URL(string: urlString) {
+            Link(destination: url) { Image(systemName: systemImage) }
+                .foregroundStyle(Color.accentColor)
+                .help(help)
+        } else {
+            Image(systemName: systemImage).foregroundStyle(.quaternary)
+        }
     }
 
     private var planTable: some View {

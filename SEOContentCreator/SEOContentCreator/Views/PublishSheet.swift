@@ -10,6 +10,7 @@ struct PublishSheet: View {
     @State private var confirmOverwrite = false
     @State private var selectedDocID: String?
     @State private var selectedImageIDs: Set<UUID> = []
+    @State private var copiedLink: String?
 
     private var hasPrevious: Bool { !topic.publications.isEmpty }
     private var sortedPublications: [ExternalDocument] {
@@ -23,6 +24,26 @@ struct PublishSheet: View {
     }
 
     var body: some View {
+        Group {
+            if publisher.lastPublishedDocURL != nil { resultView } else { formView }
+        }
+        .padding(20)
+        .frame(width: 520, height: 600)
+        .confirmationDialog("Перезаписать существующий документ?", isPresented: $confirmOverwrite) {
+            Button("Перезаписать", role: .destructive) { Task { await doPublish() } }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Текущее содержимое документа будет заменено.")
+        }
+        .onAppear {
+            if let coverID = topic.coverImageID,
+               selectableImages.contains(where: { $0.uuid == coverID }) {
+                selectedImageIDs = [coverID]
+            }
+        }
+    }
+
+    private var formView: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Публикация в Google Docs").font(.title2).bold()
 
@@ -33,6 +54,8 @@ struct PublishSheet: View {
                     if let link = topic.illustrationsFolderURL, let url = URL(string: link) {
                         Link("Папка иллюстраций на Диске", destination: url).font(.callout)
                     }
+                    Text("После публикации документ и папка с картинками получат доступ по ссылке.")
+                        .font(.caption).foregroundStyle(.secondary)
                     if topic.currentVersion == nil {
                         Text("Нет принятой версии текста.").foregroundStyle(.red)
                     }
@@ -96,18 +119,64 @@ struct PublishSheet: View {
                 .disabled(publisher.isPublishing || topic.currentVersion == nil)
             }
         }
-        .padding(20)
-        .frame(width: 520, height: 600)
-        .confirmationDialog("Перезаписать существующий документ?", isPresented: $confirmOverwrite) {
-            Button("Перезаписать", role: .destructive) { Task { await doPublish() } }
-            Button("Отмена", role: .cancel) {}
-        } message: {
-            Text("Текущее содержимое документа будет заменено.")
+    }
+
+    private var resultView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Статья опубликована", systemImage: "checkmark.circle.fill")
+                .font(.title2).bold().foregroundStyle(.green)
+
+            if let warning = publisher.lastErrorMessage {
+                Text(warning).foregroundStyle(.orange).font(.callout)
+            }
+
+            GroupBox("Ссылки") {
+                VStack(alignment: .leading, spacing: 12) {
+                    linkRow(title: "Документ статьи", urlString: publisher.lastPublishedDocURL,
+                            emptyNote: nil)
+                    linkRow(title: "Папка с иллюстрациями", urlString: topic.illustrationsFolderURL,
+                            emptyNote: "Картинки не загружались, поэтому папки нет.")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Text("Доступ по ссылке открыт: контент-менеджер сможет открыть документ и забрать фотки без приглашения и без входа в Google.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer()
+
+            HStack {
+                Spacer()
+                Button("Готово") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
         }
-        .onAppear {
-            if let coverID = topic.coverImageID,
-               selectableImages.contains(where: { $0.uuid == coverID }) {
-                selectedImageIDs = [coverID]
+    }
+
+    @ViewBuilder
+    private func linkRow(title: String, urlString: String?, emptyNote: String?) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.callout).bold()
+            if let urlString, let url = URL(string: urlString) {
+                HStack(spacing: 8) {
+                    Link(urlString, destination: url)
+                        .lineLimit(1).truncationMode(.middle)
+                    Button {
+                        let pb = NSPasteboard.general
+                        pb.clearContents()
+                        pb.setString(urlString, forType: .string)
+                        copiedLink = title
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Скопировать ссылку")
+                    if copiedLink == title {
+                        Text("Скопировано").font(.caption).foregroundStyle(.green)
+                    }
+                }
+            } else if let emptyNote {
+                Text(emptyNote).font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -152,6 +221,5 @@ struct PublishSheet: View {
             imagesToUpload: images,
             in: context
         )
-        if publisher.lastErrorMessage == nil { dismiss() }
     }
 }

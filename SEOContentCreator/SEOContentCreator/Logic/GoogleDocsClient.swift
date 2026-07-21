@@ -110,6 +110,22 @@ struct GoogleDocsClient {
         "https://drive.google.com/drive/folders/\(id)"
     }
 
+    static func folderID(fromURL url: String) -> String? {
+        guard let range = url.range(of: "/drive/folders/") else { return nil }
+        let id = url[range.upperBound...].components(separatedBy: "/").first
+        return (id?.isEmpty == false) ? id : nil
+    }
+
+    /// Grants "anyone with the link" access. A permission set on a folder cascades
+    /// to everything inside it, so sharing the topic folder covers its images.
+    /// Repeat calls are safe: Drive keeps one `anyone` permission per file and
+    /// updates its role instead of adding duplicates.
+    /// Works under the `drive.file` scope because the app created these files.
+    func shareWithAnyoneWithLink(fileID: String, role: String) async throws {
+        let url = URL(string: "https://www.googleapis.com/drive/v3/files/\(fileID)/permissions")!
+        _ = try await send(url: url, method: "POST", json: ["role": role, "type": "anyone"])
+    }
+
     /// Finds or creates a folder INSIDE the given parent (unlike the root-level
     /// `findOrCreateFolder(name:)` above).
     func findOrCreateFolder(name: String, parentID: String) async throws -> String {
