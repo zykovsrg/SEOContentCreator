@@ -5,7 +5,9 @@ import Foundation
 /// `save(apiKey:account:)` / `loadAPIKey(account:)` pair — despite the
 /// `apiKey` parameter name, they are generic secret-string storage keyed by
 /// `account`, so adding near-duplicate overloads here would just be
-/// redundant Keychain code.
+/// redundant Keychain code. `folderID` is not a secret, but storing it
+/// alongside the real credentials keeps this to one storage mechanism
+/// instead of adding separate UserDefaults plumbing for one value.
 enum WordstatCredentialStore {
     static func saveLegacyToken(_ token: String) throws {
         try KeychainService.save(apiKey: token, account: "wordstatLegacyToken")

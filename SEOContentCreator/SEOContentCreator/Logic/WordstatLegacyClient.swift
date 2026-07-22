@@ -3,7 +3,10 @@ import Foundation
 /// The legacy OAuth-based Wordstat API. As of 2026-07-22 this endpoint fails
 /// at the TLS layer (see docs/superpowers/notes/2026-07-22-wordstat-api.md) —
 /// built anyway in case Yandex restores it or a different token behaves
-/// differently. Response shape is unconfirmed; see WordstatResponseParser.
+/// differently. Only the auth mechanism (Bearer header) is documented; the
+/// rest of the request/response contract — request field names, region
+/// format, response shape — is unconfirmed by any live successful call. See
+/// WordstatResponseParser.
 struct WordstatLegacyClient {
     enum ClientError: Error, LocalizedError, Equatable {
         case missingToken
@@ -14,14 +17,14 @@ struct WordstatLegacyClient {
         var errorDescription: String? {
             switch self {
             case .missingToken:
-                return "Не задан токен Wordstat. Добавьте его в настройках."
+                return "Не задан токен старого API Wordstat. Добавьте его в настройках."
             case .endpointUnavailable:
                 return "Старый API Wordstat недоступен (ошибка TLS-сертификата). "
                     + "Похоже, сервис отключён. Переключитесь на Yandex Cloud в настройках."
             case .quotaExceeded:
-                return "Исчерпан дневной лимит запросов к Wordstat. Попробуйте завтра."
+                return "Исчерпан дневной лимит запросов к старому API Wordstat. Попробуйте завтра."
             case .httpError(let code):
-                return "Wordstat вернул ошибку \(code)."
+                return "Старый API Wordstat вернул ошибку \(code)."
             }
         }
     }
@@ -59,7 +62,7 @@ struct WordstatLegacyClient {
 
     /// Task 1 observed exactly this failure live: a certificate for
     /// wordstat.yandex.ru served on the api.wordstat.yandex.net host.
-    private static func isCertificateFailure(_ error: URLError) -> Bool {
+    static func isCertificateFailure(_ error: URLError) -> Bool {
         [.serverCertificateUntrusted, .serverCertificateHasBadDate,
          .serverCertificateNotYetValid, .secureConnectionFailed].contains(error.code)
     }
