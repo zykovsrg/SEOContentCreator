@@ -25,6 +25,11 @@ enum TemplateVariables {
         TemplateVariable(token: "{{текущий_h1}}", description: "H1 текущей версии (если задан этапом «Семантика-в-текст»)", source: "Предыдущая версия"),
         TemplateVariable(token: "{{текущий_title}}", description: "SEO Title текущей версии", source: "Предыдущая версия"),
         TemplateVariable(token: "{{текущий_description}}", description: "SEO Description текущей версии", source: "Предыдущая версия"),
-        TemplateVariable(token: "{{запрещённые_формулировки}}", description: "Таблица запрещённых формулировок", source: "Шаблоны → Запрещённые формулировки")
+        TemplateVariable(token: "{{запрещённые_формулировки}}", description: "Таблица запрещённых формулировок", source: "Шаблоны → Запрещённые формулировки"),
+        TemplateVariable(
+            token: "{{задача_читателя}}",
+            description: "Сохранённая карта задачи читателя",
+            source: "Подготовка статьи → Задача читателя"
+        )
     ]
 }

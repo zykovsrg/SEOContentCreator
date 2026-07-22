@@ -40,11 +40,10 @@ struct StageTemplateDefaultsTests {
         #expect(StageTemplateDefaults.content(for: .draft).userPromptTemplate.contains("{{структура}}"))
     }
 
-    @Test func structureStageIsPlanOnlyWithoutKeywords() {
+    @Test func structureStageIsPlanOnlyWithoutStructureVariable() {
         let c = StageTemplateDefaults.content(for: .structure)
         #expect(c.userPromptTemplate.contains("{{тема}}"))
         #expect(c.userPromptTemplate.contains("H1"))
-        #expect(!c.userPromptTemplate.contains("{{семантика}}"))
         #expect(!c.userPromptTemplate.contains("{{структура}}"))
     }
 
@@ -67,5 +66,31 @@ struct StageTemplateDefaultsTests {
         #expect(c.userPromptTemplate.contains("{{текущие_промты_этапов}}"))
         #expect(c.userPromptTemplate.contains("recommendations"))
         #expect(c.temperature == 0.3)
+    }
+
+    @Test func readerIntentAppearsOnlyInRelevantStages() {
+        let included: Set<PipelineStage> = [.structure, .draft, .semanticsInText, .seoCheck]
+        for stage in PipelineStage.allCases where stage.kind != .action {
+            let prompt = StageTemplateDefaults.content(for: stage).userPromptTemplate
+            let contains = prompt.contains("{{задача_читателя}}")
+            #expect(contains == included.contains(stage))
+            if included.contains(stage) {
+                #expect(prompt.contains("<!-- reader-intent-v1:\(stage.rawValue) -->"))
+            }
+        }
+    }
+
+    @Test func structureUsesSemanticsAsOrientationNotMandatoryKeys() {
+        let prompt = StageTemplateDefaults.content(for: .structure).userPromptTemplate
+        #expect(prompt.contains("{{семантика}}"))
+        #expect(prompt.contains("ориентир"))
+        #expect(prompt.contains("не список обязательных"))
+        #expect(!prompt.contains("блок «Полезное действие»"))
+    }
+
+    @Test func seoCheckAddsIntentAndCompletenessCategories() {
+        let prompt = StageTemplateDefaults.content(for: .seoCheck).userPromptTemplate
+        #expect(prompt.contains("«Интент»"))
+        #expect(prompt.contains("«Полнота»"))
     }
 }
