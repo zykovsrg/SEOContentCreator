@@ -34,6 +34,7 @@ These types are used across tasks. Names must match exactly.
 |---|---|---|
 | `WordstatPhrase` | 2 | `struct { text: String, frequency: Int }` |
 | `WordstatProvider` | 2 | `(_ seed: String) async throws -> [WordstatPhrase]` |
+| `WordstatProviderKind` | 10 | enum: `legacy`, `cloud` — which client backs the provider |
 | `SemanticDroppedPhrase` | 3 | `struct { phrase: WordstatPhrase, reason: String }` |
 | `SemanticRuleFilterResult` | 3 | `struct { survivors: [WordstatPhrase], dropped: [SemanticDroppedPhrase] }` |
 | `SemanticSeedPlan` | 6 | `struct { synonyms: [String], masks: [String], tails: [String] }` |
@@ -1492,18 +1493,68 @@ git commit -m "feat: add standalone cannibalization checker"
 
 ---
 
-### Task 10: Real Wordstat client
+### Task 10: Real Wordstat client — two providers behind one interface
 
-Do not start until Task 1 is complete. Read `docs/superpowers/notes/2026-07-22-wordstat-api.md` and use the recorded endpoint, auth, and response shape. The code below is the shape the rest of the plan depends on; the request construction and the `Response` decoding structs must match the note, not this sketch.
+Task 1 found that the user's existing credential (an OAuth token for the legacy
+`api.wordstat.yandex.net`) fails at the TLS layer — the server presents a
+certificate for `wordstat.yandex.ru`, not for the host being called, and the
+official docs now point at a replacement API on Yandex Cloud. Full findings:
+`docs/superpowers/notes/2026-07-22-wordstat-api.md`.
+
+The user asked to build both, since the legacy one might start working again
+(a different token, a Yandex-side fix) and the Cloud one needs a Yandex Cloud
+account that does not exist yet. Both providers produce the same
+`WordstatProvider` closure from Task 2, so `SemanticCollectionRunner` (Task 11)
+and the funnel screen (Task 12) never know which one is active — only a
+`WordstatProviderKind` setting picks between them.
+
+Confidence differs sharply between the two:
+
+- **Cloud client**: request and response shape are documented in detail and
+  corroborated by two independent sources plus the official migration notice.
+  Build it to spec with normal confidence.
+- **Legacy client**: request auth is documented; the response shape is not
+  confirmed anywhere (the live call never got past the TLS handshake). It
+  reuses the Cloud response parser as a best-effort guess — both are Wordstat
+  data, so the shapes are plausibly close — but this is explicitly a guess, not
+  a confirmed fact. If the legacy endpoint ever responds for real with a
+  different shape, the parser will need revisiting; that is expected, not a
+  bug in this task.
 
 **Files:**
-- Create: `SEOContentCreator/SEOContentCreator/Logic/WordstatClient.swift`
+- Create: `SEOContentCreator/SEOContentCreator/Logic/WordstatResponseParser.swift`
+- Create: `SEOContentCreator/SEOContentCreator/Logic/WordstatCloudClient.swift`
+- Create: `SEOContentCreator/SEOContentCreator/Logic/WordstatLegacyClient.swift`
 - Create: `SEOContentCreator/SEOContentCreator/Logic/WordstatCredentialStore.swift`
+- Create: `SEOContentCreator/SEOContentCreatorTests/Fixtures/wordstat-cloud-sample.json`
 - Test: `SEOContentCreator/SEOContentCreatorTests/WordstatResponseParserTests.swift`
 
-- [ ] **Step 1: Write the failing parser test using the Task 1 fixture**
+- [ ] **Step 1: Add the fixture**
 
-Adjust the expected values to match the phrases actually present in your fixture.
+This is a synthetic fixture built from the documented Cloud API response shape
+in the Task 1 note (no live call ever returned a body, so nothing was actually
+captured). Create it directly — no test needed for the fixture itself:
+
+```json
+{
+  "totalCount": "71858",
+  "results": [
+    {"phrase": "рак молочной железы лечение", "count": "15927"},
+    {"phrase": "рак молочной железы симптомы", "count": "9127"},
+    {"phrase": "рак молочной железы диагностика", "count": "8890"},
+    {"phrase": "рак молочной железы 1 стадия", "count": "4300"},
+    {"phrase": "рак молочной железы реферат", "count": "3208"}
+  ],
+  "associations": []
+}
+```
+
+```bash
+mkdir -p SEOContentCreator/SEOContentCreatorTests/Fixtures
+# write the JSON above to SEOContentCreator/SEOContentCreatorTests/Fixtures/wordstat-cloud-sample.json
+```
+
+- [ ] **Step 2: Write the failing parser tests**
 
 ```swift
 import Testing
@@ -1513,7 +1564,7 @@ import Foundation
 struct WordstatResponseParserTests {
     private func fixture() throws -> Data {
         let url = Bundle(for: BundleMarker.self)
-            .url(forResource: "wordstat-sample", withExtension: "json")
+            .url(forResource: "wordstat-cloud-sample", withExtension: "json")
         let path = try #require(url)
         return try Data(contentsOf: path)
     }
@@ -1521,9 +1572,29 @@ struct WordstatResponseParserTests {
     @Test func parsesPhrasesWithFrequencies() throws {
         let phrases = try WordstatResponseParser.parse(fixture())
 
-        #expect(!phrases.isEmpty)
-        #expect(phrases.allSatisfy { !$0.text.isEmpty })
-        #expect(phrases.allSatisfy { $0.frequency >= 0 })
+        #expect(phrases.count == 5)
+        #expect(phrases[0] == WordstatPhrase(text: "рак молочной железы лечение", frequency: 15927))
+    }
+
+    @Test func decodesCountEncodedAsString() throws {
+        // The Cloud API sends count as a string (gRPC int64 serialization).
+        let data = Data("""
+        {"totalCount":"1","results":[{"phrase":"пример","count":"42"}],"associations":[]}
+        """.utf8)
+
+        let phrases = try WordstatResponseParser.parse(data)
+
+        #expect(phrases == [WordstatPhrase(text: "пример", frequency: 42)])
+    }
+
+    @Test func skipsBlankPhrases() throws {
+        let data = Data("""
+        {"totalCount":"1","results":[{"phrase":"  ","count":"5"}],"associations":[]}
+        """.utf8)
+
+        let phrases = try WordstatResponseParser.parse(data)
+
+        #expect(phrases.isEmpty)
     }
 
     @Test func throwsOnMalformedJSON() {
@@ -1539,30 +1610,30 @@ struct WordstatResponseParserTests {
 private final class BundleMarker {}
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 3: Run tests to verify they fail**
 
 Compile. Expected: "cannot find 'WordstatResponseParser' in scope".
 
-- [ ] **Step 3: Write the parser and client**
-
-Fill `Response` and the `phrases` mapping from the Task 1 note.
+- [ ] **Step 4: Write the shared parser**
 
 ```swift
 import Foundation
 
+/// Shape confirmed for the Cloud API's `/topRequests` response
+/// (docs/superpowers/notes/2026-07-22-wordstat-api.md). Reused as a
+/// best-effort guess for the legacy API too, since its response shape was
+/// never actually observed.
 enum WordstatResponseParser {
     enum ParserError: Error, Equatable {
         case badResponse
     }
 
-    /// Shape comes from docs/superpowers/notes/2026-07-22-wordstat-api.md.
-    /// Adjust the coding keys there rather than guessing here.
     private struct Response: Decodable {
         struct Phrase: Decodable {
             var phrase: String
-            var count: Int
+            var count: String
         }
-        var includingPhrases: [Phrase]
+        var results: [Phrase]
     }
 
     static func parse(_ data: Data) throws -> [WordstatPhrase] {
@@ -1570,17 +1641,140 @@ enum WordstatResponseParser {
             throw ParserError.badResponse
         }
 
-        return response.includingPhrases.compactMap { item in
+        return response.results.compactMap { item in
             let text = item.phrase.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { return nil }
-            return WordstatPhrase(text: text, frequency: max(0, item.count))
+            guard !text.isEmpty, let count = Int(item.count) else { return nil }
+            return WordstatPhrase(text: text, frequency: max(0, count))
         }
     }
 }
+```
 
-struct WordstatClient {
+- [ ] **Step 5: Run tests to verify they pass**
+
+Compile, then run `WordstatResponseParserTests` with Cmd+U. Expected: 4 tests pass.
+
+- [ ] **Step 6: Write the credential store**
+
+Read `KeychainService.swift` first and mirror its API for three additional
+keys — the legacy token and the two Cloud credentials:
+
+```swift
+import Foundation
+
+/// Stores Wordstat credentials for both providers alongside the OpenAI key,
+/// using the same Keychain path.
+enum WordstatCredentialStore {
+    static func saveLegacyToken(_ token: String) throws {
+        try KeychainService.save(token, account: "wordstatLegacyToken")
+    }
+
+    static func loadLegacyToken() throws -> String {
+        try KeychainService.load(account: "wordstatLegacyToken")
+    }
+
+    static func saveCloudAPIKey(_ key: String) throws {
+        try KeychainService.save(key, account: "wordstatCloudAPIKey")
+    }
+
+    static func loadCloudAPIKey() throws -> String {
+        try KeychainService.load(account: "wordstatCloudAPIKey")
+    }
+
+    static func saveCloudFolderID(_ folderID: String) throws {
+        try KeychainService.save(folderID, account: "wordstatCloudFolderID")
+    }
+
+    static func loadCloudFolderID() throws -> String {
+        try KeychainService.load(account: "wordstatCloudFolderID")
+    }
+}
+```
+
+If `KeychainService` does not expose `save(_:account:)` and `load(account:)`,
+add those overloads there rather than duplicating Keychain code.
+
+- [ ] **Step 7: Write the Cloud client**
+
+```swift
+import Foundation
+
+/// The current, documented, self-service Wordstat API. See
+/// docs/superpowers/notes/2026-07-22-wordstat-api.md for the source.
+struct WordstatCloudClient {
+    enum ClientError: Error, LocalizedError, Equatable {
+        case missingCredentials
+        case quotaExceeded
+        case httpError(Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .missingCredentials:
+                return "Не заданы ключ и folderId Yandex Cloud. Добавьте их в настройках."
+            case .quotaExceeded:
+                return "Исчерпан лимит запросов к Wordstat (Yandex Cloud). Попробуйте позже."
+            case .httpError(let code):
+                return "Wordstat (Yandex Cloud) вернул ошибку \(code)."
+            }
+        }
+    }
+
+    /// Moscow city and Moscow region — the confirmed defaults.
+    static let defaultRegions = ["213", "1"]
+
+    var apiKey: String
+    var folderID: String
+    var session: URLSession = .shared
+
+    func phrases(for seed: String) async throws -> [WordstatPhrase] {
+        guard !apiKey.isEmpty, !folderID.isEmpty else { throw ClientError.missingCredentials }
+
+        var request = URLRequest(url: Self.endpoint)
+        request.httpMethod = "POST"
+        request.setValue("Api-Key \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "phrase": seed,
+            "folderId": folderID,
+            "numPhrases": 200,
+            "regions": Self.defaultRegions,
+            "devices": ["DEVICE_ALL"]
+        ])
+
+        let (data, response) = try await session.data(for: request)
+
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw http.statusCode == 429 ? ClientError.quotaExceeded : ClientError.httpError(http.statusCode)
+        }
+
+        return try WordstatResponseParser.parse(data)
+    }
+
+    static let endpoint = URL(string: "https://searchapi.api.cloud.yandex.net/v2/wordstat/topRequests")!
+
+    func provider() -> WordstatProvider {
+        { seed in try await phrases(for: seed) }
+    }
+}
+```
+
+- [ ] **Step 8: Write the legacy client**
+
+The distinguishing feature: a TLS/certificate failure gets a specific,
+actionable error instead of a generic network message, since Task 1 confirmed
+this is the failure mode to expect today.
+
+```swift
+import Foundation
+
+/// The legacy OAuth-based Wordstat API. As of 2026-07-22 this endpoint fails
+/// at the TLS layer (see docs/superpowers/notes/2026-07-22-wordstat-api.md) —
+/// built anyway in case Yandex restores it or a different token behaves
+/// differently. Response shape is unconfirmed; see WordstatResponseParser.
+struct WordstatLegacyClient {
     enum ClientError: Error, LocalizedError, Equatable {
         case missingToken
+        case endpointUnavailable
         case quotaExceeded
         case httpError(Int)
 
@@ -1588,6 +1782,9 @@ struct WordstatClient {
             switch self {
             case .missingToken:
                 return "Не задан токен Wordstat. Добавьте его в настройках."
+            case .endpointUnavailable:
+                return "Старый API Wordstat недоступен (ошибка TLS-сертификата). "
+                    + "Похоже, сервис отключён. Переключитесь на Yandex Cloud в настройках."
             case .quotaExceeded:
                 return "Исчерпан дневной лимит запросов к Wordstat. Попробуйте завтра."
             case .httpError(let code):
@@ -1596,8 +1793,8 @@ struct WordstatClient {
         }
     }
 
-    /// Moscow and Moscow region, all devices — the confirmed defaults.
-    static let defaultRegions = [1, 213]
+    /// Moscow city and Moscow region — the confirmed defaults.
+    static let defaultRegions = [213, 1]
 
     var token: String
     var session: URLSession = .shared
@@ -1614,16 +1811,26 @@ struct WordstatClient {
             "regions": Self.defaultRegions
         ])
 
-        let (data, response) = try await session.data(for: request)
+        do {
+            let (data, response) = try await session.data(for: request)
 
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw http.statusCode == 429 ? ClientError.quotaExceeded : ClientError.httpError(http.statusCode)
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                throw http.statusCode == 429 ? ClientError.quotaExceeded : ClientError.httpError(http.statusCode)
+            }
+
+            return try WordstatResponseParser.parse(data)
+        } catch let error as URLError where Self.isCertificateFailure(error) {
+            throw ClientError.endpointUnavailable
         }
-
-        return try WordstatResponseParser.parse(data)
     }
 
-    /// Endpoint from the Task 1 note.
+    /// Task 1 observed exactly this failure live: a certificate for
+    /// wordstat.yandex.ru served on the api.wordstat.yandex.net host.
+    private static func isCertificateFailure(_ error: URLError) -> Bool {
+        [.serverCertificateUntrusted, .serverCertificateHasBadDate,
+         .serverCertificateNotYetValid, .secureConnectionFailed].contains(error.code)
+    }
+
     static let endpoint = URL(string: "https://api.wordstat.yandex.net/v1/topRequests")!
 
     func provider() -> WordstatProvider {
@@ -1632,40 +1839,58 @@ struct WordstatClient {
 }
 ```
 
-`WordstatCredentialStore.swift` — read `KeychainService.swift` first and mirror its API for a second key named `wordstatToken`:
+- [ ] **Step 9: Add the provider kind switch**
+
+Add to `WordstatProvider.swift` (Task 2's file):
 
 ```swift
-import Foundation
+/// Which Wordstat backend the app calls. Stored in @AppStorage so the user
+/// can flip it without touching Keychain data for the other one.
+enum WordstatProviderKind: String, CaseIterable {
+    case legacy
+    case cloud
 
-/// Stores the Wordstat token alongside the OpenAI key, using the same Keychain path.
-enum WordstatCredentialStore {
-    private static let account = "wordstatToken"
-
-    static func save(_ token: String) throws {
-        try KeychainService.save(token, account: account)
-    }
-
-    static func load() throws -> String {
-        try KeychainService.load(account: account)
+    var label: String {
+        switch self {
+        case .legacy: return "Старый API (OAuth-токен)"
+        case .cloud: return "Yandex Cloud (API-ключ + folderId)"
+        }
     }
 }
 ```
 
-If `KeychainService` does not expose `save(_:account:)` and `load(account:)`, add those overloads there rather than duplicating Keychain code.
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Compile, then run `WordstatResponseParserTests` with Cmd+U. Expected: 2 tests pass.
-
-- [ ] **Step 5: Verify against the live API once**
-
-Add a temporary scratch call in the app, or use `curl` with the same body the client builds, and confirm the parser handles the live response. Remove any scratch code before committing.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 10: Run tests to verify they still pass**
 
 ```bash
-git add SEOContentCreator/SEOContentCreator/Logic/WordstatClient.swift SEOContentCreator/SEOContentCreator/Logic/WordstatCredentialStore.swift SEOContentCreator/SEOContentCreatorTests/WordstatResponseParserTests.swift
-git commit -m "feat: add Wordstat API client and response parser"
+cd SEOContentCreator && xcodebuild build-for-testing -scheme SEOContentCreator -destination 'platform=macOS' 2>&1 | tail -5
+```
+
+Run `WordstatResponseParserTests` with Cmd+U. Expected: 4 tests pass (unchanged from Step 5 — this step just confirms both new clients compile against the shared parser).
+
+- [ ] **Step 11: Try the legacy client against the live endpoint once, manually**
+
+This is a manual check, not an automated test — it depends on network access
+and a real token that may not be available in every environment.
+
+```bash
+# Fill in a real legacy token if you have one.
+curl -s -o /dev/null -w '%{http_code}\n' -X POST 'https://api.wordstat.yandex.net/v1/topRequests' \
+  -H 'Authorization: Bearer <LEGACY_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{"phrase":"рак молочной железы","regions":[213,1]}'
+```
+
+If this now succeeds (curl completes instead of failing the TLS handshake),
+report it — the certificate problem may have been fixed, and the response body
+should be captured as a new fixture and compared against
+`WordstatResponseParser`'s assumptions. If it still fails at the TLS layer,
+that confirms Task 1's finding and nothing further is needed here.
+
+- [ ] **Step 12: Commit**
+
+```bash
+git add SEOContentCreator/SEOContentCreator/Logic/WordstatResponseParser.swift SEOContentCreator/SEOContentCreator/Logic/WordstatCloudClient.swift SEOContentCreator/SEOContentCreator/Logic/WordstatLegacyClient.swift SEOContentCreator/SEOContentCreator/Logic/WordstatCredentialStore.swift SEOContentCreator/SEOContentCreator/Logic/WordstatProvider.swift SEOContentCreator/SEOContentCreatorTests/WordstatResponseParserTests.swift SEOContentCreator/SEOContentCreatorTests/Fixtures/wordstat-cloud-sample.json
+git commit -m "feat: add Wordstat Cloud and legacy clients behind one provider interface"
 ```
 
 ---
@@ -2077,6 +2302,7 @@ struct SemanticFunnelView: View {
     @Query(sort: \SemanticQueryMask.order) private var masks: [SemanticQueryMask]
 
     @AppStorage("openAIModel") private var model = "gpt-4.1"
+    @AppStorage("wordstatProviderKind") private var providerKindRaw = WordstatProviderKind.cloud.rawValue
 
     @State private var isRunning = false
     @State private var message: String?
@@ -2153,21 +2379,31 @@ struct SemanticFunnelView: View {
         }
     }
 
+    private func makeWordstatProvider() -> WordstatProvider {
+        switch WordstatProviderKind(rawValue: providerKindRaw) ?? .cloud {
+        case .legacy:
+            let token = (try? WordstatCredentialStore.loadLegacyToken()) ?? ""
+            return WordstatLegacyClient(token: token).provider()
+        case .cloud:
+            let apiKey = (try? WordstatCredentialStore.loadCloudAPIKey()) ?? ""
+            let folderID = (try? WordstatCredentialStore.loadCloudFolderID()) ?? ""
+            return WordstatCloudClient(apiKey: apiKey, folderID: folderID).provider()
+        }
+    }
+
     private func collect() {
         isRunning = true
         message = nil
 
         Task {
             do {
-                let token = (try? WordstatCredentialStore.load()) ?? ""
-                let client = WordstatClient(token: token)
                 let planner = SemanticSeedPlanner.live(model: model)
                 let analyzer = SemanticAgentAnalyzer.live(model: model)
                 let checker = SemanticCannibalizationChecker.live(model: model)
 
                 let runner = SemanticCollectionRunner(
                     planSeeds: { topic, masks in try await planner.plan(topic: topic, masks: masks) },
-                    pullPhrases: client.provider(),
+                    pullPhrases: makeWordstatProvider(),
                     analyzeRelevance: { topic, queries in try await analyzer.analyze(topic: topic, queries: queries) },
                     checkCannibalization: { keywords, pages in try await checker.check(keywords: keywords, pages: pages) },
                     stopWords: stopWords.filter(\.isEnabled).map(\.text),
@@ -2397,7 +2633,12 @@ git commit -m "feat: add semantic reference lists to Templates"
 
 ---
 
-### Task 14: Wordstat token in Settings
+### Task 14: Wordstat credentials and provider picker in Settings
+
+Two credential sets, because Task 10 built two clients: the legacy OAuth token
+and the Cloud API key + folderId. A picker selects which one the funnel screen
+uses (`WordstatProviderKind`, stored under the `"wordstatProviderKind"`
+`@AppStorage` key that `SemanticFunnelView` already reads).
 
 **Files:**
 - Modify: `SEOContentCreator/SEOContentCreator/Views/SettingsView.swift`
@@ -2408,9 +2649,17 @@ git commit -m "feat: add semantic reference lists to Templates"
 grep -n "KeychainService\|SecureField\|apiKey" SEOContentCreator/SEOContentCreator/Views/SettingsView.swift
 ```
 
-- [ ] **Step 2: Add a matching field for the Wordstat token**
+- [ ] **Step 2: Add three credential fields and a picker**
 
-Mirror the OpenAI key field exactly — same layout, same save button behavior, same success and failure messages — but call `WordstatCredentialStore.save(_:)` and `WordstatCredentialStore.load()`. Label it «Токен Wordstat» with the help text «Нужен для сбора семантики. Хранится в Keychain, как ключ OpenAI.»
+Mirror the OpenAI key field's layout, save-button behavior, and success/failure
+messages for each field below. Use `SecureField` for the token and API key (they
+are secrets); a plain `TextField` for the folderId (it is an identifier, not a
+secret).
+
+- «Токен Wordstat (старый API)» — `WordstatCredentialStore.saveLegacyToken(_:)` / `loadLegacyToken()`. Help text: «Для api.wordstat.yandex.net. По данным на 2026-07-22 этот API отвечает ошибкой TLS-сертификата — сохраните токен на случай, если Яндекс это исправит.»
+- «Ключ Yandex Cloud» — `WordstatCredentialStore.saveCloudAPIKey(_:)` / `loadCloudAPIKey()`. Help text: «Тот же ключ, что используется для YandexGPT в AI Studio.»
+- «Yandex Cloud folderId» — `WordstatCredentialStore.saveCloudFolderID(_:)` / `loadCloudFolderID()`. Help text: «Идентификатор каталога в Yandex Cloud — не секрет, но обязателен для каждого запроса.»
+- A `Picker("Провайдер Wordstat", selection:)` bound to an `@AppStorage("wordstatProviderKind") private var providerKindRaw = WordstatProviderKind.cloud.rawValue` in `SettingsView`, with one row per `WordstatProviderKind.allCases` showing `.label`.
 
 - [ ] **Step 3: Compile and check manually**
 
@@ -2418,13 +2667,15 @@ Mirror the OpenAI key field exactly — same layout, same save button behavior, 
 cd SEOContentCreator && xcodebuild build-for-testing -scheme SEOContentCreator -destination 'platform=macOS' 2>&1 | tail -5
 ```
 
-Launch the app, open Настройки (Cmd+,), paste the token, save, quit, relaunch, and confirm the field still shows a saved value.
+Launch the app, open Настройки (Cmd+,). For each of the three fields: paste a
+value, save, quit, relaunch, and confirm the field still shows a saved value.
+Switch the picker and confirm the choice persists across relaunch too.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add SEOContentCreator/SEOContentCreator/Views/SettingsView.swift
-git commit -m "feat: add Wordstat token to settings"
+git commit -m "feat: add Wordstat credentials and provider picker to settings"
 ```
 
 ---
@@ -2461,7 +2712,7 @@ git commit -m "docs: record semantic auto-collection in project memory"
 | Spec requirement | Task |
 |---|---|
 | AI planner: synonyms, masks, tails | 6, 7 |
-| Real Wordstat API with frequencies | 1, 10 |
+| Real Wordstat API with frequencies | 1, 10 — two providers (legacy + Cloud) after Task 1 found the legacy endpoint fails TLS |
 | Rule layer: normalize, dedup, minus-words, threshold, top-100 | 3 |
 | Cut runs after rules | 3 (`cutRunsAfterRulesSoLimitIsFilled`) |
 | AI relevance layer, academic phrasing rejected | 8 |

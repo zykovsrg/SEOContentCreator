@@ -288,8 +288,14 @@ environment; CLI verification is limited to `build-for-testing`.
 
 ## Open Questions
 
-- Exact Wordstat API endpoint, auth flow, and quota, to be confirmed from
-  documentation at the start of implementation.
+- Resolved during implementation planning: there turned out to be two Wordstat
+  APIs. The user's existing OAuth token targets a legacy endpoint
+  (`api.wordstat.yandex.net`) that fails at the TLS layer as of 2026-07-22 —
+  the server presents a certificate for the wrong hostname, and the official
+  docs now point at a Yandex Cloud replacement (API key + folderId). Full
+  findings in `docs/superpowers/notes/2026-07-22-wordstat-api.md`. Decision:
+  build both providers behind the same `WordstatProvider` interface, selected
+  by a setting, rather than betting on one. See plan Task 10.
 
 ## Future Work
 
