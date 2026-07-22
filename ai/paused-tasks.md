@@ -24,6 +24,37 @@ Resume criteria:
 
 ## Paused tasks
 
+### 2026-07-22 — Задача читателя (поисковый интент) и пользовательские дефолты промтов
+
+Status: paused
+
+Why paused: пользователь переключился на автоматизацию сбора и очистки семантики
+через Yandex Wordstat и ИИ-агента; подтвердил `task-switch`.
+
+Current state: дизайн и план написаны и закоммичены
+(`docs/superpowers/specs/2026-07-22-reader-intent-personal-prompt-defaults-design.md`,
+`docs/superpowers/plans/2026-07-22-reader-intent-personal-prompt-defaults.md`).
+Реализация не начиналась: в коде нет ни `readerIntent`, ни упоминаний задачи
+читателя, в changelog записи нет. Рабочее дерево чистое.
+
+Relevant files:
+- `docs/superpowers/plans/2026-07-22-reader-intent-personal-prompt-defaults.md` (начинать отсюда)
+- `SEOContentCreator/SEOContentCreator/Models/Topic.swift`
+- `SEOContentCreator/SEOContentCreator/Logic/StageTemplateDefaults.swift`
+- `SEOContentCreator/SEOContentCreator/Logic/StageTemplateSeeder.swift`
+- `SEOContentCreator/SEOContentCreator/Logic/PromptBuilder.swift`
+- `SEOContentCreator/SEOContentCreator/Views/BriefView.swift`
+- `SEOContentCreator/SEOContentCreator/Views/Templates/StagePromptEditorView.swift`
+
+Open risks: SwiftData-совместимость существующей базы; сохранение уже
+модифицированных пользователем промтов; семантика пользовательского дефолта и
+кнопки сброса; недопущение лишнего контекста в нерелевантных этапах.
+
+Resume criteria: пользователь просит вернуться к задаче читателя или к
+пользовательским дефолтам промтов; тогда открыть план и идти по нему через
+`executing-plans`. Учесть, что задача про автосбор семантики может изменить то,
+как семантика попадает на этап «Структура».
+
 ### 2026-07-09 — Inspector layout and bottom action labels
 
 Status: paused
