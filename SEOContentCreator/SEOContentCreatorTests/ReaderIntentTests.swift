@@ -53,4 +53,15 @@ struct ReaderIntentTests {
         topic.semanticKeywords.append(SemanticKeyword(text: "второй", userDecision: .required))
         #expect(intent.isStale(for: topic) == true)
     }
+
+    @Test func presentationStatusCoversMissingReadyAndStale() {
+        let topic = Topic(title: "Тема", articleType: .info)
+        #expect(ReaderIntentStatus.forTopic(topic) == .missing)
+        let intent = ReaderIntent(query: "q", hiddenGoal: "понять решение")
+        intent.semanticSnapshot = []
+        topic.readerIntent = intent
+        #expect(ReaderIntentStatus.forTopic(topic) == .ready(summary: "понять решение"))
+        topic.semanticKeywords = [SemanticKeyword(text: "новый", userDecision: .accepted)]
+        #expect(ReaderIntentStatus.forTopic(topic) == .stale(summary: "понять решение"))
+    }
 }

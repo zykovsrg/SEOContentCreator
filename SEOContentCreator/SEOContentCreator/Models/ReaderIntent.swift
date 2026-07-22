@@ -122,3 +122,17 @@ final class ReaderIntent {
         Array(Set(values.map { clean($0).lowercased() }.filter { !$0.isEmpty })).sorted()
     }
 }
+
+enum ReaderIntentStatus: Equatable {
+    case missing
+    case ready(summary: String)
+    case stale(summary: String)
+
+    static func forTopic(_ topic: Topic) -> ReaderIntentStatus {
+        guard let intent = topic.readerIntent else { return .missing }
+        let summary = intent.hiddenGoal
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return intent.isStale(for: topic) ? .stale(summary: summary) : .ready(summary: summary)
+    }
+}

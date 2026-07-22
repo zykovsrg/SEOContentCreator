@@ -9,6 +9,7 @@ struct StructureEditorSheet: View {
 
     @State private var planText = ""
     @State private var executor: StageExecutor?
+    @State private var showReaderIntent = false
 
     private var isRunning: Bool { executor?.isRunning ?? false }
 
@@ -22,6 +23,8 @@ struct StructureEditorSheet: View {
                 }
                 .disabled(isRunning)
             }
+
+            intentBanner
 
             if let error = executor?.lastErrorMessage {
                 Text(error).font(.callout).foregroundStyle(.red)
@@ -55,6 +58,44 @@ struct StructureEditorSheet: View {
         .onAppear {
             planText = topic.structureText
             if executor == nil { executor = .live(model: model) }
+        }
+        .sheet(isPresented: $showReaderIntent) {
+            ReaderIntentSheet(topic: topic)
+        }
+    }
+
+    @ViewBuilder
+    private var intentBanner: some View {
+        switch ReaderIntentStatus.forTopic(topic) {
+        case .missing:
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text("Задача читателя не заполнена. Структуру можно создать, но рамка интента не попадёт в промт.")
+                    .font(.callout)
+                Spacer()
+                Button("Заполнить") { showReaderIntent = true }
+            }
+            .padding(10)
+            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        case .ready(let summary):
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Text(summary).font(.callout).lineLimit(2)
+                Spacer()
+                Button("Редактировать") { showReaderIntent = true }
+            }
+            .padding(10)
+            .background(Color.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+        case .stale(let summary):
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text("Семантика изменилась — рекомендуется обновить. \(summary)")
+                    .font(.callout).lineLimit(2)
+                Spacer()
+                Button("Редактировать") { showReaderIntent = true }
+            }
+            .padding(10)
+            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
         }
     }
 
