@@ -13,6 +13,7 @@ struct SemanticRuleFilterResult: Equatable, Sendable {
 /// Layer 1 of the funnel: cheap, offline, deterministic.
 /// Order is deliberate — the limit is applied last so junk does not consume slots.
 enum SemanticRuleFilter {
+    /// - Parameter stopWords: Matched as whole tokens against normalized text; multi-word entries will never match.
     static func apply(
         _ phrases: [WordstatPhrase],
         stopWords: [String],
@@ -29,7 +30,10 @@ enum SemanticRuleFilter {
 
         for phrase in phrases {
             let key = normalize(phrase.text)
-            guard !key.isEmpty else { continue }
+            guard !key.isEmpty else {
+                dropped.append(SemanticDroppedPhrase(phrase: phrase, reason: "пустой текст запроса"))
+                continue
+            }
 
             if let matched = normalizedStopWords.first(where: { containsWord($0, in: key) }) {
                 dropped.append(SemanticDroppedPhrase(phrase: phrase, reason: "минус-слово «\(matched)»"))
@@ -45,7 +49,14 @@ enum SemanticRuleFilter {
             }
 
             if let existing = byKey[key] {
-                byKey[key] = WordstatPhrase(text: existing.text, frequency: max(existing.frequency, phrase.frequency))
+                if phrase.frequency > existing.frequency {
+                    // existing's frequency does not survive the merge — record it as the loser.
+                    dropped.append(SemanticDroppedPhrase(phrase: existing, reason: "дубликат «\(existing.text)»"))
+                    byKey[key] = WordstatPhrase(text: existing.text, frequency: phrase.frequency)
+                } else {
+                    // phrase's frequency does not beat (or only ties) existing — it is the loser.
+                    dropped.append(SemanticDroppedPhrase(phrase: phrase, reason: "дубликат «\(existing.text)»"))
+                }
             } else {
                 byKey[key] = phrase
                 order.append(key)
@@ -67,7 +78,7 @@ enum SemanticRuleFilter {
     }
 
     /// Lowercases, unifies ё/е, and collapses whitespace so duplicates match.
-    static func normalize(_ text: String) -> String {
+    private static func normalize(_ text: String) -> String {
         text
             .lowercased()
             .replacingOccurrences(of: "ё", with: "е")

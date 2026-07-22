@@ -85,4 +85,51 @@ struct SemanticRuleFilterTests {
         #expect(result.dropped.map(\.phrase.text) == ["второй"])
         #expect(result.dropped[0].reason.contains("топ-1"))
     }
+
+    @Test func keepsPhraseExactlyAtThreshold() {
+        let input = [phrase("ровно на пороге", 10)]
+
+        let result = SemanticRuleFilter.apply(input, stopWords: [], threshold: 10, limit: 100)
+
+        #expect(result.survivors.map(\.text) == ["ровно на пороге"])
+        #expect(result.dropped.isEmpty)
+    }
+
+    @Test func recordsBlankPhraseAsDropped() {
+        let input = [phrase("   ", 500), phrase("нормальный запрос", 500)]
+
+        let result = SemanticRuleFilter.apply(input, stopWords: [], threshold: 10, limit: 100)
+
+        #expect(result.survivors.map(\.text) == ["нормальный запрос"])
+        #expect(result.dropped.count == 1)
+        #expect(result.dropped[0].reason.contains("пустой"))
+    }
+
+    @Test func recordsMergedDuplicateAsDropped() {
+        let input = [phrase("Рак  Груди", 100), phrase("рак груди", 300)]
+
+        let result = SemanticRuleFilter.apply(input, stopWords: [], threshold: 10, limit: 100)
+
+        #expect(result.survivors.count == 1)
+        #expect(result.survivors[0].frequency == 300)
+        #expect(result.dropped.count == 1)
+        #expect(result.dropped[0].phrase.frequency == 100)
+        #expect(result.dropped[0].reason.contains("дубликат"))
+    }
+
+    @Test func returnsEmptyResultForEmptyInput() {
+        let result = SemanticRuleFilter.apply([], stopWords: [], threshold: 10, limit: 100)
+
+        #expect(result.survivors.isEmpty)
+        #expect(result.dropped.isEmpty)
+    }
+
+    @Test func limitOfZeroDropsEverything() {
+        let input = [phrase("запрос", 500)]
+
+        let result = SemanticRuleFilter.apply(input, stopWords: [], threshold: 10, limit: 0)
+
+        #expect(result.survivors.isEmpty)
+        #expect(result.dropped.count == 1)
+    }
 }
