@@ -74,11 +74,27 @@ final class ReaderIntent {
     }
 
     var taskFormula: String {
-        let audience = Self.clean(audienceContext)
-        let goal = Self.clean(hiddenGoal)
-        let success = Self.clean(successCriterion)
-        let obstacles = Self.clean(barriers)
-        let format = Self.clean(solutionFormat)
+        Self.taskFormula(
+            audienceContext: audienceContext,
+            hiddenGoal: hiddenGoal,
+            successCriterion: successCriterion,
+            barriers: barriers,
+            solutionFormat: solutionFormat
+        )
+    }
+
+    static func taskFormula(
+        audienceContext: String,
+        hiddenGoal: String,
+        successCriterion: String,
+        barriers: String,
+        solutionFormat: String
+    ) -> String {
+        let audience = clean(audienceContext)
+        let goal = clean(hiddenGoal)
+        let success = clean(successCriterion)
+        let obstacles = clean(barriers)
+        let format = clean(solutionFormat)
         var result = "Помочь \(audience.isEmpty ? "читателю" : audience) \(goal.isEmpty ? "решить практическую задачу" : goal)"
         if !success.isEmpty { result += ", чтобы \(success)" }
         if !obstacles.isEmpty { result += ", учитывая \(obstacles)" }

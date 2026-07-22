@@ -17,16 +17,13 @@ struct ReaderIntentDraft: Equatable {
     }
 
     var taskFormula: String {
-        let audience = clean(audienceContext)
-        let goal = clean(hiddenGoal)
-        let success = clean(successCriterion)
-        let obstacles = clean(barriers)
-        let format = clean(solutionFormat)
-        var result = "Помочь \(audience.isEmpty ? "читателю" : audience) \(goal.isEmpty ? "решить практическую задачу" : goal)"
-        if !success.isEmpty { result += ", чтобы \(success)" }
-        if !obstacles.isEmpty { result += ", учитывая \(obstacles)" }
-        if !format.isEmpty { result += ", в формате: \(format)" }
-        return result + "."
+        ReaderIntent.taskFormula(
+            audienceContext: audienceContext,
+            hiddenGoal: hiddenGoal,
+            successCriterion: successCriterion,
+            barriers: barriers,
+            solutionFormat: solutionFormat
+        )
     }
 
     init(intent: ReaderIntent? = nil) {
