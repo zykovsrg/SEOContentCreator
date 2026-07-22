@@ -10,6 +10,9 @@ final class ContextBlock {
     var version: Int
     var createdAt: Date
     var updatedAt: Date
+    var hasPersonalDefault: Bool = false
+    var personalDefaultText: String?
+    var personalDefaultUpdatedAt: Date?
 
     init(
         key: String,

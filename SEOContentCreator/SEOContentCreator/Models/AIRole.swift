@@ -11,6 +11,10 @@ final class AIRole {
     var version: Int
     var createdAt: Date
     var updatedAt: Date
+    var hasPersonalDefault: Bool = false
+    var personalDefaultMandate: String?
+    var personalDefaultBlockKeys: [String] = []
+    var personalDefaultUpdatedAt: Date?
 
     init(
         key: String,
