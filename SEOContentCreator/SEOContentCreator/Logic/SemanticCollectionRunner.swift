@@ -8,7 +8,7 @@ struct SemanticCollectionRunner {
     typealias SeedPlanner = (Topic, [String]) async throws -> SemanticSeedPlan
     typealias PhrasePuller = (String) async throws -> [WordstatPhrase]
     typealias RelevanceAnalyzer = (Topic, [WordstatPhrase]) async throws -> SemanticAgentAnalysis
-    typealias CannibalizationCheck = ([SemanticAgentKeywordResult], [PublishedSitePage]) async throws -> [SemanticAgentKeywordResult]
+    typealias CannibalizationChecker = ([SemanticAgentKeywordResult], [PublishedSitePage]) async throws -> [SemanticAgentKeywordResult]
 
     enum RunError: Error, LocalizedError, Equatable {
         case noPhrasesPulled
@@ -24,7 +24,7 @@ struct SemanticCollectionRunner {
     var planSeeds: SeedPlanner
     var pullPhrases: PhrasePuller
     var analyzeRelevance: RelevanceAnalyzer
-    var checkCannibalization: CannibalizationCheck
+    var checkCannibalization: CannibalizationChecker
     var stopWords: [String]
     var masks: [String]
     var threshold: Int
@@ -38,13 +38,14 @@ struct SemanticCollectionRunner {
 
         var pulled: [WordstatPhrase] = []
         for seed in plan.seedPhrases() {
-            // A failing seed must not abort the run; the funnel records the gap.
-            guard let phrases = try? await pullPhrases(seed) else {
+            // A failing seed must not abort the run; the funnel records why it failed.
+            do {
+                let phrases = try await pullPhrases(seed)
+                pulled.append(contentsOf: phrases)
+            } catch {
                 record(topic: topic, context: context, text: seed, frequency: nil,
-                       layer: .raw, reason: "не удалось выгрузить из Wordstat", runID: runID)
-                continue
+                       layer: .raw, reason: error.localizedDescription, runID: runID)
             }
-            pulled.append(contentsOf: phrases)
         }
 
         guard !pulled.isEmpty else { throw RunError.noPhrasesPulled }

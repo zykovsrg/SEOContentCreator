@@ -137,4 +137,41 @@ struct SemanticCollectionRunnerTests {
 
         #expect(Set(topic.funnelEntries.map(\.runID)).count == 1)
     }
+
+    @Test func recordsRealErrorMessageWhenASeedFails() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        struct FakePullError: Error, LocalizedError {
+            var errorDescription: String? { "квота исчерпана" }
+        }
+
+        let runner = SemanticCollectionRunner(
+            planSeeds: { _, _ in SemanticSeedPlan(synonyms: ["рак груди", "рмж"], masks: [], tails: []) },
+            pullPhrases: { seed in
+                if seed == "рмж" { throw FakePullError() }
+                return [WordstatPhrase(text: "рак груди лечение", frequency: 500)]
+            },
+            analyzeRelevance: { _, _ in
+                SemanticAgentAnalysis(
+                    keywords: [SemanticAgentKeywordResult(
+                        query: "рак груди лечение", frequency: nil, recommendation: .include, reasonCategory: .none,
+                        explanation: "", cannibalizationRisk: .none, cannibalizationURL: nil, cannibalizationTitle: nil
+                    )],
+                    longTail: []
+                )
+            },
+            checkCannibalization: { keywords, _ in keywords },
+            stopWords: [],
+            masks: [],
+            threshold: 10,
+            limit: 100
+        )
+
+        try await runner.run(topic: topic, pages: [], context: context)
+
+        let failedSeed = topic.funnelEntries.first { $0.text == "рмж" }
+        #expect(failedSeed?.reason == "квота исчерпана")
+    }
 }
