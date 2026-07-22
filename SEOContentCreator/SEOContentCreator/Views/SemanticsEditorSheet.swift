@@ -124,7 +124,7 @@ struct SemanticsEditorSheet: View {
             SemanticKeywordBackfill.backfill(topic)
         }
         .sheet(isPresented: $showAgent) {
-            SemanticAgentSheet(topic: topic)
+            SemanticFunnelView(topic: topic)
         }
         .sheet(isPresented: $showBulkAdd) {
             bulkAddSheet
