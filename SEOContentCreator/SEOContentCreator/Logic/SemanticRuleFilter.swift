@@ -78,7 +78,7 @@ enum SemanticRuleFilter {
     }
 
     /// Lowercases, unifies ё/е, and collapses whitespace so duplicates match.
-    private static func normalize(_ text: String) -> String {
+    static func normalize(_ text: String) -> String {
         text
             .lowercased()
             .replacingOccurrences(of: "ё", with: "е")
