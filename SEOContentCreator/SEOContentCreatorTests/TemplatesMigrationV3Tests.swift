@@ -22,7 +22,7 @@ struct TemplatesMigrationV3Tests {
         return defaults
     }
 
-    @Test func overwritesCascadeTemplatesAndBlocks() throws {
+    @Test func preservesCustomizedTemplatesRolesAndBlocksAsPersonalDefaults() throws {
         let context = try makeContext()
         let defaults = makeDefaults()
         let oldDraft = StageTemplate(
@@ -45,16 +45,32 @@ struct TemplatesMigrationV3Tests {
 
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
 
-        #expect(oldDraft.userPromptTemplate == StageTemplateDefaults.content(for: .draft).userPromptTemplate)
-        #expect(oldProductBlocks.userPromptTemplate == StageTemplateDefaults.content(for: .productBlocks).userPromptTemplate)
+        // draft is one of the 4 reader-intent stages: original custom text is preserved,
+        // and the reader-intent addition is appended (no anchor match on this short custom text).
+        #expect(oldDraft.userPromptTemplate.contains("старый user"))
+        #expect(oldDraft.userPromptTemplate.contains("{{задача_читателя}}"))
+        #expect(oldDraft.hasPersonalDefault)
+        #expect(oldDraft.personalDefaultUserPromptTemplate == oldDraft.userPromptTemplate)
 
+        // productBlocks is not one of the 4 reader-intent stages: fully unchanged by the upgrade,
+        // but still becomes its first personal-default snapshot.
+        #expect(oldProductBlocks.userPromptTemplate == "правленный productBlocks")
+        #expect(oldProductBlocks.hasPersonalDefault)
+        #expect(oldProductBlocks.personalDefaultUserPromptTemplate == "правленный productBlocks")
+
+        // The unconditional block/role-mandate overwrite loop is removed in Task 5:
+        // the old custom text is preserved, not replaced with factory text.
         let blocks = try context.fetch(FetchDescriptor<ContextBlock>())
         let policy = blocks.first { $0.key == "editorialPolicy" }
-        #expect(policy?.text.contains("Один абзац") == true)
+        #expect(policy?.text == "старая редполитика")
+        #expect(policy?.hasPersonalDefault == true)
+        #expect(policy?.personalDefaultText == "старая редполитика")
 
         let roles = try context.fetch(FetchDescriptor<AIRole>())
         let author = roles.first { $0.key == "author" }
-        #expect(author?.mandate.contains("Т—Ж") == true)
+        #expect(author?.mandate == "старый mandate")
+        #expect(author?.hasPersonalDefault == true)
+        #expect(author?.personalDefaultMandate == "старый mandate")
     }
 
     @Test func addsShortenPresetForExistingInstalls() throws {
@@ -79,7 +95,13 @@ struct TemplatesMigrationV3Tests {
         #expect(presets.isEmpty)
     }
 
-    @Test func seoCheckMigratesInVersion4ToIncludeSEOMeta() throws {
+    // Renamed from seoCheckMigratesInVersion4ToIncludeSEOMeta: Task 5 removes the
+    // unconditional cascade overwrite that used to guarantee old seoCheck prompts
+    // (from before the {{текущий_h1}} field existed) got fully replaced with the
+    // current factory text. That full-replacement guarantee is exactly what this
+    // task eliminates — old customized seoCheck text is now preserved and only
+    // gets the reader-intent addition, not a rewrite to add {{текущий_h1}}.
+    @Test func seoCheckPreservesOldTextAndAddsReaderIntentAddition() throws {
         let context = try makeContext()
         let defaults = makeDefaults()
         let oldSeoCheck = StageTemplate(
@@ -90,8 +112,10 @@ struct TemplatesMigrationV3Tests {
 
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
 
-        #expect(oldSeoCheck.userPromptTemplate.contains("{{текущий_h1}}"))
-        #expect(oldSeoCheck.userPromptTemplate == StageTemplateDefaults.content(for: .seoCheck).userPromptTemplate)
+        #expect(oldSeoCheck.userPromptTemplate.contains("старый seoCheck без H1"))
+        #expect(oldSeoCheck.userPromptTemplate.contains("{{задача_читателя}}"))
+        #expect(oldSeoCheck.hasPersonalDefault)
+        #expect(oldSeoCheck.personalDefaultUserPromptTemplate == oldSeoCheck.userPromptTemplate)
     }
 
     @Test func checkingStagesGetLoweredTemperatureInVersion5() throws {

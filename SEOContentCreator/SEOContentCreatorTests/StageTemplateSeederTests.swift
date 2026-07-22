@@ -86,12 +86,16 @@ struct StageTemplateSeederTests {
 
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
 
-        #expect(old.userPromptTemplate == StageTemplateDefaults.content(for: .draft).userPromptTemplate)
+        #expect(old.userPromptTemplate.contains("Пользовательский {{тема}}"))
+        #expect(old.userPromptTemplate.contains("{{задача_читателя}}"))
+        #expect(old.hasPersonalDefault)
+        #expect(old.personalDefaultUserPromptTemplate == old.userPromptTemplate)
         #expect(old.modelName == "gpt-4o")
         #expect(old.temperature == 0.2)
         #expect(old.maxTokens == 4000)
-        #expect(oldProductBlocks.userPromptTemplate == StageTemplateDefaults.content(for: .productBlocks).userPromptTemplate)
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 8)
+        // productBlocks is not one of the 4 reader-intent stages, so its text is untouched.
+        #expect(oldProductBlocks.userPromptTemplate == "Пользовательский productBlocks")
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 9)
 
         old.userPromptTemplate = "Ручная правка после миграции"
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
@@ -111,7 +115,7 @@ struct StageTemplateSeederTests {
 
         let roles = try context.fetch(FetchDescriptor<AIRole>())
         #expect(roles.contains { $0.key == "analyst" })
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 8)
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 9)
     }
 
     @Test func migrationAddsGlassStylePresetsToPreExistingInstallationsWithoutThem() throws {
@@ -132,7 +136,7 @@ struct StageTemplateSeederTests {
         #expect(names.contains(ImageStylePresetDefaults.illustration.name))
         // The user's existing custom preset is preserved, not replaced.
         #expect(customPreset.styleText == "старый стиль")
-        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 8)
+        #expect(defaults.integer(forKey: StageTemplateSeeder.templatesDefaultsVersionKey) == 9)
 
         let coverCountAfterFirstRun = presets.filter { $0.name == ImageStylePresetDefaults.cover.name }.count
         StageTemplateSeeder.seedIfNeeded(in: context, defaults: defaults)
