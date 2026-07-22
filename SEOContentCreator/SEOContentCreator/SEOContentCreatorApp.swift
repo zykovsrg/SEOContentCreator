@@ -15,7 +15,8 @@ struct SEOContentCreatorApp: App {
             ExternalDocument.self, EditorDictionary.self, SkillPreset.self,
             SemanticKeyword.self, PublishedSitePage.self,
             ProductBlock.self, ForbiddenPhrase.self,
-            PersistedRemark.self, PromptRecommendation.self
+            PersistedRemark.self, PromptRecommendation.self,
+            SemanticStopWord.self, SemanticQueryMask.self
         ])
 
         Settings {

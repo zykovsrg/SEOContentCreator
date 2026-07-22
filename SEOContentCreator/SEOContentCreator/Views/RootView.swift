@@ -37,6 +37,7 @@ struct RootView: View {
             SkillPresetSeeder.seedIfNeeded(in: context)
             ProductBlockSeeder.seedIfNeeded(in: context)
             ForbiddenPhraseSeeder.seedIfNeeded(in: context)
+            SemanticReferenceSeeder.seedIfNeeded(in: context)
         }
     }
 
