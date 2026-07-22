@@ -27,12 +27,6 @@ struct SemanticAgentSheet: View {
             Text("Сбор семантики агентом").font(.headline)
             Text(topic.title).foregroundStyle(.secondary)
 
-            if pages.isEmpty {
-                Text("Индекс страниц сайта пустой. Проверка каннибализации будет неполной.")
-                    .font(.callout)
-                    .foregroundStyle(.orange)
-            }
-
             HStack {
                 Button("Сгенерировать тестовые запросы") { generateCandidates() }
                 Button("Проанализировать через OpenAI") { analyze() }
@@ -120,6 +114,7 @@ struct SemanticAgentSheet: View {
         Task {
             do {
                 let analyzer = SemanticAgentAnalyzer.live(model: model)
+                // Stopgap: this view is being replaced by the collection funnel screen; no real frequency is available here.
                 let analyzed = try await analyzer.analyze(topic: topic, queries: candidates.map { WordstatPhrase(text: $0, frequency: 0) })
                 results = analyzed.keywords
                 message = "Анализ завершён."

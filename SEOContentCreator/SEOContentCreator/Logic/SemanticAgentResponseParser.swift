@@ -32,6 +32,8 @@ enum SemanticAgentResponseParser {
         var recommendation: String
         var reasonCategory: String
         var explanation: String
+        // Optional: the relevance-only analyzer no longer asks the model to assess cannibalization;
+        // a later cannibalization-checking service will populate this from real page data.
         var cannibalizationRisk: String?
         var cannibalizationURL: String?
         var cannibalizationTitle: String?

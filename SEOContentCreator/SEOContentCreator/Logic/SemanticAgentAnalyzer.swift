@@ -84,7 +84,7 @@ struct SemanticAgentAnalyzer {
         мнению, интересны целевой аудитории, и верни их в поле longTail.
 
         Верни JSON:
-        {"keywords":[{"query":"...","frequency":null,"recommendation":"include|exclude","reasonCategory":"none|junk|offTopic|cannibalization|lowQuality|tooBroad|wrongIntent|other","explanation":"короткая причина"}],"longTail":["..."]}
+        {"keywords":[{"query":"...","frequency":null,"recommendation":"include|exclude","reasonCategory":"none|junk|offTopic|lowQuality|tooBroad|wrongIntent|other","explanation":"короткая причина"}],"longTail":["..."]}
         """
     }
 }
