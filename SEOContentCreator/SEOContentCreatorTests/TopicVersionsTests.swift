@@ -7,7 +7,7 @@ struct TopicVersionsTests {
     @Test func currentVersionResolvesByID() throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
-            for: Topic.self, PromptRecommendation.self, KnowledgeNode.self, ArticleVersion.self,
+            for: Topic.self, ReaderIntent.self, PromptRecommendation.self, KnowledgeNode.self, ArticleVersion.self,
                  GenerationJob.self, PersistedRemark.self, StageTemplate.self, GeneratedImage.self, ExternalDocument.self,
                  SemanticKeyword.self, PublishedSitePage.self,
             configurations: config

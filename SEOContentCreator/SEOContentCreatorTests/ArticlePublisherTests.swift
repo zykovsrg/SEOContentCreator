@@ -47,7 +47,7 @@ final class FakeDocsClient: DocsPublishing {
 struct ArticlePublisherTests {
     private func ctx() throws -> ModelContext {
         let container = try ModelContainer(
-            for: Topic.self, PromptRecommendation.self, KnowledgeNode.self, ArticleVersion.self,
+            for: Topic.self, ReaderIntent.self, PromptRecommendation.self, KnowledgeNode.self, ArticleVersion.self,
                  GenerationJob.self, PersistedRemark.self, StageTemplate.self,
                  ContextBlock.self, AIRole.self,
                  GeneratedImage.self, ImageStylePreset.self, ImagePromptTemplate.self,

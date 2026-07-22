@@ -60,7 +60,7 @@ struct TechInfoSectionBuilderTests {
 
     @Test @MainActor func sectionForTopicGathersData() throws {
         let container = try ModelContainer(
-            for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
+            for: Topic.self, ReaderIntent.self, KnowledgeNode.self, ArticleVersion.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let ctx = ModelContext(container)
         let direction = KnowledgeNode(title: "Урология", type: .direction)
@@ -87,7 +87,7 @@ struct TechInfoSectionBuilderTests {
         // checkApplied versions don't carry seoTitle; the builder must look back
         // through older versions for the newest non-empty values.
         let container = try ModelContainer(
-            for: Topic.self, KnowledgeNode.self, ArticleVersion.self,
+            for: Topic.self, ReaderIntent.self, KnowledgeNode.self, ArticleVersion.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let ctx = ModelContext(container)
         let topic = Topic(title: "Тема", articleType: .info)

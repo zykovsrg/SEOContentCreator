@@ -40,6 +40,8 @@ final class Topic {
     var semanticKeywords: [SemanticKeyword]
     @Relationship(deleteRule: .cascade, inverse: \PromptRecommendation.topic)
     var promptRecommendations: [PromptRecommendation] = []
+    @Relationship(deleteRule: .cascade, inverse: \ReaderIntent.topic)
+    var readerIntent: ReaderIntent?
 
     init(
         title: String,
