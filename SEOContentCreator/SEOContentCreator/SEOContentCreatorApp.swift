@@ -16,7 +16,7 @@ struct SEOContentCreatorApp: App {
             SemanticKeyword.self, PublishedSitePage.self,
             ProductBlock.self, ForbiddenPhrase.self,
             PersistedRemark.self, PromptRecommendation.self,
-            SemanticStopWord.self, SemanticQueryMask.self
+            SemanticStopWord.self, SemanticQueryMask.self, SemanticFunnelEntry.self
         ])
 
         Settings {

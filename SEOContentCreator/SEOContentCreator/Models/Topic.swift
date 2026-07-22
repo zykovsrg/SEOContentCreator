@@ -38,6 +38,8 @@ final class Topic {
     var publications: [ExternalDocument] = []
     @Relationship(deleteRule: .cascade, inverse: \SemanticKeyword.topic)
     var semanticKeywords: [SemanticKeyword]
+    @Relationship(deleteRule: .cascade, inverse: \SemanticFunnelEntry.topic)
+    var funnelEntries: [SemanticFunnelEntry] = []
     @Relationship(deleteRule: .cascade, inverse: \PromptRecommendation.topic)
     var promptRecommendations: [PromptRecommendation] = []
 
