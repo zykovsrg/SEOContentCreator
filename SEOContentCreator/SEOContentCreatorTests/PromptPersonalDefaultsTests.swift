@@ -145,4 +145,16 @@ struct PromptPersonalDefaultsTests {
 
         #expect(state == nil)
     }
+
+    @Test func factoryThenSaveBecomesNewPersonalDefault() {
+        let template = StageTemplate(stage: .seoCheck, userPromptTemplate: "custom")
+        let role = AIRole(key: "seo", name: "ИИ-SEO", mandate: "custom role", blockKeys: [])
+        let block = ContextBlock(key: "seoGuidelines", title: "SEO-рекомендации", text: "custom block")
+        let factory = PromptPersonalDefaultsService.factoryState(stage: .seoCheck, role: role, blocks: [block])
+        #expect(template.userPromptTemplate == "custom")
+        PromptPersonalDefaultsService.saveAsPersonalDefault(factory, template: template, role: role, blocks: [block])
+        #expect(template.personalDefaultUserPromptTemplate == StageTemplateDefaults.content(for: .seoCheck).userPromptTemplate)
+        #expect(role.personalDefaultMandate == RoleDefaults.defaultForKey("seo")?.mandate)
+        #expect(block.personalDefaultText == ContextBlockDefaults.defaultForKey("seoGuidelines")?.text)
+    }
 }

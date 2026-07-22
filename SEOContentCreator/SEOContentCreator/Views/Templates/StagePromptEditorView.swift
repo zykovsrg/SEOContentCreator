@@ -22,6 +22,7 @@ struct StagePromptEditorView: View {
     @State private var reasoningEffort = ""
     @State private var savedNote: String?
     @State private var showSandbox = false
+    @State private var showFactoryRestoreConfirmation = false
     @State private var selectedRange = NSRange(location: 0, length: 0)
     @State private var insertionToken = ""
     @State private var insertionRequestID = 0
@@ -66,6 +67,16 @@ struct StagePromptEditorView: View {
                 stage: stage,
                 template: sandboxTemplate()
             )
+        }
+        .confirmationDialog(
+            "Вернуть стандарт приложения?",
+            isPresented: $showFactoryRestoreConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Загрузить стандарт приложения") { restoreFactoryDefault() }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Изменения пока попадут только в редактор. Если затем нажать «Сохранить», общая роль и контекстные блоки изменятся также в связанных этапах.")
         }
     }
 
@@ -382,20 +393,25 @@ struct StagePromptEditorView: View {
 
     private var bottomBar: some View {
         HStack(spacing: 12) {
-            Button("Сбросить к стандартному") { resetToDefault() }
+            Button("Сбросить к моему дефолту", action: restorePersonalDefault)
                 .foregroundStyle(.secondary)
+                .disabled(PromptPersonalDefaultsService.personalDefaultState(
+                    template: template, role: role, blocks: blocks
+                ) == nil)
+            Button("Вернуть стандарт приложения") {
+                showFactoryRestoreConfirmation = true
+            }
+            .foregroundStyle(.secondary)
             Spacer()
             if let savedNote {
-                Text(savedNote)
-                    .font(.callout)
-                    .foregroundStyle(.green)
+                Text(savedNote).font(.callout).foregroundStyle(.green)
             }
             Button {
                 showSandbox = true
             } label: {
                 Label("Песочница", systemImage: "play.fill")
             }
-            Button("Сохранить") { save() }
+            Button("Сохранить", action: save)
                 .buttonStyle(.borderedProminent)
         }
         .padding(14)
@@ -406,47 +422,42 @@ struct StagePromptEditorView: View {
         insertionRequestID += 1
     }
 
-    private func load() {
-        user = template.userPromptTemplate
-        modelName = template.modelName
-        temperature = template.temperature
-        maxTokens = template.maxTokens
-        reasoningEffort = template.reasoningEffort ?? ""
+    private var editorState: PromptEditorState {
+        PromptEditorState(
+            userPromptTemplate: user,
+            modelName: activeModelName,
+            temperature: temperature,
+            maxTokens: maxTokens,
+            reasoningEffort: normalizedReasoningEffort,
+            mandate: mandate,
+            enabledBlockKeys: orderedEnabledBlockKeys(),
+            blockTexts: blockTexts
+        )
+    }
 
-        mandate = role?.mandate ?? ""
-        enabledBlockKeys = Set(role?.blockKeys ?? [])
-        blockTexts = Dictionary(uniqueKeysWithValues: blocks.map { ($0.key, $0.text) })
+    private func apply(_ state: PromptEditorState) {
+        user = state.userPromptTemplate
+        modelName = state.modelName
+        temperature = state.temperature
+        maxTokens = state.maxTokens
+        reasoningEffort = state.reasoningEffort ?? ""
+        mandate = state.mandate
+        enabledBlockKeys = Set(state.enabledBlockKeys)
+        blockTexts = state.blockTexts
+    }
+
+    private func load() {
+        apply(PromptPersonalDefaultsService.liveState(template: template, role: role, blocks: blocks))
     }
 
     private func save() {
-        template.userPromptTemplate = user
-        template.modelName = activeModelName
-        template.temperature = temperature
-        template.maxTokens = maxTokens
-        // Persist only when the model supports it and a level is chosen; otherwise clear it.
-        template.reasoningEffort = normalizedReasoningEffort
-        template.templateVersion += 1
-        template.updatedAt = .now
-
-        if let role, let change = SharedFieldUpdate.roleUpdate(
-            current: role, mandate: mandate, blockKeys: orderedEnabledBlockKeys()
-        ) {
-            role.mandate = change.mandate
-            role.blockKeys = change.blockKeys
-            role.version = change.version
-            role.updatedAt = .now
-        }
-
-        for block in blocks {
-            let text = blockTexts[block.key] ?? block.text
-            if let change = SharedFieldUpdate.blockUpdate(current: block, text: text) {
-                block.text = change.text
-                block.version = change.version
-                block.updatedAt = .now
-            }
-        }
-
-        savedNote = "Сохранено · версия \(template.templateVersion)"
+        PromptPersonalDefaultsService.saveAsPersonalDefault(
+            editorState,
+            template: template,
+            role: role,
+            blocks: blocks
+        )
+        savedNote = "Сохранено как мой дефолт · версия \(template.templateVersion)"
     }
 
     private func sandboxTemplate() -> StageTemplate {
@@ -462,15 +473,19 @@ struct StagePromptEditorView: View {
         )
     }
 
-    private func resetToDefault() {
-        let content = StageTemplateDefaults.content(for: stage)
-        user = content.userPromptTemplate
-        modelName = content.modelName
-        temperature = content.temperature
-        maxTokens = content.maxTokens
-        reasoningEffort = content.reasoningEffort ?? ""
-        save()
-        savedNote = "Сброшено к стандартному"
+    private func restorePersonalDefault() {
+        guard let state = PromptPersonalDefaultsService.personalDefaultState(
+            template: template,
+            role: role,
+            blocks: blocks
+        ) else { return }
+        apply(state)
+        savedNote = "Загружен мой дефолт · нажмите «Сохранить»"
+    }
+
+    private func restoreFactoryDefault() {
+        apply(PromptPersonalDefaultsService.factoryState(stage: stage, role: role, blocks: blocks))
+        savedNote = "Загружен стандарт приложения · нажмите «Сохранить»"
     }
 
     private func orderedEnabledBlockKeys() -> [String] {
