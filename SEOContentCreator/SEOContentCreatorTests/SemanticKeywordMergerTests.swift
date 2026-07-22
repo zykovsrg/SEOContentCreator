@@ -50,4 +50,45 @@ struct SemanticKeywordMergerTests {
         #expect(topic.semanticKeywords[0].cannibalizationURL == "https://hadassah.moscow/prostate")
         #expect(topic.semanticKeywords[0].cannibalizationTitle == "Рак простаты")
     }
+
+    @Test func savesSurvivorsAsAcceptedWhenRequested() {
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        let result = SemanticAgentKeywordResult(
+            query: "рак груди лечение",
+            frequency: 500,
+            recommendation: .include,
+            reasonCategory: .none,
+            explanation: "",
+            cannibalizationRisk: .none,
+            cannibalizationURL: nil,
+            cannibalizationTitle: nil
+        )
+
+        SemanticKeywordMerger.merge([result], into: topic, decision: .accepted)
+
+        #expect(topic.semanticKeywords[0].userDecision == .accepted)
+    }
+
+    @Test func doesNotOverwriteDecisionTheUserAlreadyMade() {
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        let existing = SemanticKeyword(text: "рак груди лечение", userDecision: .rejected)
+        existing.topic = topic
+        topic.semanticKeywords.append(existing)
+
+        let result = SemanticAgentKeywordResult(
+            query: "рак груди лечение",
+            frequency: 500,
+            recommendation: .include,
+            reasonCategory: .none,
+            explanation: "",
+            cannibalizationRisk: .none,
+            cannibalizationURL: nil,
+            cannibalizationTitle: nil
+        )
+
+        SemanticKeywordMerger.merge([result], into: topic, decision: .accepted)
+
+        #expect(existing.userDecision == .rejected)
+        #expect(existing.frequency == 500)
+    }
 }
