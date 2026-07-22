@@ -22,12 +22,12 @@ struct SemanticAgentResponseParserTests {
 
         let parsed = try SemanticAgentResponseParser.parse(json)
 
-        #expect(parsed.count == 1)
-        #expect(parsed[0].query == "лечение рака простаты")
-        #expect(parsed[0].frequency == 120)
-        #expect(parsed[0].recommendation == .exclude)
-        #expect(parsed[0].reasonCategory == .cannibalization)
-        #expect(parsed[0].cannibalizationRisk == .high)
+        #expect(parsed.keywords.count == 1)
+        #expect(parsed.keywords[0].query == "лечение рака простаты")
+        #expect(parsed.keywords[0].frequency == 120)
+        #expect(parsed.keywords[0].recommendation == .exclude)
+        #expect(parsed.keywords[0].reasonCategory == .cannibalization)
+        #expect(parsed.keywords[0].cannibalizationRisk == .high)
     }
 
     @Test func trimsQuery() throws {
@@ -50,8 +50,8 @@ struct SemanticAgentResponseParserTests {
 
         let parsed = try SemanticAgentResponseParser.parse(json)
 
-        #expect(parsed.count == 1)
-        #expect(parsed[0].query == "рак простаты цена")
+        #expect(parsed.keywords.count == 1)
+        #expect(parsed.keywords[0].query == "рак простаты цена")
     }
 
     @Test func rejectsUnknownEnumValues() {
@@ -143,5 +143,28 @@ struct SemanticAgentResponseParserTests {
         #expect(throws: SemanticAgentResponseParser.ParserError.badResponse) {
             try SemanticAgentResponseParser.parse(json)
         }
+    }
+
+    @Test func parsesLongTailQueries() throws {
+        let json = """
+        {"keywords":[{"query":"рак груди лечение","frequency":100,"recommendation":"include","reasonCategory":"none","explanation":""}],"longTail":["сколько длится лечение рака груди","можно ли вылечить рак груди полностью"]}
+        """
+
+        let analysis = try SemanticAgentResponseParser.parse(json)
+
+        #expect(analysis.keywords.count == 1)
+        #expect(analysis.longTail.count == 2)
+    }
+
+    @Test func defaultsCannibalizationFieldsWhenAbsent() throws {
+        let json = """
+        {"keywords":[{"query":"рак груди","frequency":null,"recommendation":"include","reasonCategory":"none","explanation":""}]}
+        """
+
+        let analysis = try SemanticAgentResponseParser.parse(json)
+
+        #expect(analysis.keywords[0].cannibalizationRisk == .none)
+        #expect(analysis.keywords[0].cannibalizationURL == nil)
+        #expect(analysis.longTail.isEmpty)
     }
 }

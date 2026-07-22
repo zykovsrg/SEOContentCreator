@@ -120,8 +120,8 @@ struct SemanticAgentSheet: View {
         Task {
             do {
                 let analyzer = SemanticAgentAnalyzer.live(model: model)
-                let analyzed = try await analyzer.analyze(topic: topic, queries: candidates, pages: pages)
-                results = analyzed
+                let analyzed = try await analyzer.analyze(topic: topic, queries: candidates.map { WordstatPhrase(text: $0, frequency: 0) })
+                results = analyzed.keywords
                 message = "Анализ завершён."
             } catch {
                 message = error.localizedDescription

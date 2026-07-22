@@ -11,6 +11,11 @@ struct SemanticAgentKeywordResult: Equatable {
     var cannibalizationTitle: String?
 }
 
+struct SemanticAgentAnalysis: Equatable {
+    var keywords: [SemanticAgentKeywordResult]
+    var longTail: [String]
+}
+
 enum SemanticAgentResponseParser {
     enum ParserError: Error, Equatable {
         case badResponse
@@ -18,6 +23,7 @@ enum SemanticAgentResponseParser {
 
     private struct Envelope: Decodable {
         var keywords: [Item]
+        var longTail: [String]?
     }
 
     private struct Item: Decodable {
@@ -26,12 +32,12 @@ enum SemanticAgentResponseParser {
         var recommendation: String
         var reasonCategory: String
         var explanation: String
-        var cannibalizationRisk: String
+        var cannibalizationRisk: String?
         var cannibalizationURL: String?
         var cannibalizationTitle: String?
     }
 
-    static func parse(_ text: String) throws -> [SemanticAgentKeywordResult] {
+    static func parse(_ text: String) throws -> SemanticAgentAnalysis {
         guard let data = text.data(using: .utf8) else {
             throw ParserError.badResponse
         }
@@ -52,7 +58,7 @@ enum SemanticAgentResponseParser {
 
             guard let recommendation = SemanticAgentRecommendation(rawValue: item.recommendation),
                   let reasonCategory = SemanticReasonCategory(rawValue: item.reasonCategory),
-                  let cannibalizationRisk = SemanticCannibalizationRisk(rawValue: item.cannibalizationRisk) else {
+                  let cannibalizationRisk = SemanticCannibalizationRisk(rawValue: item.cannibalizationRisk ?? "none") else {
                 throw ParserError.badResponse
             }
 
@@ -68,6 +74,10 @@ enum SemanticAgentResponseParser {
             ))
         }
 
-        return results
+        let longTail = (envelope.longTail ?? [])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        return SemanticAgentAnalysis(keywords: results, longTail: longTail)
     }
 }

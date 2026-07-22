@@ -38,14 +38,14 @@ struct SemanticAgentAnalyzer {
         )
     }
 
-    func analyze(topic: Topic, queries: [String], pages: [PublishedSitePage]) async throws -> [SemanticAgentKeywordResult] {
+    func analyze(topic: Topic, queries: [WordstatPhrase]) async throws -> SemanticAgentAnalysis {
         let key = try keyProvider()
         var collected = ""
 
         for try await event in streamProvider(
             key,
             systemPrompt,
-            userPrompt(topic: topic, queries: queries, pages: pages),
+            userPrompt(topic: topic, queries: queries),
             model,
             0.2,
             4000,
@@ -67,23 +67,24 @@ struct SemanticAgentAnalyzer {
         """
         Ты SEO-аналитик медицинского сайта. Верни только JSON без Markdown.
         Решай, какие запросы стоит включить в семантику темы, а какие не стоит.
-        Учитывай мусорные запросы, неподходящий интент и каннибализацию с опубликованными страницами.
+        Отклоняй академические и учебные формулировки, а также запросы,
+        интент которых не совпадает с типом статьи.
         """
     }
 
-    private func userPrompt(topic: Topic, queries: [String], pages: [PublishedSitePage]) -> String {
+    private func userPrompt(topic: Topic, queries: [WordstatPhrase]) -> String {
         """
         Тема: \(topic.title)
         Тип статьи: \(topic.articleType.title)
 
-        Кандидаты:
-        \(queries.map { "- \($0)" }.joined(separator: "\n"))
+        Кандидаты (запрос — частотность):
+        \(queries.map { "- \($0.text) — \($0.frequency)" }.joined(separator: "\n"))
 
-        Опубликованные страницы сайта:
-        \(pages.map(\.summaryForAgent).joined(separator: "\n\n---\n\n"))
+        Дополнительно составь 10 длинных запросов из 3-7 слов, которые, по твоему
+        мнению, интересны целевой аудитории, и верни их в поле longTail.
 
         Верни JSON:
-        {"keywords":[{"query":"...","frequency":null,"recommendation":"include|exclude","reasonCategory":"none|junk|offTopic|cannibalization|lowQuality|tooBroad|wrongIntent|other","explanation":"короткая причина","cannibalizationRisk":"none|low|medium|high","cannibalizationURL":null,"cannibalizationTitle":null}]}
+        {"keywords":[{"query":"...","frequency":null,"recommendation":"include|exclude","reasonCategory":"none|junk|offTopic|cannibalization|lowQuality|tooBroad|wrongIntent|other","explanation":"короткая причина"}],"longTail":["..."]}
         """
     }
 }
