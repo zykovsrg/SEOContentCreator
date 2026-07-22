@@ -71,4 +71,78 @@ struct PromptPersonalDefaultsTests {
         PromptPersonalDefaultsService.captureIfMissing(template: template, role: nil, blocks: [])
         #expect(template.personalDefaultUserPromptTemplate == "live v1")
     }
+
+    @Test func liveStateReflectsCurrentLiveValuesNotPersonalDefaults() {
+        let template = StageTemplate(
+            stage: .draft, userPromptTemplate: "live prompt",
+            modelName: "gpt-4.1", temperature: 0.6, maxTokens: 8000, reasoningEffort: "low"
+        )
+        template.hasPersonalDefault = true
+        template.personalDefaultUserPromptTemplate = "personal prompt"
+        template.personalDefaultModelName = "gpt-5.5"
+        template.personalDefaultTemperature = 0.9
+        template.personalDefaultMaxTokens = 12000
+        let role = AIRole(key: "author", name: "ИИ-автор", mandate: "live mandate", blockKeys: ["sources"])
+        role.hasPersonalDefault = true
+        role.personalDefaultMandate = "personal mandate"
+        let block = ContextBlock(key: "sources", title: "Источники", text: "live block")
+        block.hasPersonalDefault = true
+        block.personalDefaultText = "personal block"
+
+        let state = PromptPersonalDefaultsService.liveState(template: template, role: role, blocks: [block])
+
+        #expect(state.userPromptTemplate == "live prompt")
+        #expect(state.modelName == "gpt-4.1")
+        #expect(state.temperature == 0.6)
+        #expect(state.maxTokens == 8000)
+        #expect(state.reasoningEffort == "low")
+        #expect(state.mandate == "live mandate")
+        #expect(state.enabledBlockKeys == ["sources"])
+        #expect(state.blockTexts["sources"] == "live block")
+    }
+
+    @Test func personalDefaultStateReturnsNilWhenTemplateHasNoPersonalDefault() {
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "live")
+        let state = PromptPersonalDefaultsService.personalDefaultState(
+            template: template, role: nil, blocks: []
+        )
+        #expect(state == nil)
+    }
+
+    @Test func personalDefaultStateReturnsNilWhenRoleHasNoPersonalDefault() {
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "live")
+        template.hasPersonalDefault = true
+        template.personalDefaultUserPromptTemplate = "personal"
+        template.personalDefaultModelName = "gpt-4.1"
+        template.personalDefaultTemperature = 0.6
+        template.personalDefaultMaxTokens = 8000
+        let role = AIRole(key: "author", name: "ИИ-автор", mandate: "live role", blockKeys: [])
+        // role.hasPersonalDefault stays false
+
+        let state = PromptPersonalDefaultsService.personalDefaultState(
+            template: template, role: role, blocks: []
+        )
+
+        #expect(state == nil)
+    }
+
+    @Test func personalDefaultStateReturnsNilWhenAnyBlockLacksPersonalDefault() {
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "live")
+        template.hasPersonalDefault = true
+        template.personalDefaultUserPromptTemplate = "personal"
+        template.personalDefaultModelName = "gpt-4.1"
+        template.personalDefaultTemperature = 0.6
+        template.personalDefaultMaxTokens = 8000
+        let blockWithDefault = ContextBlock(key: "sources", title: "Источники", text: "live block a")
+        blockWithDefault.hasPersonalDefault = true
+        blockWithDefault.personalDefaultText = "personal block a"
+        let blockWithoutDefault = ContextBlock(key: "style", title: "Стиль", text: "live block b")
+        // blockWithoutDefault.hasPersonalDefault stays false
+
+        let state = PromptPersonalDefaultsService.personalDefaultState(
+            template: template, role: nil, blocks: [blockWithDefault, blockWithoutDefault]
+        )
+
+        #expect(state == nil)
+    }
 }

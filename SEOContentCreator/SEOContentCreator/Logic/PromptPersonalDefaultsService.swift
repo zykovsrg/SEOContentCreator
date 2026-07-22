@@ -11,6 +11,11 @@ struct PromptEditorState: Equatable {
     var blockTexts: [String: String]
 }
 
+/// Builds `PromptEditorState` snapshots for the three sources a stage prompt
+/// editor can show: `liveState` reads the values currently in effect,
+/// `personalDefaultState` reads the user's saved personal default (or nil if
+/// none is fully captured yet), and `factoryState` reads the code-defined
+/// factory defaults.
 enum PromptPersonalDefaultsService {
     static func liveState(
         template: StageTemplate,
@@ -118,6 +123,9 @@ enum PromptPersonalDefaultsService {
         )
     }
 
+    /// Falls back to the role's/block's current live value when no factory
+    /// default is registered for its key, since there is no other sensible
+    /// default to show in that case.
     static func factoryState(
         stage: PipelineStage,
         role: AIRole?,
