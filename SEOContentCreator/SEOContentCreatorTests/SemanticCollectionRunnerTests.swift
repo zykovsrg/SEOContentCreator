@@ -370,6 +370,30 @@ struct SemanticCollectionRunnerTests {
         #expect(longTailEntry?.reason == "Длинный запрос, предложен агентом")
     }
 
+    @Test func savesLargeFunnelJournalWithoutCrashing() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        // Matches the scale of the production crash (~9334 funnel entries total).
+        let droppedCount = 4666
+        var pulled: [WordstatPhrase] = (0..<droppedCount).map {
+            WordstatPhrase(text: "запрос \($0)", frequency: 1)
+        }
+        pulled.append(WordstatPhrase(text: "рак груди лечение", frequency: 500))
+
+        let runner = makeRunner(
+            pulled: pulled,
+            analysis: SemanticAgentAnalysis(keywords: [includedResult("рак груди лечение")], longTail: [])
+        )
+
+        try await runner.run(topic: topic, pages: [], context: context)
+
+        // raw entries for every pulled phrase + droppedByRules for every low-frequency
+        // phrase + one survived entry for the single keyword that made it through.
+        #expect(topic.funnelEntries.count == (droppedCount + 1) + droppedCount + 1)
+    }
+
     @Test func reportsPipelineStageAndWordstatCounter() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Рак груди", articleType: .disease)

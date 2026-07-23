@@ -69,6 +69,10 @@ struct SemanticCollectionRunner {
     var saveContext: (ModelContext) throws -> Void = { try $0.save() }
     var reportProgress: (SemanticCollectionProgress) -> Void = { _ in }
 
+    /// Keeps a single `context.save()` transaction from having to encode the
+    /// whole Wordstat journal (thousands of entries) at once.
+    private static let funnelSaveChunkSize = 200
+
     @discardableResult
     func run(topic: Topic, pages: [PublishedSitePage], context: ModelContext) async throws -> UUID {
         let runID = UUID()
@@ -99,18 +103,16 @@ struct SemanticCollectionRunner {
 
         guard !pulled.isEmpty else { throw RunError.wordstatReturnedNothing(runID: runID) }
 
-        for phrase in pulled {
-            record(topic: topic, context: context, text: phrase.text, frequency: phrase.frequency,
-                   layer: .raw, reason: "", runID: runID)
+        try recordInChunks(pulled, topic: topic, context: context, runID: runID) { phrase in
+            (text: phrase.text, frequency: phrase.frequency, layer: .raw, reason: "")
         }
 
         reportProgress(.filtering)
         try Task.checkCancellation()
         let filtered = SemanticRuleFilter.apply(pulled, stopWords: stopWords, threshold: threshold, limit: limit)
 
-        for drop in filtered.dropped {
-            record(topic: topic, context: context, text: drop.phrase.text, frequency: drop.phrase.frequency,
-                   layer: .droppedByRules, reason: drop.reason, runID: runID)
+        try recordInChunks(filtered.dropped, topic: topic, context: context, runID: runID) { drop in
+            (text: drop.phrase.text, frequency: drop.phrase.frequency, layer: .droppedByRules, reason: drop.reason)
         }
 
         guard !filtered.survivors.isEmpty else { throw RunError.rulesDroppedEverything(runID: runID) }
@@ -177,6 +179,27 @@ struct SemanticCollectionRunner {
         return runID
     }
 
+    /// Records and saves `items` in small batches so a single `context.save()`
+    /// never has to encode the whole Wordstat journal (thousands of entries) at
+    /// once, and so CoreData/SwiftData's autoreleased bridging objects are
+    /// drained per batch instead of piling up for the whole async task.
+    private func recordInChunks<T>(
+        _ items: [T], topic: Topic, context: ModelContext, runID: UUID,
+        describe: (T) -> (text: String, frequency: Int?, layer: SemanticFunnelLayer, reason: String)
+    ) throws {
+        for chunkStart in stride(from: 0, to: items.count, by: Self.funnelSaveChunkSize) {
+            try autoreleasepool {
+                let chunkEnd = min(chunkStart + Self.funnelSaveChunkSize, items.count)
+                for item in items[chunkStart..<chunkEnd] {
+                    let described = describe(item)
+                    record(topic: topic, context: context, text: described.text, frequency: described.frequency,
+                           layer: described.layer, reason: described.reason, runID: runID)
+                }
+                try saveContext(context)
+            }
+        }
+    }
+
     private func record(
         topic: Topic, context: ModelContext, text: String, frequency: Int?,
         layer: SemanticFunnelLayer, reason: String, runID: UUID
@@ -184,7 +207,6 @@ struct SemanticCollectionRunner {
         let entry = SemanticFunnelEntry(text: text, frequency: frequency, layer: layer, reason: reason, runID: runID)
         entry.topic = topic
         context.insert(entry)
-        topic.funnelEntries.append(entry)
     }
 }
 
