@@ -369,4 +369,104 @@ struct SemanticCollectionRunnerTests {
         let longTailEntry = topic.funnelEntries.first { $0.text == "сколько длится лечение рака груди" && $0.layer == .survived }
         #expect(longTailEntry?.reason == "Длинный запрос, предложен агентом")
     }
+
+    @Test func reportsPipelineStageAndWordstatCounter() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        var progress: [SemanticCollectionProgress] = []
+        var runner = makeRunner(
+            plan: SemanticSeedPlan(synonyms: ["рак груди", "рмж"], masks: [], tails: []),
+            pulled: [WordstatPhrase(text: "рак груди лечение", frequency: 500)],
+            analysis: SemanticAgentAnalysis(
+                keywords: [includedResult("рак груди лечение")],
+                longTail: []
+            )
+        )
+        runner.reportProgress = { progress.append($0) }
+
+        try await runner.run(topic: topic, pages: [], context: context)
+
+        #expect(progress.contains(.planning))
+        #expect(progress.contains(.wordstat(completed: 0, total: 2)))
+        #expect(progress.contains(.wordstat(completed: 1, total: 2)))
+        #expect(progress.contains(.wordstat(completed: 2, total: 2)))
+        #expect(progress.contains(.relevance))
+        #expect(progress.contains(.cannibalization))
+        #expect(progress.last == .saving)
+    }
+
+    @Test func cancellationStopsSeedLoopAndLeavesSemanticsUntouched() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        let existing = SemanticKeyword(text: "старый запрос", userDecision: .accepted)
+        existing.topic = topic
+        topic.semanticKeywords.append(existing)
+        context.insert(topic)
+
+        var pullCount = 0
+        let runner = SemanticCollectionRunner(
+            planSeeds: { _, _ in
+                SemanticSeedPlan(synonyms: ["первый", "второй"], masks: [], tails: [])
+            },
+            pullPhrases: { _ in
+                pullCount += 1
+                try await Task.sleep(for: .seconds(30))
+                return []
+            },
+            analyzeRelevance: { _, _ in SemanticAgentAnalysis(keywords: [], longTail: []) },
+            checkCannibalization: { keywords, _ in keywords },
+            stopWords: [],
+            masks: [],
+            threshold: 10,
+            limit: 100
+        )
+
+        let task = Task {
+            try await runner.run(topic: topic, pages: [], context: context)
+        }
+        while pullCount == 0 {
+            await Task.yield()
+        }
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+        #expect(pullCount == 1)
+        #expect(topic.semanticKeywords.map(\.text) == ["старый запрос"])
+    }
+
+    @Test func deadlineCancelsRunnerAndLeavesSemanticsUntouched() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        let existing = SemanticKeyword(text: "старый запрос", userDecision: .accepted)
+        existing.topic = topic
+        topic.semanticKeywords.append(existing)
+        context.insert(topic)
+
+        let runner = SemanticCollectionRunner(
+            planSeeds: { _, _ in
+                SemanticSeedPlan(synonyms: ["медленный запрос"], masks: [], tails: [])
+            },
+            pullPhrases: { _ in
+                try await Task.sleep(for: .seconds(30))
+                return [WordstatPhrase(text: "новый запрос", frequency: 100)]
+            },
+            analyzeRelevance: { _, _ in SemanticAgentAnalysis(keywords: [], longTail: []) },
+            checkCannibalization: { keywords, _ in keywords },
+            stopWords: [],
+            masks: [],
+            threshold: 10,
+            limit: 100
+        )
+
+        await #expect(throws: SemanticCollectionDeadline.DeadlineError.self) {
+            try await SemanticCollectionDeadline.run(timeout: .milliseconds(10)) {
+                try await runner.run(topic: topic, pages: [], context: context)
+            }
+        }
+        #expect(topic.semanticKeywords.map(\.text) == ["старый запрос"])
+    }
 }

@@ -17,6 +17,10 @@ struct SemanticFunnelView: View {
     @State private var isRunning = false
     @State private var message: String?
     @State private var runID: UUID?
+    @State private var progress: SemanticCollectionProgress = .planning
+    @State private var startedAt: Date?
+    @State private var collectionTask: Task<Void, Never>?
+    @State private var stopRequested = false
 
     private var entries: [SemanticFunnelEntry] {
         guard let runID else { return [] }
@@ -38,8 +42,22 @@ struct SemanticFunnelView: View {
                 Button(isRunning ? "Собираю…" : "Собрать семантику") { collect() }
                     .disabled(isRunning)
                     .keyboardShortcut(.defaultAction)
+                if isRunning {
+                    Button("Остановить", role: .destructive) { stopCollection() }
+                }
                 Spacer()
                 if isRunning { ProgressView().controlSize(.small) }
+            }
+
+            if isRunning, let startedAt {
+                TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(progress.label).font(.callout).bold()
+                        Text("Прошло \(elapsedText(from: startedAt, to: timeline.date)) · лимит 10:00")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             if let message {
@@ -57,11 +75,17 @@ struct SemanticFunnelView: View {
 
             HStack {
                 Spacer()
-                Button("Закрыть") { dismiss() }
+                Button("Закрыть") {
+                    collectionTask?.cancel()
+                    dismiss()
+                }
             }
         }
         .padding()
         .frame(width: 760, height: 620)
+        .onDisappear {
+            collectionTask?.cancel()
+        }
     }
 
     @ViewBuilder
@@ -104,8 +128,11 @@ struct SemanticFunnelView: View {
     private func collect() {
         isRunning = true
         message = nil
+        progress = .planning
+        startedAt = .now
+        stopRequested = false
 
-        Task {
+        collectionTask = Task {
             do {
                 let planner = SemanticSeedPlanner.live(model: model)
                 let analyzer = SemanticAgentAnalyzer.live(model: model)
@@ -122,8 +149,16 @@ struct SemanticFunnelView: View {
                     limit: 100
                 )
 
-                runID = try await runner.run(topic: topic, pages: pages, context: context)
+                var reportingRunner = runner
+                reportingRunner.reportProgress = { progress = $0 }
+                runID = try await SemanticCollectionDeadline.run(timeout: .seconds(600)) {
+                    try await reportingRunner.run(topic: topic, pages: pages, context: context)
+                }
                 message = "Сбор завершён."
+            } catch is CancellationError {
+                message = stopRequested
+                    ? "Сбор остановлен. Семантика темы не изменена."
+                    : "Сбор отменён. Семантика темы не изменена."
             } catch {
                 if let runError = error as? SemanticCollectionRunner.RunError {
                     runID = runError.runID
@@ -131,6 +166,19 @@ struct SemanticFunnelView: View {
                 message = error.localizedDescription
             }
             isRunning = false
+            startedAt = nil
+            collectionTask = nil
         }
+    }
+
+    private func stopCollection() {
+        stopRequested = true
+        message = "Останавливаю сбор…"
+        collectionTask?.cancel()
+    }
+
+    private func elapsedText(from start: Date, to end: Date) -> String {
+        let seconds = max(0, Int(end.timeIntervalSince(start)))
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 }

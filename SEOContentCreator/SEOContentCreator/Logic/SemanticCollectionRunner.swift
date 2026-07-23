@@ -1,6 +1,32 @@
 import Foundation
 import SwiftData
 
+enum SemanticCollectionProgress: Equatable, Sendable {
+    case planning
+    case wordstat(completed: Int, total: Int)
+    case filtering
+    case relevance
+    case cannibalization
+    case saving
+
+    var label: String {
+        switch self {
+        case .planning:
+            return "Планирую запросы с ИИ…"
+        case .wordstat(let completed, let total):
+            return "Получаю данные Wordstat: \(completed) из \(total)"
+        case .filtering:
+            return "Очищаю и группирую запросы…"
+        case .relevance:
+            return "ИИ проверяет релевантность…"
+        case .cannibalization:
+            return "ИИ проверяет каннибализацию…"
+        case .saving:
+            return "Сохраняю результат…"
+        }
+    }
+}
+
 /// Orchestrates the whole collection pipeline. Every external dependency is a
 /// closure so the whole run is testable without network or LLM access.
 @MainActor
@@ -41,23 +67,34 @@ struct SemanticCollectionRunner {
     var threshold: Int
     var limit: Int
     var saveContext: (ModelContext) throws -> Void = { try $0.save() }
+    var reportProgress: (SemanticCollectionProgress) -> Void = { _ in }
 
     @discardableResult
     func run(topic: Topic, pages: [PublishedSitePage], context: ModelContext) async throws -> UUID {
         let runID = UUID()
 
+        reportProgress(.planning)
+        try Task.checkCancellation()
         let plan = try await planSeeds(topic, masks)
+        try Task.checkCancellation()
 
         var pulled: [WordstatPhrase] = []
-        for seed in plan.seedPhrases() {
+        let seeds = plan.seedPhrases()
+        reportProgress(.wordstat(completed: 0, total: seeds.count))
+        for (index, seed) in seeds.enumerated() {
+            try Task.checkCancellation()
             // A failing seed must not abort the run; the funnel records why it failed.
             do {
                 let phrases = try await pullPhrases(seed)
+                try Task.checkCancellation()
                 pulled.append(contentsOf: phrases)
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 record(topic: topic, context: context, text: seed, frequency: nil,
                        layer: .raw, reason: error.localizedDescription, runID: runID)
             }
+            reportProgress(.wordstat(completed: index + 1, total: seeds.count))
         }
 
         guard !pulled.isEmpty else { throw RunError.wordstatReturnedNothing(runID: runID) }
@@ -67,6 +104,8 @@ struct SemanticCollectionRunner {
                    layer: .raw, reason: "", runID: runID)
         }
 
+        reportProgress(.filtering)
+        try Task.checkCancellation()
         let filtered = SemanticRuleFilter.apply(pulled, stopWords: stopWords, threshold: threshold, limit: limit)
 
         for drop in filtered.dropped {
@@ -80,7 +119,9 @@ struct SemanticCollectionRunner {
             filtered.survivors.map { (SemanticRuleFilter.normalize($0.text), $0.frequency) },
             uniquingKeysWith: { first, _ in first }
         )
+        reportProgress(.relevance)
         let analysis = try await analyzeRelevance(topic, filtered.survivors)
+        try Task.checkCancellation()
         let keywordsWithRealFrequency = analysis.keywords.map { keyword -> SemanticAgentKeywordResult in
             var updated = keyword
             updated.frequency = realFrequencyByQuery[SemanticRuleFilter.normalize(keyword.query)]
@@ -95,7 +136,9 @@ struct SemanticCollectionRunner {
         }
 
         let included = keywordsWithRealFrequency.filter { $0.recommendation == .include }
+        reportProgress(.cannibalization)
         let checked = try await checkCannibalization(included, pages)
+        try Task.checkCancellation()
 
         let longTailResults = analysis.longTail.map { query in
             SemanticAgentKeywordResult(
@@ -118,6 +161,8 @@ struct SemanticCollectionRunner {
 
         let rollback = SemanticMergeRollback.capture(topic: topic)
         do {
+            reportProgress(.saving)
+            try Task.checkCancellation()
             SemanticKeywordMerger.merge(survivors, into: topic, decision: .accepted)
             if let intent = topic.readerIntent {
                 intent.semanticSnapshot = ReaderIntent.acceptedSemanticSnapshot(for: topic)
