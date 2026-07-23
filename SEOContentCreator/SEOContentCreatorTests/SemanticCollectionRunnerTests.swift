@@ -9,9 +9,37 @@ struct SemanticCollectionRunnerTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
             for: Topic.self, ReaderIntent.self, SemanticKeyword.self, SemanticFunnelEntry.self,
+            SemanticCollectionCheckpoint.self,
             configurations: config
         )
         return ModelContext(container)
+    }
+
+    @Test func checkpointPersistsOnATopicAndReadsBack() throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        let checkpoint = SemanticCollectionCheckpoint(
+            runID: UUID(),
+            seeds: ["рак груди", "рак груди лечение"],
+            stopWords: ["реферат"],
+            masks: ["как"],
+            threshold: 10,
+            limit: 100
+        )
+        checkpoint.topic = topic
+        context.insert(checkpoint)
+        try context.save()
+
+        #expect(topic.collectionCheckpoint === checkpoint)
+        #expect(checkpoint.seeds == ["рак груди", "рак груди лечение"])
+        #expect(checkpoint.completedSeeds.isEmpty)
+        #expect(checkpoint.pulled.isEmpty)
+        #expect(checkpoint.stopWordsSnapshot == ["реферат"])
+        #expect(checkpoint.masksSnapshot == ["как"])
+        #expect(checkpoint.thresholdSnapshot == 10)
+        #expect(checkpoint.limitSnapshot == 100)
     }
 
     private func makeRunner(

@@ -44,6 +44,8 @@ final class Topic {
     var promptRecommendations: [PromptRecommendation] = []
     @Relationship(deleteRule: .cascade, inverse: \ReaderIntent.topic)
     var readerIntent: ReaderIntent?
+    @Relationship(deleteRule: .cascade, inverse: \SemanticCollectionCheckpoint.topic)
+    var collectionCheckpoint: SemanticCollectionCheckpoint?
 
     init(
         title: String,
