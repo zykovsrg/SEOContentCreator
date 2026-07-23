@@ -67,7 +67,7 @@ struct SemanticsEditorSheet: View {
                     Button("Обновить страницы сайта") { refreshSitePages() }
                         .disabled(isRefreshingPages)
                         .controlSize(.small)
-                    Button("Сбор агентом") { showAgent = true }
+                    Button("Собрать семантику") { showAgent = true }
                         .controlSize(.small)
                 }
 
