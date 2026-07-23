@@ -13,6 +13,17 @@ struct SettingsView: View {
     @State private var googleMessage: String?
     @State private var auth = GoogleAuthService()
 
+    @AppStorage("wordstatProviderKind") private var providerKindRaw = WordstatProviderKind.cloud.rawValue
+    @State private var wordstatLegacyToken = ""
+    @State private var wordstatLegacyMessage: String?
+    @State private var hasWordstatLegacyToken = KeychainService.hasAPIKey(account: "wordstatLegacyToken")
+    @State private var wordstatCloudAPIKey = ""
+    @State private var wordstatCloudAPIKeyMessage: String?
+    @State private var hasWordstatCloudAPIKey = KeychainService.hasAPIKey(account: "wordstatCloudAPIKey")
+    @State private var wordstatCloudFolderID = ""
+    @State private var wordstatCloudFolderIDMessage: String?
+    @State private var hasWordstatCloudFolderID = KeychainService.hasAPIKey(account: "wordstatCloudFolderID")
+
     private let models = [
         "gpt-5.5-pro", "gpt-5.5",
         "gpt-5.4-pro", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
@@ -73,6 +84,59 @@ struct SettingsView: View {
                     Text(googleMessage).font(.caption).foregroundStyle(.secondary)
                 }
             }
+
+            Section("Wordstat") {
+                Picker("Провайдер Wordstat", selection: $providerKindRaw) {
+                    ForEach(WordstatProviderKind.allCases, id: \.rawValue) { kind in
+                        Text(kind.label).tag(kind.rawValue)
+                    }
+                }
+
+                SecureField("Токен Wordstat (старый API)", text: $wordstatLegacyToken)
+                Text("Для api.wordstat.yandex.net. По данным на 2026-07-22 этот API отвечает ошибкой TLS-сертификата — сохраните токен на случай, если Яндекс это исправит.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("Сохранить токен") { saveWordstatLegacyToken() }
+                        .disabled(wordstatLegacyToken.isEmpty)
+                    Spacer()
+                    if hasWordstatLegacyToken {
+                        Label("Токен сохранён", systemImage: "checkmark.seal").foregroundStyle(.green)
+                    }
+                }
+                if let wordstatLegacyMessage {
+                    Text(wordstatLegacyMessage).font(.caption).foregroundStyle(.secondary)
+                }
+
+                SecureField("Ключ Yandex Cloud", text: $wordstatCloudAPIKey)
+                Text("Тот же ключ, что используется для YandexGPT в AI Studio.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("Сохранить ключ") { saveWordstatCloudAPIKey() }
+                        .disabled(wordstatCloudAPIKey.isEmpty)
+                    Spacer()
+                    if hasWordstatCloudAPIKey {
+                        Label("Ключ сохранён", systemImage: "checkmark.seal").foregroundStyle(.green)
+                    }
+                }
+                if let wordstatCloudAPIKeyMessage {
+                    Text(wordstatCloudAPIKeyMessage).font(.caption).foregroundStyle(.secondary)
+                }
+
+                TextField("Yandex Cloud folderId", text: $wordstatCloudFolderID)
+                Text("Идентификатор каталога в Yandex Cloud — не секрет, но обязателен для каждого запроса.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("Сохранить folderId") { saveWordstatCloudFolderID() }
+                        .disabled(wordstatCloudFolderID.isEmpty)
+                    Spacer()
+                    if hasWordstatCloudFolderID {
+                        Label("folderId сохранён", systemImage: "checkmark.seal").foregroundStyle(.green)
+                    }
+                }
+                if let wordstatCloudFolderIDMessage {
+                    Text(wordstatCloudFolderIDMessage).font(.caption).foregroundStyle(.secondary)
+                }
+            }
         }
         .formStyle(.grouped)
         .frame(width: 460, height: 480)
@@ -121,5 +185,38 @@ struct SettingsView: View {
         auth.signOut()
         isGoogleSignedIn = false
         googleMessage = "Выход выполнен."
+    }
+
+    private func saveWordstatLegacyToken() {
+        do {
+            try WordstatCredentialStore.saveLegacyToken(wordstatLegacyToken)
+            wordstatLegacyToken = ""
+            hasWordstatLegacyToken = true
+            wordstatLegacyMessage = "Токен сохранён в Keychain."
+        } catch {
+            wordstatLegacyMessage = "Не удалось сохранить: \(error.localizedDescription)"
+        }
+    }
+
+    private func saveWordstatCloudAPIKey() {
+        do {
+            try WordstatCredentialStore.saveCloudAPIKey(wordstatCloudAPIKey)
+            wordstatCloudAPIKey = ""
+            hasWordstatCloudAPIKey = true
+            wordstatCloudAPIKeyMessage = "Ключ сохранён в Keychain."
+        } catch {
+            wordstatCloudAPIKeyMessage = "Не удалось сохранить: \(error.localizedDescription)"
+        }
+    }
+
+    private func saveWordstatCloudFolderID() {
+        do {
+            try WordstatCredentialStore.saveCloudFolderID(wordstatCloudFolderID)
+            wordstatCloudFolderID = ""
+            hasWordstatCloudFolderID = true
+            wordstatCloudFolderIDMessage = "folderId сохранён в Keychain."
+        } catch {
+            wordstatCloudFolderIDMessage = "Не удалось сохранить: \(error.localizedDescription)"
+        }
     }
 }
