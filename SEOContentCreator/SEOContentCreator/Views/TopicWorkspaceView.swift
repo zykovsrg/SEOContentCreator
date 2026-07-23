@@ -27,7 +27,7 @@ struct TopicWorkspaceView: View {
     @State private var showPartialAccept = false
     @State private var showPromptAnalysis = false
     @State private var checkedWithNoRemarks = false
-    @State private var showReaderIntent = false
+    @State private var preparationDestination: PreparationDestination?
 
     enum InspectorTab: String, CaseIterable, Identifiable {
         case remarks, versions, semantics, log
@@ -54,11 +54,7 @@ struct TopicWorkspaceView: View {
                         StageRailView(
                             selectedStage: $selectedStage,
                             topic: topic,
-                            openSemantics: {
-                                inspectorTab = .semantics
-                                showInspector = true
-                            },
-                            openReaderIntent: { showReaderIntent = true }
+                            openPreparation: { preparationDestination = $0 }
                         )
                             .panelCard()
                         workColumn
@@ -88,7 +84,14 @@ struct TopicWorkspaceView: View {
             ProductBlocksSheet { runStage(.productBlocks, blocks: $0) }
         }
         .sheet(isPresented: $showStructure) { StructureEditorSheet(topic: topic) }
-        .sheet(isPresented: $showReaderIntent) { ReaderIntentSheet(topic: topic) }
+        .sheet(item: $preparationDestination) { destination in
+            switch destination {
+            case .readerIntent:
+                ReaderIntentSheet(topic: topic)
+            case .semantics:
+                SemanticsWorkspaceSheet(topic: topic)
+            }
+        }
         .sheet(isPresented: $showHints) { SoftHintsSheet(topic: topic) }
         .sheet(isPresented: $showImages) { ImagesView(topic: topic) }
         .sheet(isPresented: $showPublish) {

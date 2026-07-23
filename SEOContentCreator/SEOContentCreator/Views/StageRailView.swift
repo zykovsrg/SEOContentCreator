@@ -5,8 +5,7 @@ import SwiftData
 struct StageRailView: View {
     @Binding var selectedStage: PipelineStage
     var topic: Topic
-    var openSemantics: () -> Void
-    var openReaderIntent: () -> Void
+    var openPreparation: (PreparationDestination) -> Void
     @Query private var roles: [AIRole]
 
     private func isCompleted(_ stage: PipelineStage) -> Bool {
@@ -112,18 +111,23 @@ struct StageRailView: View {
                 .padding(.top, 18)
                 .padding(.bottom, 8)
 
-            Button(action: openSemantics) {
-                preparationRow(
-                    title: "Семантика",
-                    subtitle: topic.semanticKeywords.isEmpty ? "Не заполнена" : "Запросов: \(topic.semanticKeywords.count)",
-                    icon: topic.semanticKeywords.isEmpty ? "circle" : "checkmark.circle.fill",
-                    color: topic.semanticKeywords.isEmpty ? .secondary : .green
-                )
+            ForEach(PreparationDestination.allCases) { destination in
+                Button { openPreparation(destination) } label: {
+                    switch destination {
+                    case .readerIntent:
+                        readerIntentRow
+                    case .semantics:
+                        semanticsRow
+                    }
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+        }
+    }
 
-            Button(action: openReaderIntent) {
-                switch ReaderIntentStatus.forTopic(topic) {
+    @ViewBuilder
+    private var readerIntentRow: some View {
+        switch ReaderIntentStatus.forTopic(topic) {
                 case .missing:
                     preparationRow(
                         title: "Задача читателя", subtitle: "Не заполнена",
@@ -139,10 +143,18 @@ struct StageRailView: View {
                         title: "Задача читателя", subtitle: "Семантика изменилась · \(summary)",
                         icon: "exclamationmark.triangle.fill", color: .orange
                     )
-                }
-            }
-            .buttonStyle(.plain)
         }
+    }
+
+    private var semanticsRow: some View {
+        preparationRow(
+            title: "Семантика",
+            subtitle: topic.semanticKeywords.isEmpty
+                ? "Не заполнена"
+                : "Запросов: \(topic.semanticKeywords.count)",
+            icon: topic.semanticKeywords.isEmpty ? "circle" : "checkmark.circle.fill",
+            color: topic.semanticKeywords.isEmpty ? .secondary : .green
+        )
     }
 
     private func preparationRow(
