@@ -283,3 +283,13 @@ private struct SemanticMergeRollback {
         }
     }
 }
+
+extension SemanticCollectionRunner {
+    /// Discards saved progress for a topic so the next run starts from zero.
+    /// Does not touch the funnel journal or semantic keywords.
+    static func resetCheckpoint(for topic: Topic, context: ModelContext) throws {
+        guard let checkpoint = topic.collectionCheckpoint else { return }
+        context.delete(checkpoint)
+        try context.save()
+    }
+}

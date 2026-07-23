@@ -42,6 +42,35 @@ struct SemanticCollectionRunnerTests {
         #expect(checkpoint.limitSnapshot == 100)
     }
 
+    @Test func resetCheckpointDeletesIt() throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        let checkpoint = SemanticCollectionCheckpoint(
+            runID: UUID(), seeds: ["старый"],
+            stopWords: [], masks: [], threshold: 10, limit: 100
+        )
+        checkpoint.topic = topic
+        context.insert(checkpoint)
+        try context.save()
+        #expect(topic.collectionCheckpoint != nil)
+
+        try SemanticCollectionRunner.resetCheckpoint(for: topic, context: context)
+
+        #expect(topic.collectionCheckpoint == nil)
+    }
+
+    @Test func resetCheckpointIsANoOpWhenThereIsNoCheckpoint() throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        try SemanticCollectionRunner.resetCheckpoint(for: topic, context: context)
+
+        #expect(topic.collectionCheckpoint == nil)
+    }
+
     private func makeRunner(
         plan: SemanticSeedPlan = SemanticSeedPlan(synonyms: ["рак груди"], masks: [], tails: []),
         pulled: [WordstatPhrase],
