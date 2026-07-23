@@ -303,7 +303,7 @@ struct SemanticCollectionRunnerTests {
         #expect(Set(topic.funnelEntries.map(\.runID)).count == 1)
     }
 
-    @Test func recordsRealErrorMessageWhenASeedFails() async throws {
+    @Test func stopsTheRunImmediatelyWhenASeedFails() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Рак груди", articleType: .disease)
         context.insert(topic)
@@ -312,21 +312,15 @@ struct SemanticCollectionRunnerTests {
             var errorDescription: String? { "квота исчерпана" }
         }
 
+        var attemptedSeeds: [String] = []
         let runner = SemanticCollectionRunner(
-            planSeeds: { _, _ in SemanticSeedPlan(synonyms: ["рак груди", "рмж"], masks: [], tails: []) },
+            planSeeds: { _, _ in SemanticSeedPlan(synonyms: ["первый", "второй", "третий"], masks: [], tails: []) },
             pullPhrases: { seed in
-                if seed == "рмж" { throw FakePullError() }
-                return [WordstatPhrase(text: "рак груди лечение", frequency: 500)]
+                attemptedSeeds.append(seed)
+                if seed == "второй" { throw FakePullError() }
+                return [WordstatPhrase(text: "\(seed) запрос", frequency: 500)]
             },
-            analyzeRelevance: { _, _ in
-                SemanticAgentAnalysis(
-                    keywords: [SemanticAgentKeywordResult(
-                        query: "рак груди лечение", frequency: nil, recommendation: .include, reasonCategory: .none,
-                        explanation: "", cannibalizationRisk: .none, cannibalizationURL: nil, cannibalizationTitle: nil
-                    )],
-                    longTail: []
-                )
-            },
+            analyzeRelevance: { _, _ in SemanticAgentAnalysis(keywords: [], longTail: []) },
             checkCannibalization: { keywords, _ in keywords },
             stopWords: [],
             masks: [],
@@ -334,10 +328,14 @@ struct SemanticCollectionRunnerTests {
             limit: 100
         )
 
-        try await runner.run(topic: topic, pages: [], context: context)
+        await #expect(throws: FakePullError.self) {
+            try await runner.run(topic: topic, pages: [], context: context)
+        }
 
-        let failedSeed = topic.funnelEntries.first { $0.text == "рмж" }
+        #expect(attemptedSeeds == ["первый", "второй"])
+        let failedSeed = topic.funnelEntries.first { $0.text == "второй" }
         #expect(failedSeed?.reason == "квота исчерпана")
+        #expect(topic.semanticKeywords.isEmpty)
     }
 
     @Test func overwritesAnalyzerFrequencyWithRealWordstatFrequency() async throws {
@@ -358,21 +356,18 @@ struct SemanticCollectionRunnerTests {
         #expect(topic.semanticKeywords[0].frequency == 500)
     }
 
-    @Test func wordstatReturnedNothingErrorCarriesRunID() async throws {
+    @Test func wordstatReturnedNothingWhenEveryPullSucceedsButYieldsNoPhrases() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Рак груди", articleType: .disease)
         context.insert(topic)
 
-        // The seed pull fails (rather than merely returning empty) so a real
-        // funnel entry is recorded before the "no phrases" guard throws —
-        // otherwise there would be nothing in the journal to recover.
-        struct FakePullError: Error, LocalizedError {
-            var errorDescription: String? { "Wordstat недоступен" }
-        }
-
+        // Every seed succeeds, but Wordstat genuinely has nothing for any of
+        // them. This is the only way to reach the "no phrases" guard now that
+        // any pullPhrases *error* aborts the run immediately instead of being
+        // recorded-and-continued.
         let runner = SemanticCollectionRunner(
             planSeeds: { _, _ in SemanticSeedPlan(synonyms: ["рак груди"], masks: [], tails: []) },
-            pullPhrases: { _ in throw FakePullError() },
+            pullPhrases: { _ in [] },
             analyzeRelevance: { _, _ in SemanticAgentAnalysis(keywords: [], longTail: []) },
             checkCannibalization: { keywords, _ in keywords },
             stopWords: [],
@@ -381,12 +376,13 @@ struct SemanticCollectionRunnerTests {
             limit: 100
         )
 
-        do {
-            _ = try await runner.run(topic: topic, pages: [], context: context)
-            Issue.record("Expected wordstatReturnedNothing to be thrown")
-        } catch let error as SemanticCollectionRunner.RunError {
-            #expect(Set(topic.funnelEntries.map(\.runID)) == [error.runID])
+        await #expect(throws: SemanticCollectionRunner.RunError.self) {
+            try await runner.run(topic: topic, pages: [], context: context)
         }
+
+        // Nothing succeeded or failed — Wordstat legitimately had nothing to
+        // say for any seed, so there is nothing to journal.
+        #expect(topic.funnelEntries.isEmpty)
     }
 
     @Test func rulesDroppedEverythingErrorCarriesRunID() async throws {

@@ -84,10 +84,10 @@ struct SemanticCollectionRunner {
 
         var pulled: [WordstatPhrase] = []
         let seeds = plan.seedPhrases()
+        var completedSeeds = 0
         reportProgress(.wordstat(completed: 0, total: seeds.count))
-        for (index, seed) in seeds.enumerated() {
+        for seed in seeds {
             try Task.checkCancellation()
-            // A failing seed must not abort the run; the funnel records why it failed.
             do {
                 let phrases = try await pullPhrases(seed)
                 try Task.checkCancellation()
@@ -95,10 +95,18 @@ struct SemanticCollectionRunner {
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
+                // Every pullPhrases error means Wordstat itself failed to
+                // answer (network, auth, quota, unparseable response) — a
+                // legitimately empty result returns [], never throws. So any
+                // error here means continuing to the next seed would just
+                // burn through an already-unreachable API. Record it for
+                // visibility, then stop the whole run.
                 record(topic: topic, context: context, text: seed, frequency: nil,
                        layer: .raw, reason: error.localizedDescription, runID: runID)
+                throw error
             }
-            reportProgress(.wordstat(completed: index + 1, total: seeds.count))
+            completedSeeds += 1
+            reportProgress(.wordstat(completed: completedSeeds, total: seeds.count))
         }
 
         guard !pulled.isEmpty else { throw RunError.wordstatReturnedNothing(runID: runID) }
