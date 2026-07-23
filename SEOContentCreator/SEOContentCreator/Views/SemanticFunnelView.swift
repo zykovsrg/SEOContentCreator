@@ -150,7 +150,11 @@ struct SemanticFunnelView: View {
     }
 
     private func resetProgress() {
-        try? SemanticCollectionRunner.resetCheckpoint(for: topic, context: context)
+        do {
+            try SemanticCollectionRunner.resetCheckpoint(for: topic, context: context)
+        } catch {
+            message = "Не удалось сбросить прогресс: \(error.localizedDescription)"
+        }
     }
 
     private func collect() {
