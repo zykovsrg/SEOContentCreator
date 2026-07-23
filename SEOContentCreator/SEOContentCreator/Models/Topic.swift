@@ -42,6 +42,8 @@ final class Topic {
     var funnelEntries: [SemanticFunnelEntry] = []
     @Relationship(deleteRule: .cascade, inverse: \PromptRecommendation.topic)
     var promptRecommendations: [PromptRecommendation] = []
+    @Relationship(deleteRule: .cascade, inverse: \ReaderIntent.topic)
+    var readerIntent: ReaderIntent?
 
     init(
         title: String,

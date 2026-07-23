@@ -23,6 +23,11 @@ struct PromptBuilder {
             node.content.isEmpty ? node.title : "\(node.title): \(node.content)"
         }.joined(separator: "\n")
 
+        let readerIntentStages: Set<PipelineStage> = [.structure, .draft, .semanticsInText, .seoCheck]
+        let readerIntent = template.stage.map { readerIntentStages.contains($0) } == true
+            ? ReaderIntentPromptRenderer.render(topic: topic)
+            : ""
+
         let substitutions: [String: String] = [
             "{{тема}}": topic.title,
             "{{тип}}": topic.articleType.title,
@@ -40,7 +45,8 @@ struct PromptBuilder {
             "{{текущий_description}}": topic.currentVersion?.seoDescription ?? "",
             "{{запрещённые_формулировки}}": forbiddenPhrases.isEmpty ? "(список пуст)" : forbiddenPhrases,
             "{{история_версий_по_этапам}}": StageVersionsSummaryBuilder.build(topic: topic),
-            "{{текущие_промты_этапов}}": stageTemplatesSummary
+            "{{текущие_промты_этапов}}": stageTemplatesSummary,
+            "{{задача_читателя}}": readerIntent
         ]
         func substitute(_ text: String) -> String {
             var result = text

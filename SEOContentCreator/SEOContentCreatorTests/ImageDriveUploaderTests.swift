@@ -7,7 +7,7 @@ import SwiftData
 struct ImageDriveUploaderTests {
     private func makeContext() throws -> ModelContext {
         let container = try ModelContainer(
-            for: Topic.self, KnowledgeNode.self, ArticleVersion.self, GeneratedImage.self,
+            for: Topic.self, ReaderIntent.self, KnowledgeNode.self, ArticleVersion.self, GeneratedImage.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         return ModelContext(container)
     }

@@ -16,6 +16,13 @@ final class StageTemplate {
     var templateVersion: Int
     var createdAt: Date
     var updatedAt: Date
+    var hasPersonalDefault: Bool = false
+    var personalDefaultUserPromptTemplate: String?
+    var personalDefaultModelName: String?
+    var personalDefaultTemperature: Double?
+    var personalDefaultMaxTokens: Int?
+    var personalDefaultReasoningEffort: String?
+    var personalDefaultUpdatedAt: Date?
 
     init(
         stage: PipelineStage,

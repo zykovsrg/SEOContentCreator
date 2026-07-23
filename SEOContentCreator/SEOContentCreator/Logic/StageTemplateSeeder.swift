@@ -3,7 +3,7 @@ import SwiftData
 
 enum StageTemplateSeeder {
     static let templatesDefaultsVersionKey = "templatesDefaultsVersion"
-    private static let currentTemplatesDefaultsVersion = 8
+    private static let currentTemplatesDefaultsVersion = 9
 
     @MainActor
     static func seedIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
@@ -77,45 +77,39 @@ enum StageTemplateSeeder {
         let storedVersion = defaults.integer(forKey: templatesDefaultsVersionKey)
         guard storedVersion < currentTemplatesDefaultsVersion else { return }
 
-        let cascadeStages: Set<String> = [
-            PipelineStage.structure.rawValue,
-            PipelineStage.draft.rawValue,
-            PipelineStage.productBlocks.rawValue,
-            PipelineStage.semanticsInText.rawValue,
-            PipelineStage.factCheck.rawValue,
-            PipelineStage.finalReview.rawValue,
-            PipelineStage.seoCheck.rawValue
-        ]
         let templates = (try? context.fetch(FetchDescriptor<StageTemplate>())) ?? []
         for template in templates {
-            guard let stage = template.stage, cascadeStages.contains(template.stageRaw) else { continue }
-            let content = StageTemplateDefaults.content(for: stage)
-            template.userPromptTemplate = content.userPromptTemplate
+            guard let stage = template.stage else { continue }
+            template.userPromptTemplate = StagePromptIntentMigration.upgrade(template.userPromptTemplate, for: stage)
             // Checking stages need a low, predictable temperature (stable JSON,
             // less "creativity"); author stages keep their existing temperature.
+            // This is a model-parameter backfill, not a prompt-text overwrite, so
+            // it stays additive/idempotent independently of the reader-intent upgrade above.
             if stage.kind == .checking {
-                template.temperature = content.temperature
+                template.temperature = StageTemplateDefaults.content(for: stage).temperature
             }
             template.updatedAt = .now
         }
 
-        let migratedBlockKeys: Set<String> = ["editorialPolicy", "sources", "seoGuidelines"]
         let blocks = (try? context.fetch(FetchDescriptor<ContextBlock>())) ?? []
-        for block in blocks where migratedBlockKeys.contains(block.key) {
-            if let def = ContextBlockDefaults.defaultForKey(block.key) {
-                block.text = def.text
-            }
+        var roles = (try? context.fetch(FetchDescriptor<AIRole>())) ?? []
+        if !roles.isEmpty,
+           !roles.contains(where: { $0.key == "analyst" }),
+           let definition = RoleDefaults.defaultForKey("analyst") {
+            let analyst = AIRole(
+                key: definition.key,
+                name: definition.name,
+                mandate: definition.mandate,
+                blockKeys: definition.blockKeys
+            )
+            context.insert(analyst)
+            roles.append(analyst)
         }
 
-        let roles = (try? context.fetch(FetchDescriptor<AIRole>())) ?? []
-        for role in roles {
-            if let def = RoleDefaults.defaultForKey(role.key) {
-                role.mandate = def.mandate
-            }
-        }
-        if !roles.isEmpty, !roles.contains(where: { $0.key == "analyst" }),
-           let def = RoleDefaults.defaultForKey("analyst") {
-            context.insert(AIRole(key: def.key, name: def.name, mandate: def.mandate, blockKeys: def.blockKeys))
+        for template in templates {
+            guard let stage = template.stage else { continue }
+            let role = roles.first { $0.key == stage.roleKey }
+            PromptPersonalDefaultsService.captureIfMissing(template: template, role: role, blocks: blocks)
         }
 
         let presets = (try? context.fetch(FetchDescriptor<SkillPreset>())) ?? []
@@ -134,13 +128,13 @@ enum StageTemplateSeeder {
             context.insert(SkillPresetDefaults.make(def, order: nextOrder))
         }
 
-        // Image prompt templates are seeded per kind but were never migrated,
-        // so installs older than the glass-style flow still run pre-glass prompts.
-        let imagePrompts = (try? context.fetch(FetchDescriptor<ImagePromptTemplate>())) ?? []
-        for template in imagePrompts {
-            guard let kind = template.kind else { continue }
-            template.userPromptTemplate = ImagePromptDefaults.content(for: kind)
-            template.updatedAt = .now
+        if storedVersion < 8 {
+            let imagePrompts = (try? context.fetch(FetchDescriptor<ImagePromptTemplate>())) ?? []
+            for template in imagePrompts {
+                guard let kind = template.kind else { continue }
+                template.userPromptTemplate = ImagePromptDefaults.content(for: kind)
+                template.updatedAt = .now
+            }
         }
 
         // ImageStylePreset seeds only when the whole table is empty (seedImageStylePresetIfNeeded),

@@ -212,4 +212,27 @@ struct PromptBuilderTests {
         let result = PromptBuilder().build(template: t, topic: topic, currentText: nil)
         #expect(!result.user.contains("{{продуктовые_блоки}}"))
     }
+
+    @Test func substitutesReaderIntentVariable() {
+        let template = StageTemplate(stage: .draft, userPromptTemplate: "{{задача_читателя}}")
+        let topic = Topic(title: "Тема", articleType: .info)
+        topic.readerIntent = ReaderIntent(query: "запрос", hiddenGoal: "решить задачу")
+        let result = PromptBuilder().build(template: template, topic: topic, currentText: nil)
+        #expect(result.user.contains("Практическая задача: решить задачу"))
+    }
+
+    @Test func missingReaderIntentUsesExplicitFallback() {
+        let template = StageTemplate(stage: .structure, userPromptTemplate: "{{задача_читателя}}")
+        let topic = Topic(title: "Тема", articleType: .info)
+        let result = PromptBuilder().build(template: template, topic: topic, currentText: nil)
+        #expect(result.user == "Карта задачи читателя не заполнена.")
+    }
+
+    @Test func unrelatedStageDoesNotReceiveReaderIntentEvenWithManualToken() {
+        let template = StageTemplate(stage: .factCheck, userPromptTemplate: "До {{задача_читателя}} После")
+        let topic = Topic(title: "Тема", articleType: .info)
+        topic.readerIntent = ReaderIntent(query: "запрос", hiddenGoal: "решить задачу")
+        let result = PromptBuilder().build(template: template, topic: topic, currentText: "Текст")
+        #expect(result.user == "До  После")
+    }
 }

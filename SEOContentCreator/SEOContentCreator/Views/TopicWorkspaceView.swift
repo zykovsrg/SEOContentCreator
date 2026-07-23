@@ -27,6 +27,7 @@ struct TopicWorkspaceView: View {
     @State private var showPartialAccept = false
     @State private var showPromptAnalysis = false
     @State private var checkedWithNoRemarks = false
+    @State private var showReaderIntent = false
 
     enum InspectorTab: String, CaseIterable, Identifiable {
         case remarks, versions, semantics, log
@@ -50,7 +51,15 @@ struct TopicWorkspaceView: View {
             } else {
                 VStack(spacing: 0) {
                     HStack(spacing: 10) {
-                        StageRailView(selectedStage: $selectedStage, topic: topic)
+                        StageRailView(
+                            selectedStage: $selectedStage,
+                            topic: topic,
+                            openSemantics: {
+                                inspectorTab = .semantics
+                                showInspector = true
+                            },
+                            openReaderIntent: { showReaderIntent = true }
+                        )
                             .panelCard()
                         workColumn
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,6 +88,7 @@ struct TopicWorkspaceView: View {
             ProductBlocksSheet { runStage(.productBlocks, blocks: $0) }
         }
         .sheet(isPresented: $showStructure) { StructureEditorSheet(topic: topic) }
+        .sheet(isPresented: $showReaderIntent) { ReaderIntentSheet(topic: topic) }
         .sheet(isPresented: $showHints) { SoftHintsSheet(topic: topic) }
         .sheet(isPresented: $showImages) { ImagesView(topic: topic) }
         .sheet(isPresented: $showPublish) {
