@@ -21,8 +21,8 @@ struct TemplateChipTextTests {
         #expect(TemplateChipText.chip(model: "gpt-4.1", maxTokens: 8000, reasoning: nil)
                 == "gpt-4.1 · 8k")
     }
-    @Test func categoriesCoverAllFourGroups() {
-        #expect(TemplateCategory.allCases.count == 4)
+    @Test func categoriesCoverAllFiveGroups() {
+        #expect(TemplateCategory.allCases.count == 5)
         #expect(TemplateCategory.allCases.first == .stages)
     }
 }
