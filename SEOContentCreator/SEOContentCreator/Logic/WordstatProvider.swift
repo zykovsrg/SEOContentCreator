@@ -1,7 +1,7 @@
 import Foundation
 
 /// One phrase returned by Wordstat, with its monthly impression count.
-struct WordstatPhrase: Equatable, Sendable {
+struct WordstatPhrase: Codable, Equatable, Sendable {
     var text: String
     var frequency: Int
 }
