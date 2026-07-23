@@ -75,5 +75,7 @@ struct SemanticReaderIntentPromptTests {
         #expect(SemanticAgentAnalyzer.systemPrompt.contains("академические"))
         #expect(SemanticAgentAnalyzer.systemPrompt.contains("интент"))
         #expect(SemanticAgentAnalyzer.systemPrompt.contains("типом статьи"))
+        #expect(SemanticAgentAnalyzer.systemPrompt.contains("Сгруппируй близкие по смыслу запросы"))
+        #expect(SemanticAgentAnalyzer.systemPrompt.contains("без стороннего сервиса"))
     }
 }

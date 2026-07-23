@@ -71,4 +71,10 @@ struct SemanticCannibalizationCheckerTests {
         #expect(updated[0].cannibalizationRisk == .low)
         #expect(updated[0].reasonCategory == .none)
     }
+
+    @Test func promptAssignsCannibalizationCheckToAI() {
+        #expect(SemanticCannibalizationChecker.systemPrompt.contains("Самостоятельно"))
+        #expect(SemanticCannibalizationChecker.systemPrompt.contains("опубликованными страницами"))
+        #expect(SemanticCannibalizationChecker.systemPrompt.contains("без стороннего сервиса"))
+    }
 }
