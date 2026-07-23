@@ -5,23 +5,43 @@ struct SemanticSeedPlan: Equatable, Sendable {
     var masks: [String]
     var tails: [String]
 
-    /// Every phrase the Wordstat layer will pull, deduplicated and normalized.
-    /// Each synonym is pulled bare, plus once per mask and once per tail.
+    /// Wordstat quota is tight (each seed is one API request), so a single
+    /// collection run never sends more than this many.
+    static let maxSeedPhrases = 100
+
+    /// Every phrase the Wordstat layer will pull, deduplicated, normalized,
+    /// and capped at `maxSeedPhrases`. Priority under the cap: bare synonyms
+    /// first (each Wordstat call already returns up to 200 related phrases,
+    /// so the bare forms are the highest-yield requests), then mask
+    /// combinations round-robin across synonyms, then tail combinations the
+    /// same way — so a tight cap spreads coverage evenly across synonyms
+    /// instead of exhausting it on the first one.
     func seedPhrases() -> [String] {
         var seen = Set<String>()
         var result: [String] = []
 
-        for synonym in synonyms {
-            let base = SemanticRuleFilter.normalize(synonym)
-            guard !base.isEmpty else { continue }
+        func append(_ candidate: String) {
+            guard result.count < Self.maxSeedPhrases else { return }
+            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { return }
+            result.append(trimmed)
+        }
 
-            let maskPhrases = masks.map { "\(base) \(SemanticRuleFilter.normalize($0))" }
-            let tailPhrases = tails.map { "\(base) \(SemanticRuleFilter.normalize($0))" }
+        let bases = synonyms.map(SemanticRuleFilter.normalize).filter { !$0.isEmpty }
 
-            for candidate in [base] + maskPhrases + tailPhrases {
-                let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { continue }
-                result.append(trimmed)
+        for base in bases {
+            append(base)
+        }
+        for mask in masks {
+            let normalized = SemanticRuleFilter.normalize(mask)
+            for base in bases {
+                append("\(base) \(normalized)")
+            }
+        }
+        for tail in tails {
+            let normalized = SemanticRuleFilter.normalize(tail)
+            for base in bases {
+                append("\(base) \(normalized)")
             }
         }
 
