@@ -40,6 +40,7 @@ struct SemanticCollectionRunner {
     var masks: [String]
     var threshold: Int
     var limit: Int
+    var saveContext: (ModelContext) throws -> Void = { try $0.save() }
 
     @discardableResult
     func run(topic: Topic, pages: [PublishedSitePage], context: ModelContext) async throws -> UUID {
@@ -115,8 +116,18 @@ struct SemanticCollectionRunner {
                    layer: .survived, reason: reason, runID: runID)
         }
 
-        SemanticKeywordMerger.merge(survivors, into: topic, decision: .accepted)
-        try? context.save()
+        let rollback = SemanticMergeRollback.capture(topic: topic)
+        do {
+            SemanticKeywordMerger.merge(survivors, into: topic, decision: .accepted)
+            if let intent = topic.readerIntent {
+                intent.semanticSnapshot = ReaderIntent.acceptedSemanticSnapshot(for: topic)
+                intent.updatedAt = .now
+            }
+            try saveContext(context)
+        } catch {
+            rollback.restore(topic: topic, context: context)
+            throw error
+        }
 
         return runID
     }
@@ -129,5 +140,79 @@ struct SemanticCollectionRunner {
         entry.topic = topic
         context.insert(entry)
         topic.funnelEntries.append(entry)
+    }
+}
+
+private struct SemanticMergeRollback {
+    struct KeywordState {
+        let keyword: SemanticKeyword
+        let frequency: Int?
+        let agentRecommendationRaw: String
+        let userDecisionRaw: String
+        let reasonCategoryRaw: String
+        let explanation: String
+        let cannibalizationRiskRaw: String
+        let cannibalizationURL: String?
+        let cannibalizationTitle: String?
+        let updatedAt: Date
+
+        init(_ keyword: SemanticKeyword) {
+            self.keyword = keyword
+            frequency = keyword.frequency
+            agentRecommendationRaw = keyword.agentRecommendationRaw
+            userDecisionRaw = keyword.userDecisionRaw
+            reasonCategoryRaw = keyword.reasonCategoryRaw
+            explanation = keyword.explanation
+            cannibalizationRiskRaw = keyword.cannibalizationRiskRaw
+            cannibalizationURL = keyword.cannibalizationURL
+            cannibalizationTitle = keyword.cannibalizationTitle
+            updatedAt = keyword.updatedAt
+        }
+
+        func restore() {
+            keyword.frequency = frequency
+            keyword.agentRecommendationRaw = agentRecommendationRaw
+            keyword.userDecisionRaw = userDecisionRaw
+            keyword.reasonCategoryRaw = reasonCategoryRaw
+            keyword.explanation = explanation
+            keyword.cannibalizationRiskRaw = cannibalizationRiskRaw
+            keyword.cannibalizationURL = cannibalizationURL
+            keyword.cannibalizationTitle = cannibalizationTitle
+            keyword.updatedAt = updatedAt
+        }
+    }
+
+    let originalKeywordIDs: Set<UUID>
+    let keywordStates: [KeywordState]
+    let topicUpdatedAt: Date
+    let intent: ReaderIntent?
+    let intentSemanticSnapshot: [String]?
+    let intentUpdatedAt: Date?
+
+    static func capture(topic: Topic) -> Self {
+        Self(
+            originalKeywordIDs: Set(topic.semanticKeywords.map(\.uuid)),
+            keywordStates: topic.semanticKeywords.map(KeywordState.init),
+            topicUpdatedAt: topic.updatedAt,
+            intent: topic.readerIntent,
+            intentSemanticSnapshot: topic.readerIntent?.semanticSnapshot,
+            intentUpdatedAt: topic.readerIntent?.updatedAt
+        )
+    }
+
+    func restore(topic: Topic, context: ModelContext) {
+        let newKeywords = topic.semanticKeywords.filter { !originalKeywordIDs.contains($0.uuid) }
+        topic.semanticKeywords.removeAll { !originalKeywordIDs.contains($0.uuid) }
+        for keyword in newKeywords {
+            context.delete(keyword)
+        }
+        keywordStates.forEach { $0.restore() }
+        topic.updatedAt = topicUpdatedAt
+        if let intent {
+            intent.semanticSnapshot = intentSemanticSnapshot ?? []
+            if let intentUpdatedAt {
+                intent.updatedAt = intentUpdatedAt
+            }
+        }
     }
 }

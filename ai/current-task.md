@@ -11,21 +11,16 @@ Allowed stages: intake / spec / planning / implementation / review / task-finish
 ## Mode
 
 
-
 ## Goal
-
 
 
 ## Use Superpowers
 
 
-
 ## Relevant files
 
 
-
 ## Done criteria
-
 
 
 ## Agent handoff

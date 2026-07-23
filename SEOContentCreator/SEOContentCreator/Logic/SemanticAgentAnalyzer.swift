@@ -44,8 +44,8 @@ struct SemanticAgentAnalyzer {
 
         for try await event in streamProvider(
             key,
-            systemPrompt,
-            userPrompt(topic: topic, queries: queries),
+            Self.systemPrompt,
+            Self.userPrompt(topic: topic, queries: queries),
             model,
             0.2,
             4000,
@@ -63,19 +63,26 @@ struct SemanticAgentAnalyzer {
         return try SemanticAgentResponseParser.parse(collected)
     }
 
-    private var systemPrompt: String {
-        """
+    static let systemPrompt = """
         Ты SEO-аналитик медицинского сайта. Верни только JSON без Markdown.
         Решай, какие запросы стоит включить в семантику темы, а какие не стоит.
+        Сгруппируй близкие по смыслу запросы самостоятельно, без стороннего сервиса:
+        убери дубли и оставь наиболее естественные формулировки из каждого кластера.
         Отклоняй академические и учебные формулировки, а также запросы,
         интент которых не совпадает с типом статьи.
         """
-    }
 
-    private func userPrompt(topic: Topic, queries: [WordstatPhrase]) -> String {
-        """
+    static func userPrompt(topic: Topic, queries: [WordstatPhrase]) -> String {
+        let readerIntent = ReaderIntentPromptRenderer.render(topic: topic)
+        return """
         Тема: \(topic.title)
         Тип статьи: \(topic.articleType.title)
+
+        \(readerIntent)
+
+        Оценивай релевантность не только названию темы, но и целевой аудитории,
+        практической задаче, критерию успеха и барьерам из карты. Карта — контекст:
+        не выдумывай спрос, медицинские факты или обещания и не эксплуатируй страхи.
 
         Кандидаты (запрос — частотность):
         \(queries.map { "- \($0.text) — \($0.frequency)" }.joined(separator: "\n"))
