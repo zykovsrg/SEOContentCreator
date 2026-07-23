@@ -172,7 +172,20 @@ struct SemanticCollectionRunnerTests {
                 longTail: []
             )
         )
-        runner.saveContext = { _ in throw FakeSaveError() }
+        runner.saveContext = { context in
+            // Let every save succeed until the final merge save — i.e. until
+            // SemanticKeywordMerger has actually added these two survivors to
+            // topic.semanticKeywords in memory — then fail exactly that one,
+            // so the test can assert the rollback restores only the merge
+            // and intent-snapshot state, leaving the funnel journal and the
+            // checkpoint's earlier progress-saves intact.
+            let mergeHasHappened = topic.semanticKeywords.contains { $0.text == "рак груди лечение" }
+                && topic.semanticKeywords.contains { $0.text == "восстановление после лечения" }
+            if mergeHasHappened {
+                throw FakeSaveError()
+            }
+            try context.save()
+        }
 
         // Simulates an unrelated unsaved edit made before collection.
         topic.notes = "важная несохранённая заметка"
@@ -194,6 +207,7 @@ struct SemanticCollectionRunnerTests {
         #expect(topic.updatedAt == topicUpdatedAt)
         #expect(intent.updatedAt == intentUpdatedAt)
         #expect(!topic.funnelEntries.isEmpty)
+        #expect(topic.collectionCheckpoint != nil)
     }
 
     @Test func failedRunDoesNotRefreshReaderIntentSemanticSnapshot() async throws {
@@ -545,5 +559,201 @@ struct SemanticCollectionRunnerTests {
             }
         }
         #expect(topic.semanticKeywords.map(\.text) == ["старый запрос"])
+    }
+
+    @Test func failingSeedLeavesACheckpointWithProgressSoFar() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        struct FakeWordstatError: Error, LocalizedError {
+            var errorDescription: String? { "Wordstat недоступен" }
+        }
+
+        let runner = SemanticCollectionRunner(
+            planSeeds: { _, _ in SemanticSeedPlan(synonyms: ["первый", "второй", "третий"], masks: [], tails: []) },
+            pullPhrases: { seed in
+                if seed == "второй" { throw FakeWordstatError() }
+                return [WordstatPhrase(text: "\(seed) запрос", frequency: 500)]
+            },
+            analyzeRelevance: { _, _ in SemanticAgentAnalysis(keywords: [], longTail: []) },
+            checkCannibalization: { keywords, _ in keywords },
+            stopWords: ["минус"],
+            masks: [],
+            threshold: 10,
+            limit: 100
+        )
+
+        await #expect(throws: FakeWordstatError.self) {
+            try await runner.run(topic: topic, pages: [], context: context)
+        }
+
+        let checkpoint = try #require(topic.collectionCheckpoint)
+        #expect(checkpoint.seeds == ["первый", "второй", "третий"])
+        #expect(checkpoint.completedSeeds == ["первый"])
+        #expect(checkpoint.pulled.map(\.text) == ["первый запрос"])
+        #expect(checkpoint.stopWordsSnapshot == ["минус"])
+        #expect(checkpoint.thresholdSnapshot == 10)
+        #expect(checkpoint.limitSnapshot == 100)
+    }
+
+    @Test func resumingSkipsSeedsAlreadyInTheCheckpointAndDoesNotReplan() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        let checkpoint = SemanticCollectionCheckpoint(
+            runID: UUID(), seeds: ["первый", "второй"],
+            stopWords: [], masks: [], threshold: 10, limit: 100
+        )
+        checkpoint.completedSeeds = ["первый"]
+        checkpoint.pulled = [WordstatPhrase(text: "первый запрос", frequency: 500)]
+        checkpoint.topic = topic
+        context.insert(checkpoint)
+        try context.save()
+
+        var attemptedSeeds: [String] = []
+        let runner = SemanticCollectionRunner(
+            planSeeds: { _, _ in
+                Issue.record("planSeeds must not be called when a checkpoint already exists")
+                return SemanticSeedPlan(synonyms: [], masks: [], tails: [])
+            },
+            pullPhrases: { seed in
+                attemptedSeeds.append(seed)
+                return [WordstatPhrase(text: "второй запрос", frequency: 300)]
+            },
+            analyzeRelevance: { _, queries in
+                SemanticAgentAnalysis(
+                    keywords: queries.map {
+                        SemanticAgentKeywordResult(
+                            query: $0.text, frequency: nil, recommendation: .include, reasonCategory: .none,
+                            explanation: "", cannibalizationRisk: .none, cannibalizationURL: nil, cannibalizationTitle: nil
+                        )
+                    },
+                    longTail: []
+                )
+            },
+            checkCannibalization: { keywords, _ in keywords },
+            stopWords: [],
+            masks: [],
+            threshold: 10,
+            limit: 100
+        )
+
+        try await runner.run(topic: topic, pages: [], context: context)
+
+        #expect(attemptedSeeds == ["второй"])
+        #expect(topic.semanticKeywords.map(\.text).sorted() == ["второй запрос", "первый запрос"])
+    }
+
+    @Test func resumedRunUsesSettingsFrozenAtFirstAttemptNotTheRunnersConstructorValues() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        // Frozen at the first attempt: no stop-words.
+        let checkpoint = SemanticCollectionCheckpoint(
+            runID: UUID(), seeds: ["рак груди реферат"],
+            stopWords: [], masks: [], threshold: 10, limit: 100
+        )
+        checkpoint.topic = topic
+        context.insert(checkpoint)
+        try context.save()
+
+        let runner = SemanticCollectionRunner(
+            planSeeds: { _, _ in
+                Issue.record("planSeeds must not be called when a checkpoint already exists")
+                return SemanticSeedPlan(synonyms: [], masks: [], tails: [])
+            },
+            pullPhrases: { _ in [WordstatPhrase(text: "рак груди реферат", frequency: 900)] },
+            analyzeRelevance: { _, queries in
+                SemanticAgentAnalysis(
+                    keywords: queries.map {
+                        SemanticAgentKeywordResult(
+                            query: $0.text, frequency: nil, recommendation: .include, reasonCategory: .none,
+                            explanation: "", cannibalizationRisk: .none, cannibalizationURL: nil, cannibalizationTitle: nil
+                        )
+                    },
+                    longTail: []
+                )
+            },
+            checkCannibalization: { keywords, _ in keywords },
+            // Live setting now has a stop-word that would drop this phrase — but
+            // the checkpoint's frozen (empty) snapshot must win.
+            stopWords: ["реферат"],
+            masks: [],
+            threshold: 10,
+            limit: 100
+        )
+
+        try await runner.run(topic: topic, pages: [], context: context)
+
+        #expect(topic.semanticKeywords.map(\.text) == ["рак груди реферат"])
+    }
+
+    @Test func successfulRunDeletesTheCheckpoint() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        let runner = makeRunner(
+            pulled: [WordstatPhrase(text: "рак груди лечение", frequency: 500)],
+            analysis: SemanticAgentAnalysis(keywords: [includedResult("рак груди лечение")], longTail: [])
+        )
+
+        try await runner.run(topic: topic, pages: [], context: context)
+
+        #expect(topic.collectionCheckpoint == nil)
+    }
+
+    @Test func resetCheckpointClearsProgressSoTheNextRunStartsFresh() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        let oldCheckpoint = SemanticCollectionCheckpoint(
+            runID: UUID(), seeds: ["старый"],
+            stopWords: [], masks: [], threshold: 10, limit: 100
+        )
+        oldCheckpoint.completedSeeds = ["старый"]
+        oldCheckpoint.pulled = [WordstatPhrase(text: "старый запрос", frequency: 500)]
+        oldCheckpoint.topic = topic
+        context.insert(oldCheckpoint)
+        try context.save()
+
+        try SemanticCollectionRunner.resetCheckpoint(for: topic, context: context)
+        #expect(topic.collectionCheckpoint == nil)
+
+        var plannedSeeds: [String] = []
+        let runner = SemanticCollectionRunner(
+            planSeeds: { _, _ in
+                SemanticSeedPlan(synonyms: ["новый"], masks: [], tails: [])
+            },
+            pullPhrases: { seed in
+                plannedSeeds.append(seed)
+                return [WordstatPhrase(text: "новый запрос", frequency: 500)]
+            },
+            analyzeRelevance: { _, queries in
+                SemanticAgentAnalysis(
+                    keywords: queries.map {
+                        SemanticAgentKeywordResult(
+                            query: $0.text, frequency: nil, recommendation: .include, reasonCategory: .none,
+                            explanation: "", cannibalizationRisk: .none, cannibalizationURL: nil, cannibalizationTitle: nil
+                        )
+                    },
+                    longTail: []
+                )
+            },
+            checkCannibalization: { keywords, _ in keywords },
+            stopWords: [],
+            masks: [],
+            threshold: 10,
+            limit: 100
+        )
+
+        try await runner.run(topic: topic, pages: [], context: context)
+
+        #expect(plannedSeeds == ["новый"])
+        #expect(topic.collectionCheckpoint == nil)
     }
 }

@@ -75,23 +75,60 @@ struct SemanticCollectionRunner {
 
     @discardableResult
     func run(topic: Topic, pages: [PublishedSitePage], context: ModelContext) async throws -> UUID {
-        let runID = UUID()
-
-        reportProgress(.planning)
-        try Task.checkCancellation()
-        let plan = try await planSeeds(topic, masks)
         try Task.checkCancellation()
 
-        var pulled: [WordstatPhrase] = []
-        let seeds = plan.seedPhrases()
-        var completedSeeds = 0
-        reportProgress(.wordstat(completed: 0, total: seeds.count))
+        let checkpoint: SemanticCollectionCheckpoint
+        let runID: UUID
+        let seeds: [String]
+        var pulled: [WordstatPhrase]
+        var completedSeeds: Set<String>
+
+        if let existing = topic.collectionCheckpoint {
+            checkpoint = existing
+            runID = existing.runID
+            seeds = existing.seeds
+            pulled = existing.pulled
+            completedSeeds = Set(existing.completedSeeds)
+            reportProgress(.wordstat(completed: completedSeeds.count, total: seeds.count))
+        } else {
+            runID = UUID()
+            reportProgress(.planning)
+            try Task.checkCancellation()
+            let plan = try await planSeeds(topic, masks)
+            try Task.checkCancellation()
+            seeds = plan.seedPhrases()
+            pulled = []
+            completedSeeds = []
+            let created = SemanticCollectionCheckpoint(
+                runID: runID, seeds: seeds,
+                stopWords: stopWords, masks: masks, threshold: threshold, limit: limit
+            )
+            created.topic = topic
+            context.insert(created)
+            try saveContext(context)
+            checkpoint = created
+            reportProgress(.wordstat(completed: 0, total: seeds.count))
+        }
+
+        // A resumed run always uses the settings frozen when the checkpoint
+        // was first created, even if this runner was constructed with
+        // different live settings.
+        let effectiveStopWords = checkpoint.stopWordsSnapshot
+        let effectiveThreshold = checkpoint.thresholdSnapshot
+        let effectiveLimit = checkpoint.limitSnapshot
+
         for seed in seeds {
             try Task.checkCancellation()
+            guard !completedSeeds.contains(seed) else { continue }
             do {
                 let phrases = try await pullPhrases(seed)
                 try Task.checkCancellation()
                 pulled.append(contentsOf: phrases)
+                completedSeeds.insert(seed)
+                checkpoint.pulled = pulled
+                checkpoint.completedSeeds = Array(completedSeeds)
+                checkpoint.updatedAt = .now
+                try saveContext(context)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -100,13 +137,14 @@ struct SemanticCollectionRunner {
                 // legitimately empty result returns [], never throws. So any
                 // error here means continuing to the next seed would just
                 // burn through an already-unreachable API. Record it for
-                // visibility, then stop the whole run.
+                // visibility, then stop the whole run. The checkpoint keeps
+                // whatever progress was made so far.
                 record(topic: topic, context: context, text: seed, frequency: nil,
                        layer: .raw, reason: error.localizedDescription, runID: runID)
+                try saveContext(context)
                 throw error
             }
-            completedSeeds += 1
-            reportProgress(.wordstat(completed: completedSeeds, total: seeds.count))
+            reportProgress(.wordstat(completed: completedSeeds.count, total: seeds.count))
         }
 
         guard !pulled.isEmpty else { throw RunError.wordstatReturnedNothing(runID: runID) }
@@ -117,7 +155,7 @@ struct SemanticCollectionRunner {
 
         reportProgress(.filtering)
         try Task.checkCancellation()
-        let filtered = SemanticRuleFilter.apply(pulled, stopWords: stopWords, threshold: threshold, limit: limit)
+        let filtered = SemanticRuleFilter.apply(pulled, stopWords: effectiveStopWords, threshold: effectiveThreshold, limit: effectiveLimit)
 
         try recordInChunks(filtered.dropped, topic: topic, context: context, runID: runID) { drop in
             (text: drop.phrase.text, frequency: drop.phrase.frequency, layer: .droppedByRules, reason: drop.reason)
@@ -170,6 +208,22 @@ struct SemanticCollectionRunner {
         }
 
         let rollback = SemanticMergeRollback.capture(topic: topic)
+        // Captured before the delete below so a failed save can rebuild an
+        // equivalent checkpoint: SwiftData nils out relationships as soon as
+        // delete() is called (before any save), so re-inserting the same
+        // deleted instance in the catch block does not reliably restore its
+        // `topic` link. Recreating a fresh object with this snapshot avoids
+        // relying on that.
+        let checkpointSnapshot = (
+            runID: checkpoint.runID,
+            seeds: checkpoint.seeds,
+            completedSeeds: checkpoint.completedSeeds,
+            pulled: checkpoint.pulled,
+            stopWords: checkpoint.stopWordsSnapshot,
+            masks: checkpoint.masksSnapshot,
+            threshold: checkpoint.thresholdSnapshot,
+            limit: checkpoint.limitSnapshot
+        )
         do {
             reportProgress(.saving)
             try Task.checkCancellation()
@@ -178,8 +232,24 @@ struct SemanticCollectionRunner {
                 intent.semanticSnapshot = ReaderIntent.acceptedSemanticSnapshot(for: topic)
                 intent.updatedAt = .now
             }
+            context.delete(checkpoint)
             try saveContext(context)
         } catch {
+            // context.delete(checkpoint) above must not survive a failed
+            // save — the checkpoint (and the resume progress it holds) must
+            // still be there for the next attempt, consistent with every
+            // other failure path in this function leaving the checkpoint in
+            // place. Rebuild it from the pre-delete snapshot rather than
+            // resurrecting the deleted instance.
+            let restored = SemanticCollectionCheckpoint(
+                runID: checkpointSnapshot.runID, seeds: checkpointSnapshot.seeds,
+                stopWords: checkpointSnapshot.stopWords, masks: checkpointSnapshot.masks,
+                threshold: checkpointSnapshot.threshold, limit: checkpointSnapshot.limit
+            )
+            restored.completedSeeds = checkpointSnapshot.completedSeeds
+            restored.pulled = checkpointSnapshot.pulled
+            restored.topic = topic
+            context.insert(restored)
             rollback.restore(topic: topic, context: context)
             throw error
         }
