@@ -21,6 +21,7 @@ struct SemanticFunnelView: View {
     @State private var startedAt: Date?
     @State private var collectionTask: Task<Void, Never>?
     @State private var stopRequested = false
+    @State private var showResetConfirmation = false
 
     private var entries: [SemanticFunnelEntry] {
         guard let runID else { return [] }
@@ -39,14 +40,22 @@ struct SemanticFunnelView: View {
             }
 
             HStack {
-                Button(isRunning ? "Собираю…" : "Собрать семантику") { collect() }
+                Button(collectButtonLabel) { collect() }
                     .disabled(isRunning)
                     .keyboardShortcut(.defaultAction)
                 if isRunning {
                     Button("Остановить", role: .destructive) { stopCollection() }
+                } else if topic.collectionCheckpoint != nil {
+                    Button("Сбросить") { showResetConfirmation = true }
                 }
                 Spacer()
                 if isRunning { ProgressView().controlSize(.small) }
+            }
+
+            if !isRunning, let checkpoint = topic.collectionCheckpoint {
+                Text("Прошлый сбор остановлен: \(checkpoint.completedSeeds.count) из \(checkpoint.seeds.count) запросов получено.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if isRunning, let startedAt {
@@ -85,6 +94,16 @@ struct SemanticFunnelView: View {
         .frame(width: 760, height: 620)
         .onDisappear {
             collectionTask?.cancel()
+        }
+        .confirmationDialog(
+            "Сбросить сохранённый прогресс сбора?",
+            isPresented: $showResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Сбросить", role: .destructive) { resetProgress() }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Весь прогресс текущего незавершённого сбора будет потерян.")
         }
     }
 
@@ -125,6 +144,15 @@ struct SemanticFunnelView: View {
         }
     }
 
+    private var collectButtonLabel: String {
+        if isRunning { return "Собираю…" }
+        return topic.collectionCheckpoint != nil ? "Продолжить сбор" : "Собрать семантику"
+    }
+
+    private func resetProgress() {
+        try? SemanticCollectionRunner.resetCheckpoint(for: topic, context: context)
+    }
+
     private func collect() {
         isRunning = true
         message = nil
@@ -163,7 +191,11 @@ struct SemanticFunnelView: View {
                 if let runError = error as? SemanticCollectionRunner.RunError {
                     runID = runError.runID
                 }
-                message = error.localizedDescription
+                if topic.collectionCheckpoint != nil {
+                    message = "\(error.localizedDescription)\nПрогресс сохранён, можно продолжить позже."
+                } else {
+                    message = error.localizedDescription
+                }
             }
             isRunning = false
             startedAt = nil
