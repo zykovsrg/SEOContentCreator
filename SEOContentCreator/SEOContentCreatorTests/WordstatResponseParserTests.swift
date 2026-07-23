@@ -38,6 +38,18 @@ struct WordstatResponseParserTests {
         #expect(phrases.isEmpty)
     }
 
+    @Test func treatsEmptyObjectAsNoPhrases() throws {
+        // Confirmed live against the real Cloud API: when Wordstat has no
+        // data at all for a phrase, it returns HTTP 200 with body `{}` —
+        // the "results" field is omitted entirely, not sent as `[]`. This
+        // must not be treated as a parse failure.
+        let data = Data("{}".utf8)
+
+        let phrases = try WordstatResponseParser.parse(data)
+
+        #expect(phrases.isEmpty)
+    }
+
     @Test func throwsOnMalformedJSON() {
         let data = Data("не json".utf8)
 

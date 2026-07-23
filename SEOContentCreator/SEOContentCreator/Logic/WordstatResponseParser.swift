@@ -15,6 +15,19 @@ enum WordstatResponseParser {
             var count: String
         }
         var results: [Phrase]
+
+        /// When Wordstat has no data at all for a phrase, the Cloud API
+        /// returns HTTP 200 with body `{}` — "results" is omitted entirely
+        /// rather than sent as `[]` (confirmed live against the real API).
+        /// A missing key here means zero phrases, not a malformed response.
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            results = try container.decodeIfPresent([Phrase].self, forKey: .results) ?? []
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case results
+        }
     }
 
     static func parse(_ data: Data) throws -> [WordstatPhrase] {
