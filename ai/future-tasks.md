@@ -965,33 +965,3 @@ Acceptance criteria:
 Promotion notes:
 
 Если сбор упадёт или база не откроется — это баг-фикс, не архитектурная задача; смотреть в первую очередь на `SemanticCollectionRunner.run` и миграцию `Topic.funnelEntries`.
-
-### FT-20260723-002 — Сохранение прогресса сбора семантики между этапами (resume + сброс)
-
-Status: promoted
-
-Priority: medium
-
-Source: пользователь во время ручной проверки фикса краша, увидел обрыв соединения на этапе «Получаю данные Wordstat: 11 из 2160» и потерял весь прогресс, 2026-07-23
-
-Created: 2026-07-23
-
-Context:
-
-`SemanticCollectionRunner.run` (SEOContentCreator/SEOContentCreator/Logic/SemanticCollectionRunner.swift) сейчас держит весь прогресс (собранные Wordstat-фразы, план, фильтрацию) только в памяти одного запуска. Funnel-журнал (`SemanticFunnelEntry`) уже частично сохраняется по ходу дела, но при разрыве сети/отмене на этапе Wordstat весь непройденный сбор нужно начинать заново с нуля — раздражает при больших наборах (тысячи запросов, лимиты API по времени).
-
-Proposed task:
-
-Спроектировать сохранение состояния текущего этапа сбора (например: какие seed-фразы уже опрошены, что уже получено от Wordstat) так, чтобы при обрыве/перезапуске приложение могло продолжить с последнего завершённого шага, а не с начала. Добавить пользователю явную возможность сбросить сохранённый прогресс и начать сбор заново.
-
-Acceptance criteria:
-
-- При обрыве соединения на этапе Wordstat повторный запуск сбора продолжает с последнего пройденного шага, а не запрашивает уже полученные фразы заново.
-- Пользователь может явно сбросить сохранённый прогресс для темы и начать сбор с нуля.
-- Существующее поведение (funnel-журнал, чанкованное сохранение, лимиты) не ломается.
-
-Promotion notes:
-
-Это меняет модель данных/хранение состояния сбора — перед реализацией нужен отдельный дизайн (где хранить прогресс: SwiftData-модель или UserDefaults, как отличать «этап» на уровне API-вызовов) и подтверждение рисков, так как затрагивает архитектуру `SemanticCollectionRunner`.
-
-Promoted 2026-07-23 into `ai/current-task.md`. Scope at promotion time was widened by the user to also include: stop the whole run (not just record a per-seed failure and keep looping) on any Wordstat error or connection failure, so the user isn't left staring at a run that silently keeps burning through seeds it can no longer reach.
