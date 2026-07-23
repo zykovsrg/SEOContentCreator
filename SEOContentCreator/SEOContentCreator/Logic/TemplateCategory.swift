@@ -7,6 +7,7 @@ enum TemplateCategory: String, CaseIterable, Identifiable {
     case images         // Изображения (промты + пресеты)
     case skills         // Скиллы
     case forbidden      // Фразы (запрещённые формулировки + словарь правок)
+    case semantics      // Семантика (минус-слова + вопросительные маски)
 
     var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum TemplateCategory: String, CaseIterable, Identifiable {
         case .images:    return "Изображения"
         case .skills:    return "Скиллы"
         case .forbidden: return "Фразы"
+        case .semantics: return "Семантика"
         }
     }
 }

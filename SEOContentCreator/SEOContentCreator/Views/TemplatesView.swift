@@ -95,7 +95,11 @@ struct TemplatesView: View {
             VStack(spacing: 0) {
                 header
                 categoryTabsRow
-                templateList
+                if category == .semantics {
+                    SemanticReferenceEditorView()
+                } else {
+                    templateList
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .panelCard(cornerRadius: 12)
@@ -268,6 +272,8 @@ struct TemplatesView: View {
             ForEach(editorDictionaries) { dict in
                 rowButton(value: .editorDictionary(dict.uuid), title: "Словарь правок", subtitle: "Редполитика")
             }
+        case .semantics:
+            EmptyView() // Rendered directly in body via SemanticReferenceEditorView, bypassing the row list.
         }
     }
 
