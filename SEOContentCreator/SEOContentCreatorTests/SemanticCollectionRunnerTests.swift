@@ -198,9 +198,16 @@ struct SemanticCollectionRunnerTests {
         let topic = Topic(title: "Рак груди", articleType: .disease)
         context.insert(topic)
 
+        // The seed pull fails (rather than merely returning empty) so a real
+        // funnel entry is recorded before the "no phrases" guard throws —
+        // otherwise there would be nothing in the journal to recover.
+        struct FakePullError: Error, LocalizedError {
+            var errorDescription: String? { "Wordstat недоступен" }
+        }
+
         let runner = SemanticCollectionRunner(
             planSeeds: { _, _ in SemanticSeedPlan(synonyms: ["рак груди"], masks: [], tails: []) },
-            pullPhrases: { _ in [] },
+            pullPhrases: { _ in throw FakePullError() },
             analyzeRelevance: { _, _ in SemanticAgentAnalysis(keywords: [], longTail: []) },
             checkCannibalization: { keywords, _ in keywords },
             stopWords: [],
