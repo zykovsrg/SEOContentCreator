@@ -12,7 +12,8 @@ struct SemanticReaderIntentPromptTests {
             successCriterion: "ребёнок в безопасности, родитель может заниматься делами",
             barriers: "страх навредить развитию и ограниченное пространство",
             solutionType: .comparison,
-            solutionFormat: "чек-лист критериев выбора"
+            solutionFormat: "чек-лист критериев выбора",
+            coverage: [.choiceComparison, .risksLimitations]
         )
         return topic
     }
@@ -24,9 +25,13 @@ struct SemanticReaderIntentPromptTests {
         )
 
         #expect(prompt.contains("Задача читателя:"))
+        #expect(prompt.contains("манеж для 6 месячного"))
         #expect(prompt.contains("обеспечить безопасность и освободить руки"))
+        #expect(prompt.contains("ребёнок в безопасности, родитель может заниматься делами"))
         #expect(prompt.contains("страх навредить развитию"))
         #expect(prompt.contains("чек-лист критериев выбора"))
+        #expect(prompt.contains("выбор и сравнение"))
+        #expect(prompt.contains("риски и ограничения"))
     }
 
     @Test func seedPromptKeepsExplicitMissingIntentFallback() {
@@ -43,7 +48,11 @@ struct SemanticReaderIntentPromptTests {
         )
 
         #expect(prompt.contains("Задача читателя:"))
+        #expect(prompt.contains("манеж для 6 месячного"))
         #expect(prompt.contains("родитель ребёнка шести месяцев"))
+        #expect(prompt.contains("ребёнок в безопасности, родитель может заниматься делами"))
+        #expect(prompt.contains("выбор и сравнение"))
+        #expect(prompt.contains("риски и ограничения"))
         #expect(prompt.contains("какой манеж выбрать — 120"))
         #expect(prompt.contains("10 длинных запросов из 3-7 слов"))
     }

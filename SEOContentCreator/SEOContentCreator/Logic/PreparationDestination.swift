@@ -13,3 +13,11 @@ enum PreparationDestination: String, CaseIterable, Identifiable {
         }
     }
 }
+
+struct PreparationPresentationState {
+    var destination: PreparationDestination?
+
+    mutating func open(_ destination: PreparationDestination) {
+        self.destination = destination
+    }
+}

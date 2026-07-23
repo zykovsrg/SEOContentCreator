@@ -79,6 +79,66 @@ struct SemanticCollectionRunnerTests {
         #expect(ReaderIntentStatus.forTopic(topic) == .ready(summary: "понять варианты лечения"))
     }
 
+    @Test func saveFailureRestoresOnlySemanticMergeAndIntentSnapshot() async throws {
+        struct FakeSaveError: Error {}
+
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease, notes: "до запуска")
+        let existing = SemanticKeyword(
+            text: "рак груди лечение",
+            frequency: 100,
+            agentRecommendation: .none,
+            userDecision: .required,
+            reasonCategory: .other,
+            explanation: "ручная пометка"
+        )
+        existing.topic = topic
+        topic.semanticKeywords.append(existing)
+        let intent = ReaderIntent(
+            query: "рак груди",
+            hiddenGoal: "понять варианты лечения",
+            semanticSnapshot: ["старый запрос"]
+        )
+        topic.readerIntent = intent
+        context.insert(topic)
+
+        var runner = makeRunner(
+            pulled: [
+                WordstatPhrase(text: "рак груди лечение", frequency: 500),
+                WordstatPhrase(text: "восстановление после лечения", frequency: 250)
+            ],
+            analysis: SemanticAgentAnalysis(
+                keywords: [
+                    includedResult("рак груди лечение"),
+                    includedResult("восстановление после лечения")
+                ],
+                longTail: []
+            )
+        )
+        runner.saveContext = { _ in throw FakeSaveError() }
+
+        // Simulates an unrelated unsaved edit made before collection.
+        topic.notes = "важная несохранённая заметка"
+        let topicUpdatedAt = topic.updatedAt
+        let intentUpdatedAt = intent.updatedAt
+
+        await #expect(throws: FakeSaveError.self) {
+            try await runner.run(topic: topic, pages: [], context: context)
+        }
+
+        #expect(topic.notes == "важная несохранённая заметка")
+        #expect(topic.semanticKeywords.count == 1)
+        #expect(topic.semanticKeywords.first === existing)
+        #expect(existing.frequency == 100)
+        #expect(existing.userDecision == .required)
+        #expect(existing.reasonCategory == .other)
+        #expect(existing.explanation == "ручная пометка")
+        #expect(intent.semanticSnapshot == ["старый запрос"])
+        #expect(topic.updatedAt == topicUpdatedAt)
+        #expect(intent.updatedAt == intentUpdatedAt)
+        #expect(!topic.funnelEntries.isEmpty)
+    }
+
     @Test func failedRunDoesNotRefreshReaderIntentSemanticSnapshot() async throws {
         let context = try makeContext()
         let topic = Topic(title: "Рак груди", articleType: .disease)

@@ -10,4 +10,12 @@ struct PreparationDestinationTests {
         #expect(PreparationDestination.readerIntent.title == "Задача читателя")
         #expect(PreparationDestination.semantics.title == "Семантика")
     }
+
+    @Test func preparationRowActionSelectsDedicatedSheetDestination() {
+        var presentation = PreparationPresentationState()
+
+        presentation.open(.semantics)
+
+        #expect(presentation.destination == .semantics)
+    }
 }
