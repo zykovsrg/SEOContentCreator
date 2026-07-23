@@ -8,7 +8,7 @@ struct SemanticCollectionRunnerTests {
     private func makeContext() throws -> ModelContext {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
-            for: Topic.self, SemanticKeyword.self, SemanticFunnelEntry.self,
+            for: Topic.self, ReaderIntent.self, SemanticKeyword.self, SemanticFunnelEntry.self,
             configurations: config
         )
         return ModelContext(container)
@@ -52,6 +52,54 @@ struct SemanticCollectionRunnerTests {
 
         #expect(topic.semanticKeywords.map(\.text) == ["рак груди лечение"])
         #expect(topic.semanticKeywords[0].userDecision == .accepted)
+    }
+
+    @Test func successfulRunRefreshesReaderIntentSemanticSnapshot() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        let intent = ReaderIntent(
+            query: "рак груди",
+            hiddenGoal: "понять варианты лечения",
+            semanticSnapshot: []
+        )
+        topic.readerIntent = intent
+        context.insert(topic)
+
+        let runner = makeRunner(
+            pulled: [WordstatPhrase(text: "рак груди лечение", frequency: 500)],
+            analysis: SemanticAgentAnalysis(
+                keywords: [includedResult("рак груди лечение")],
+                longTail: []
+            )
+        )
+
+        try await runner.run(topic: topic, pages: [], context: context)
+
+        #expect(intent.semanticSnapshot == ["рак груди лечение"])
+        #expect(ReaderIntentStatus.forTopic(topic) == .ready(summary: "понять варианты лечения"))
+    }
+
+    @Test func failedRunDoesNotRefreshReaderIntentSemanticSnapshot() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        let intent = ReaderIntent(
+            query: "рак груди",
+            hiddenGoal: "понять варианты лечения",
+            semanticSnapshot: ["старый запрос"]
+        )
+        topic.readerIntent = intent
+        context.insert(topic)
+
+        let runner = makeRunner(
+            pulled: [],
+            analysis: SemanticAgentAnalysis(keywords: [], longTail: [])
+        )
+
+        await #expect(throws: SemanticCollectionRunner.RunError.self) {
+            try await runner.run(topic: topic, pages: [], context: context)
+        }
+
+        #expect(intent.semanticSnapshot == ["старый запрос"])
     }
 
     @Test func recordsRuleDropsInFunnel() async throws {

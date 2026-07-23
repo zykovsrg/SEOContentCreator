@@ -116,7 +116,11 @@ struct SemanticCollectionRunner {
         }
 
         SemanticKeywordMerger.merge(survivors, into: topic, decision: .accepted)
-        try? context.save()
+        if let intent = topic.readerIntent {
+            intent.semanticSnapshot = ReaderIntent.acceptedSemanticSnapshot(for: topic)
+            intent.updatedAt = .now
+        }
+        try context.save()
 
         return runID
     }
