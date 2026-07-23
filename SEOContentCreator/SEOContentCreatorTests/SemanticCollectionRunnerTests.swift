@@ -174,4 +174,84 @@ struct SemanticCollectionRunnerTests {
         let failedSeed = topic.funnelEntries.first { $0.text == "рмж" }
         #expect(failedSeed?.reason == "квота исчерпана")
     }
+
+    @Test func overwritesAnalyzerFrequencyWithRealWordstatFrequency() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        var keywordWithWrongFrequency = includedResult("рак груди лечение")
+        keywordWithWrongFrequency.frequency = nil // simulates a model that echoed null
+
+        let runner = makeRunner(
+            pulled: [WordstatPhrase(text: "рак груди лечение", frequency: 500)],
+            analysis: SemanticAgentAnalysis(keywords: [keywordWithWrongFrequency], longTail: [])
+        )
+
+        try await runner.run(topic: topic, pages: [], context: context)
+
+        #expect(topic.semanticKeywords[0].frequency == 500)
+    }
+
+    @Test func wordstatReturnedNothingErrorCarriesRunID() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        let runner = SemanticCollectionRunner(
+            planSeeds: { _, _ in SemanticSeedPlan(synonyms: ["рак груди"], masks: [], tails: []) },
+            pullPhrases: { _ in [] },
+            analyzeRelevance: { _, _ in SemanticAgentAnalysis(keywords: [], longTail: []) },
+            checkCannibalization: { keywords, _ in keywords },
+            stopWords: [],
+            masks: [],
+            threshold: 10,
+            limit: 100
+        )
+
+        do {
+            _ = try await runner.run(topic: topic, pages: [], context: context)
+            Issue.record("Expected wordstatReturnedNothing to be thrown")
+        } catch let error as SemanticCollectionRunner.RunError {
+            #expect(Set(topic.funnelEntries.map(\.runID)) == [error.runID])
+        }
+    }
+
+    @Test func rulesDroppedEverythingErrorCarriesRunID() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        let runner = makeRunner(
+            plan: SemanticSeedPlan(synonyms: ["рак груди"], masks: [], tails: []),
+            pulled: [WordstatPhrase(text: "рак груди реферат", frequency: 900)],
+            analysis: SemanticAgentAnalysis(keywords: [], longTail: [])
+        )
+
+        do {
+            _ = try await runner.run(topic: topic, pages: [], context: context)
+            Issue.record("Expected rulesDroppedEverything to be thrown")
+        } catch let error as SemanticCollectionRunner.RunError {
+            #expect(topic.funnelEntries.filter { $0.layer == .droppedByRules }.map(\.runID) == [error.runID])
+        }
+    }
+
+    @Test func survivedEntryShowsLongTailExplanation() async throws {
+        let context = try makeContext()
+        let topic = Topic(title: "Рак груди", articleType: .disease)
+        context.insert(topic)
+
+        let runner = makeRunner(
+            pulled: [WordstatPhrase(text: "рак груди лечение", frequency: 500)],
+            analysis: SemanticAgentAnalysis(
+                keywords: [includedResult("рак груди лечение")],
+                longTail: ["сколько длится лечение рака груди"]
+            )
+        )
+
+        try await runner.run(topic: topic, pages: [], context: context)
+
+        let longTailEntry = topic.funnelEntries.first { $0.text == "сколько длится лечение рака груди" && $0.layer == .survived }
+        #expect(longTailEntry?.reason == "Длинный запрос, предложен агентом")
+    }
 }

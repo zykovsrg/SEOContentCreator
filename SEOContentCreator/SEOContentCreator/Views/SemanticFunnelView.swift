@@ -125,6 +125,9 @@ struct SemanticFunnelView: View {
                 runID = try await runner.run(topic: topic, pages: pages, context: context)
                 message = "Сбор завершён."
             } catch {
+                if let runError = error as? SemanticCollectionRunner.RunError {
+                    runID = runError.runID
+                }
                 message = error.localizedDescription
             }
             isRunning = false

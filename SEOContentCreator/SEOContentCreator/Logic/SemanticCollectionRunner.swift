@@ -11,12 +11,23 @@ struct SemanticCollectionRunner {
     typealias CannibalizationChecker = ([SemanticAgentKeywordResult], [PublishedSitePage]) async throws -> [SemanticAgentKeywordResult]
 
     enum RunError: Error, LocalizedError, Equatable {
-        case noPhrasesPulled
+        case wordstatReturnedNothing(runID: UUID)
+        case rulesDroppedEverything(runID: UUID)
 
         var errorDescription: String? {
             switch self {
-            case .noPhrasesPulled:
+            case .wordstatReturnedNothing:
                 return "Wordstat не вернул ни одного запроса. Семантика темы не изменена."
+            case .rulesDroppedEverything:
+                return "Все собранные запросы отсеяны правилами (минус-слова или низкая частотность). Семантика темы не изменена."
+            }
+        }
+
+        /// So a caller can still inspect the funnel journal recorded before the throw.
+        var runID: UUID {
+            switch self {
+            case .wordstatReturnedNothing(let id), .rulesDroppedEverything(let id):
+                return id
             }
         }
     }
@@ -48,7 +59,7 @@ struct SemanticCollectionRunner {
             }
         }
 
-        guard !pulled.isEmpty else { throw RunError.noPhrasesPulled }
+        guard !pulled.isEmpty else { throw RunError.wordstatReturnedNothing(runID: runID) }
 
         for phrase in pulled {
             record(topic: topic, context: context, text: phrase.text, frequency: phrase.frequency,
@@ -62,18 +73,27 @@ struct SemanticCollectionRunner {
                    layer: .droppedByRules, reason: drop.reason, runID: runID)
         }
 
-        guard !filtered.survivors.isEmpty else { throw RunError.noPhrasesPulled }
+        guard !filtered.survivors.isEmpty else { throw RunError.rulesDroppedEverything(runID: runID) }
 
+        let realFrequencyByQuery = Dictionary(
+            filtered.survivors.map { (SemanticRuleFilter.normalize($0.text), $0.frequency) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let analysis = try await analyzeRelevance(topic, filtered.survivors)
+        let keywordsWithRealFrequency = analysis.keywords.map { keyword -> SemanticAgentKeywordResult in
+            var updated = keyword
+            updated.frequency = realFrequencyByQuery[SemanticRuleFilter.normalize(keyword.query)]
+            return updated
+        }
 
-        for keyword in analysis.keywords where keyword.recommendation == .exclude {
+        for keyword in keywordsWithRealFrequency where keyword.recommendation == .exclude {
             record(topic: topic, context: context, text: keyword.query, frequency: keyword.frequency,
                    layer: .droppedByRelevance,
                    reason: keyword.explanation.isEmpty ? keyword.reasonCategory.label : keyword.explanation,
                    runID: runID)
         }
 
-        let included = analysis.keywords.filter { $0.recommendation == .include }
+        let included = keywordsWithRealFrequency.filter { $0.recommendation == .include }
         let checked = try await checkCannibalization(included, pages)
 
         let longTailResults = analysis.longTail.map { query in
@@ -87,8 +107,12 @@ struct SemanticCollectionRunner {
         let survivors = checked + longTailResults
 
         for keyword in survivors {
+            let riskNote = (keyword.cannibalizationRisk == .high || keyword.cannibalizationRisk == .medium)
+                ? "Риск каннибализации: \(keyword.cannibalizationRisk.label)"
+                : ""
+            let reason = [riskNote, keyword.explanation].filter { !$0.isEmpty }.joined(separator: " — ")
             record(topic: topic, context: context, text: keyword.query, frequency: keyword.frequency,
-                   layer: .survived, reason: "", runID: runID)
+                   layer: .survived, reason: reason, runID: runID)
         }
 
         SemanticKeywordMerger.merge(survivors, into: topic, decision: .accepted)
