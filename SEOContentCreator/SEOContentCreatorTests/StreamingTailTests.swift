@@ -2,6 +2,16 @@ import Testing
 @testable import SEOContentCreator
 
 struct StreamingTailTests {
+    @Test func defaultWindowStaysAboutOneScreenful() {
+        var long = ""
+        for i in 0..<500 { long += "Строка \(i).\n" }
+        let tail = long.streamingTail()
+        // The live window must stay small: layout of this string is redone on every
+        // streamed update, so an oversized default silently slows generation down.
+        #expect(tail.count <= 1202)
+        #expect(long.hasSuffix(String(tail.dropFirst(2))))
+    }
+
     @Test func shortTextIsReturnedUnchanged() {
         let text = "line1\nline2\nline3"
         #expect(text.streamingTail(maxChars: 4000) == text)

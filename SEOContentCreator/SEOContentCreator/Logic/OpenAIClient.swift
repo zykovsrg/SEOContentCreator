@@ -2,10 +2,11 @@ import Foundation
 import os
 
 /// TEMP diagnostics for the "generation slows down as text grows" investigation
-/// (see ai/current-task.md). Logs raw SSE line arrival on the network task, independent
-/// of MainActor — compare against `perfLog` in StageExecutor to see whether the network/
-/// model pacing itself slows down or whether the delay only appears once events reach
-/// MainActor. Remove once the root cause is confirmed and fixed.
+/// (see ai/current-task.md). Logs raw SSE line arrival on the detached network task —
+/// compare against `mainActorPerfLog` in StageExecutor to see whether the network/model
+/// pacing itself slows down or whether the delay only appears once events reach MainActor.
+/// The two used to log identical timings from the same (main) thread, which is what
+/// exposed the root cause. Remove once the fix is confirmed to hold.
 let networkPerfLog = Logger(subsystem: "com.zykovsrg.SEOContentCreator", category: "streaming-perf-network")
 
 enum OpenAIStreamEvent: Equatable {
@@ -79,8 +80,16 @@ struct OpenAIClient {
         maxTokens: Int = 8000,
         reasoningEffort: String? = nil
     ) -> AsyncThrowingStream<OpenAIStreamEvent, Error> {
-        AsyncThrowingStream { continuation in
-            let task = Task {
+        let session = self.session
+        let endpoint = self.endpoint
+        return AsyncThrowingStream { continuation in
+            // `Task {}` here would inherit the caller's actor, and the caller is the
+            // MainActor-bound StageExecutor — that put the whole SSE read/parse loop on
+            // the main thread, where it competed with SwiftUI layout and throttled
+            // generation to a crawl (measured: ~1 token/s while the main thread ran at
+            // 100% CPU). Detached keeps reading the network off the main thread, so
+            // token throughput no longer depends on how fast the window redraws.
+            let task = Task.detached {
                 do {
                     // Reasoning models (GPT-5.x / o-series) can spend well over a
                     // minute "thinking" before the first streamed byte arrives — most

@@ -184,7 +184,12 @@ extension String {
     /// ever-growing stream re-lays-out a larger and larger string and lags badly on long
     /// output. While generation is in flight only the newest text matters; the complete text
     /// (and the formatted diff) is shown once it finishes.
-    func streamingTail(maxChars: Int = 4000) -> String {
+    ///
+    /// The window is deliberately small — a few paragraphs, about one screenful. Every
+    /// published update re-measures and re-lays-out the whole string, and that cost is
+    /// paid ~10x/sec for the entire run, so a wider window buys nothing readable and
+    /// costs real generation speed.
+    func streamingTail(maxChars: Int = 1200) -> String {
         guard count > maxChars else { return self }
         let tail = suffix(maxChars)
         if let newline = tail.firstIndex(of: "\n") {
