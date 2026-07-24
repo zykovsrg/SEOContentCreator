@@ -15,9 +15,12 @@ struct TopicWorkspaceView: View {
     @State private var acceptedRemarkIDs: Set<UUID> = []
     @State private var rejectedRemarkIDs: Set<UUID> = []
     @State private var redoingRemarkIDs: Set<UUID> = []
-    /// Accepted remarks whose quote could not be located in the text, so they were
-    /// not applied and are flagged as «не применено» instead of dropped silently.
+    /// Accepted remarks that produced nothing at all (degenerate quote, or a removal
+    /// suggestion for text that isn't there) — flagged as «не применено».
     @State private var unresolvedRemarkIDs: Set<UUID> = []
+    /// Accepted remarks whose quote wasn't found in the body, so their suggestion was
+    /// appended in a trailing block instead of being lost — flagged as «добавлено в конец».
+    @State private var appendedRemarkIDs: Set<UUID> = []
     /// Frozen text the current review's remarks were made against. Accepted remarks
     /// are re-applied from here on every toggle, so the current version can change
     /// under us without the edits drifting.
@@ -320,6 +323,7 @@ struct TopicWorkspaceView: View {
                 acceptedIDs: acceptedRemarkIDs,
                 rejectedIDs: rejectedRemarkIDs,
                 unresolvedIDs: unresolvedRemarkIDs,
+                appendedIDs: appendedRemarkIDs,
                 redoingIDs: redoingRemarkIDs,
                 onAccept: {
                     acceptedRemarkIDs.insert($0.id); rejectedRemarkIDs.remove($0.id)
@@ -493,6 +497,7 @@ struct TopicWorkspaceView: View {
         acceptedRemarkIDs = []
         rejectedRemarkIDs = []
         unresolvedRemarkIDs = []
+        appendedRemarkIDs = []
         reviewBaseSnapshot = nil
         reviewBaseVersionID = nil
         reviewAppliedVersionID = nil
@@ -515,6 +520,7 @@ struct TopicWorkspaceView: View {
                 reviewBaseVersionID = topic.currentVersionID
                 reviewAppliedVersionID = nil
                 unresolvedRemarkIDs = []
+                appendedRemarkIDs = []
                 inspectorTab = .remarks
                 showInspector = true
             }
@@ -572,33 +578,44 @@ struct TopicWorkspaceView: View {
 
     /// Re-applies the currently accepted remarks to the frozen base and commits the
     /// result to the review's single version — called on every accept/reject so edits
-    /// appear in the text immediately (per the user's chosen behaviour). Remarks whose
-    /// quote can't be located are surfaced as «не применено» rather than dropped.
+    /// appear in the text immediately (per the user's chosen behaviour). A remark is
+    /// never silently dropped: Title/H1/Description remarks go straight to those fields
+    /// (`metadataEdits`), a body quote that can't be located is appended in a trailing
+    /// block (`appendedIDs`), and only a truly degenerate remark is flagged «не применено».
     private func applyAcceptedInstantly() {
         let accepted = (executor?.remarks ?? []).filter { acceptedRemarkIDs.contains($0.id) }
         let result = RemarkApplier.apply(base: reviewBase, accepted: accepted)
         unresolvedRemarkIDs = result.unresolvedIDs
-        syncReviewVersion(text: result.text)
+        appendedRemarkIDs = result.appendedIDs
+        syncReviewVersion(text: result.text, metadataEdits: result.metadataEdits)
     }
 
-    /// Writes `text` into the review's applied version, creating it lazily on the first
-    /// real change and updating it in place afterwards (one version per review, not per
-    /// accepted remark).
-    private func syncReviewVersion(text: String) {
+    /// Writes `text` (and any Title/H1/Description edits) into the review's applied
+    /// version, creating it lazily on the first real change and updating it in place
+    /// afterwards (one version per review, not per accepted remark).
+    private func syncReviewVersion(text: String, metadataEdits: [RemarkApplier.MetadataField: String] = [:]) {
+        let base = topic.versions.first(where: { $0.uuid == reviewBaseVersionID })
+        let h1 = metadataEdits[.h1] ?? base?.h1 ?? topic.currentVersion?.h1
+        let seoTitle = metadataEdits[.seoTitle] ?? base?.seoTitle ?? topic.currentVersion?.seoTitle
+        let seoDescription = metadataEdits[.seoDescription] ?? base?.seoDescription ?? topic.currentVersion?.seoDescription
+
         if let id = reviewAppliedVersionID,
            let version = topic.versions.first(where: { $0.uuid == id }) {
             version.text = text
+            version.h1 = h1
+            version.seoTitle = seoTitle
+            version.seoDescription = seoDescription
             topic.currentVersionID = id
             topic.updatedAt = .now
             return
         }
-        guard text != reviewBase else { return }   // nothing applied yet: don't spawn a no-op version
-        let base = topic.versions.first(where: { $0.uuid == reviewBaseVersionID })
+        // Nothing applied yet: don't spawn a no-op version.
+        guard text != reviewBase || !metadataEdits.isEmpty else { return }
         let version = ArticleVersion(stage: selectedStage, source: .checkApplied, text: text)
         version.status = .accepted
-        version.h1 = base?.h1 ?? topic.currentVersion?.h1
-        version.seoTitle = base?.seoTitle ?? topic.currentVersion?.seoTitle
-        version.seoDescription = base?.seoDescription ?? topic.currentVersion?.seoDescription
+        version.h1 = h1
+        version.seoTitle = seoTitle
+        version.seoDescription = seoDescription
         version.topic = topic
         context.insert(version)
         reviewAppliedVersionID = version.uuid
@@ -608,11 +625,12 @@ struct TopicWorkspaceView: View {
 
     private func finishReview() {
         let accepted = (executor?.remarks ?? []).filter { acceptedRemarkIDs.contains($0.id) }
-        var result = RemarkApplier.apply(base: reviewBase, accepted: accepted).text
+        let result = RemarkApplier.apply(base: reviewBase, accepted: accepted)
+        var text = result.text
         if selectedStage == .finalReview {
-            result = TechInfoSectionBuilder.append(to: result, section: TechInfoSectionBuilder.section(for: topic))
+            text = TechInfoSectionBuilder.append(to: text, section: TechInfoSectionBuilder.section(for: topic))
         }
-        syncReviewVersion(text: result)
+        syncReviewVersion(text: text, metadataEdits: result.metadataEdits)
         clearReviewState()
     }
 
@@ -681,7 +699,9 @@ struct TopicWorkspaceView: View {
         reviewBaseVersionID = nil
         reviewAppliedVersionID = nil
         let accepted = restored.remarks.filter { restored.accepted.contains($0.id) }
-        unresolvedRemarkIDs = RemarkApplier.apply(base: reviewBaseSnapshot ?? "", accepted: accepted).unresolvedIDs
+        let result = RemarkApplier.apply(base: reviewBaseSnapshot ?? "", accepted: accepted)
+        unresolvedRemarkIDs = result.unresolvedIDs
+        appendedRemarkIDs = result.appendedIDs
     }
 
     private func clearReviewState() {
@@ -690,6 +710,7 @@ struct TopicWorkspaceView: View {
         acceptedRemarkIDs = []
         rejectedRemarkIDs = []
         unresolvedRemarkIDs = []
+        appendedRemarkIDs = []
         reviewBaseSnapshot = nil
         reviewBaseVersionID = nil
         reviewAppliedVersionID = nil

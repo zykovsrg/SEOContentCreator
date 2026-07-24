@@ -5,6 +5,7 @@ struct RemarksPanelView: View {
     var acceptedIDs: Set<UUID>
     var rejectedIDs: Set<UUID>
     var unresolvedIDs: Set<UUID> = []
+    var appendedIDs: Set<UUID> = []
     var redoingIDs: Set<UUID> = []
     var onAccept: (Remark) -> Void
     var onReject: (Remark) -> Void
@@ -34,6 +35,7 @@ struct RemarksPanelView: View {
         let accepted = acceptedIDs.contains(remark.id)
         let rejected = rejectedIDs.contains(remark.id)
         let unresolved = accepted && unresolvedIDs.contains(remark.id)
+        let appended = accepted && appendedIDs.contains(remark.id)
         let redoing = redoingIDs.contains(remark.id)
         VStack(alignment: .leading, spacing: 8) {
             Text(remark.category.uppercased())
@@ -60,6 +62,9 @@ struct RemarksPanelView: View {
                 if unresolved {
                     Label("не применено", systemImage: "exclamationmark.triangle.fill")
                         .font(.caption).foregroundStyle(.orange)
+                } else if appended {
+                    Label("добавлено в конец", systemImage: "text.append")
+                        .font(.caption).foregroundStyle(.orange)
                 } else if accepted {
                     Label("принято", systemImage: "checkmark").font(.caption).foregroundStyle(.green)
                 } else if rejected {
@@ -67,7 +72,10 @@ struct RemarksPanelView: View {
                 }
             }
             if unresolved {
-                Text("Не удалось найти эту фразу в тексте — правку нужно внести вручную (через «Редактор») или нажать «Переделать», чтобы ИИ уточнил цитату.")
+                Text("Не удалось найти эту фразу в тексте, а добавить нечего — правку нужно внести вручную (через «Редактор») или нажать «Переделать», чтобы ИИ уточнил цитату.")
+                    .font(.caption2).foregroundStyle(.orange)
+            } else if appended {
+                Text("Не удалось найти эту фразу в исходном месте, поэтому правка добавлена отдельным блоком в конец текста — при желании перенесите её вручную через «Редактор».")
                     .font(.caption2).foregroundStyle(.orange)
             }
             HStack(spacing: 8) {

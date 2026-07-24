@@ -1,12 +1,31 @@
 import Foundation
 
 enum RemarkApplier {
-    /// Outcome of applying accepted remarks: the resulting text plus the ids of
-    /// accepted remarks whose `quote` could not be located (so the UI can flag
-    /// them as "не применено" instead of dropping them silently).
+    /// SEO remarks about Title/H1/Description target fields that live outside the
+    /// article body (`ArticleVersion.h1/seoTitle/seoDescription`) — the prompt shows
+    /// the model these as separate context lines ("H1: …", "Title: …", "Description: …"),
+    /// never as part of `{{текущий_текст}}`, so their `quote` is never findable in the
+    /// body and must not be searched for there.
+    enum MetadataField: String, CaseIterable {
+        case h1, seoTitle, seoDescription
+    }
+
+    /// Outcome of applying accepted remarks.
     struct ApplyResult: Equatable {
+        /// Article body text: matched replacements applied in place, plus a trailing
+        /// block for any remark whose quote could not be located (see `appendedIDs`).
         var text: String
-        var unresolvedIDs: Set<UUID>
+        /// Remarks recognised as Title/H1/Description edits: applied directly to those
+        /// fields (never searched for in the body), keyed by target field.
+        var metadataEdits: [MetadataField: String] = [:]
+        /// Accepted remarks whose quote was not found in the body, so — per the user's
+        /// request that a correction must never be silently dropped — their suggestion
+        /// was appended in a clearly marked trailing block instead of being lost.
+        var appendedIDs: Set<UUID> = []
+        /// Accepted remarks that produced nothing at all: the quote normalises to
+        /// nothing referenceable (e.g. stray Markdown punctuation) and there is no
+        /// suggestion text worth appending on its own.
+        var unresolvedIDs: Set<UUID> = []
     }
 
     /// A run of text, tagged once it came from an applied `suggestion` so later
@@ -16,23 +35,48 @@ enum RemarkApplier {
         var protected: Bool
     }
 
-    /// Applies accepted remarks to `base` by replacing the first remaining, unprotected
-    /// match of each non-empty `quote` with its `suggestion`, in the given order.
+    /// Applies accepted remarks to `base`.
     ///
-    /// Matching is tolerant: the model rarely echoes the article byte-for-byte, so
-    /// quotes are compared on a normalised projection (collapsed whitespace, dropped
-    /// Markdown emphasis, unified quotes/dashes, ё→е, case-folded) while the replacement
-    /// still lands on the exact original range. A quote that has no match (or normalises
-    /// to nothing) is reported in `unresolvedIDs`, never applied at the wrong place —
-    /// a false replacement is worse than a reported miss. Empty quotes are advisory and
-    /// are neither applied nor reported.
+    /// Title/H1/Description remarks (see `MetadataField`) are routed to `metadataEdits`
+    /// and never searched for in the body — there is nothing to find, since those fields
+    /// aren't part of the article text in the first place.
+    ///
+    /// Remaining remarks replace the first remaining, unprotected match of their `quote`
+    /// in the body, in the given order. Matching is tolerant: the model rarely echoes the
+    /// article byte-for-byte, so quotes are compared on a normalised projection (collapsed
+    /// whitespace, dropped Markdown emphasis, unified quotes/dashes, ё→е, case-folded)
+    /// while the replacement still lands on the exact original range — a false replacement
+    /// is worse than a reported miss, so matching never guesses.
+    ///
+    /// A quote with no match is never just dropped: its suggestion is appended in a
+    /// trailing "не удалось разместить автоматически" block (`appendedIDs`), so every
+    /// accepted correction ends up somewhere in the text. Only a degenerate quote with
+    /// nothing to reference and no suggestion to fall back on is truly unresolved.
     static func apply(base: String, accepted: [Remark]) -> ApplyResult {
         var segments = [Segment(text: base, protected: false)]
         var unresolved = Set<UUID>()
+        var appended = Set<UUID>()
+        var trailing: [(quote: String, suggestion: String)] = []
+        var metadataEdits: [MetadataField: String] = [:]
+
         for remark in accepted {
+            if let (field, value) = metadataField(for: remark) {
+                metadataEdits[field] = value
+                continue
+            }
             guard !remark.quote.isEmpty else { continue }
-            guard let (index, range) = firstUnprotectedMatch(of: remark.quote, in: segments) else {
-                unresolved.insert(remark.id)
+            let needle = trimSpaces(project(remark.quote).chars)
+            guard !needle.isEmpty else {
+                unresolved.insert(remark.id)   // nothing referenceable in the quote at all
+                continue
+            }
+            guard let (index, range) = firstUnprotectedMatch(needle: needle, in: segments) else {
+                if remark.suggestion.isEmpty {
+                    unresolved.insert(remark.id)   // nothing to add: was a removal that isn't there
+                } else {
+                    appended.insert(remark.id)
+                    trailing.append((remark.quote, remark.suggestion))
+                }
                 continue
             }
             let segment = segments[index]
@@ -44,14 +88,37 @@ enum RemarkApplier {
             if !after.isEmpty { replacement.append(Segment(text: after, protected: false)) }
             segments.replaceSubrange(index...index, with: replacement)
         }
-        return ApplyResult(text: segments.map(\.text).joined(), unresolvedIDs: unresolved)
+
+        var text = segments.map(\.text).joined()
+        if !trailing.isEmpty {
+            let block = trailing.map { "- «\($0.quote)» → \($0.suggestion.isEmpty ? "(удалить)" : $0.suggestion)" }
+                .joined(separator: "\n")
+            text += "\n\n## Правки, которые не удалось разместить автоматически\n" + block
+        }
+        return ApplyResult(text: text, metadataEdits: metadataEdits, appendedIDs: appended, unresolvedIDs: unresolved)
+    }
+
+    /// Recognises a Title/H1/Description remark from its `quote` prefix — the exact
+    /// labels `StageTemplateDefaults.seoCheck`'s prompt shows the model as context
+    /// ("H1: …", "Title: …", "Description: …") — and extracts the new value from
+    /// `suggestion`, stripping the same label prefix if the model echoed it back too
+    /// (as in "станет: Title: Новый заголовок").
+    private static func metadataField(for remark: Remark) -> (MetadataField, String)? {
+        let prefixes: [(String, MetadataField)] = [
+            ("h1:", .h1), ("title:", .seoTitle), ("description:", .seoDescription)
+        ]
+        let loweredQuote = remark.quote.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard let (prefix, field) = prefixes.first(where: { loweredQuote.hasPrefix($0.0) }) else { return nil }
+        var value = remark.suggestion.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.lowercased().hasPrefix(prefix) {
+            value = String(value.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return (field, value)
     }
 
     private static func firstUnprotectedMatch(
-        of quote: String, in segments: [Segment]
+        needle: [Character], in segments: [Segment]
     ) -> (index: Int, range: Range<String.Index>)? {
-        let needle = trimSpaces(project(quote).chars)
-        guard !needle.isEmpty else { return nil }
         for (index, segment) in segments.enumerated() where !segment.protected {
             if let range = search(needle, in: project(segment.text)) {
                 return (index, range)

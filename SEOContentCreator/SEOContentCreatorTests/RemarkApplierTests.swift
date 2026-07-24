@@ -20,11 +20,25 @@ struct RemarkApplierTests {
         #expect(result.text == "Цена 4500. Текст ёмкий.")
     }
 
-    @Test func notFoundQuoteReportedUnresolved() {
+    @Test func notFoundQuoteIsAppendedNotDropped() {
+        // The correction must never vanish silently: since it can't be placed inline,
+        // it lands in a clearly marked trailing block instead.
         let r = remark("совершенно другого текста здесь нет", "qqq")
+        let result = RemarkApplier.apply(base: "abc", accepted: [r])
+        #expect(result.appendedIDs == [r.id])
+        #expect(result.unresolvedIDs.isEmpty)
+        #expect(result.text.hasPrefix("abc"))
+        #expect(result.text.contains("совершенно другого текста здесь нет"))
+        #expect(result.text.contains("qqq"))
+    }
+
+    @Test func notFoundRemovalSuggestionIsUnresolvedNotAppended() {
+        // Nothing to add: the suggestion was to remove text that isn't there.
+        let r = remark("совершенно другого текста здесь нет", "")
         let result = RemarkApplier.apply(base: "abc", accepted: [r])
         #expect(result.text == "abc")
         #expect(result.unresolvedIDs == [r.id])
+        #expect(result.appendedIDs.isEmpty)
     }
 
     @Test func emptyAcceptedReturnsBase() {
@@ -41,11 +55,16 @@ struct RemarkApplierTests {
     }
 
     @Test func laterRemarkDoesNotMatchInsideEarlierSuggestion() {
+        // "старый" must not match inside the "очень старый" the first remark just
+        // inserted — since it's now unfindable unprotected, it is appended instead
+        // of silently skipped (never dropping a correction).
+        let r2 = remark("старый", "древний")
         let result = RemarkApplier.apply(
             base: "Это новый метод.",
-            accepted: [remark("новый", "очень старый"), remark("старый", "древний")]
+            accepted: [remark("новый", "очень старый"), r2]
         )
-        #expect(result.text == "Это очень старый метод.")
+        #expect(result.text.hasPrefix("Это очень старый метод."))
+        #expect(result.appendedIDs == [r2.id])
     }
 
     @Test func secondOccurrenceOfRepeatedQuoteInOriginalTextStillMatches() {
@@ -56,14 +75,15 @@ struct RemarkApplierTests {
         #expect(result.text == "Б[1] в спине. Позже б[2] в ноге.")
     }
 
-    @Test func skipsRemarkWhenOnlyRemainingMatchIsInsideProtectedText() {
+    @Test func appendsRemarkWhenOnlyRemainingMatchIsInsideProtectedText() {
         let r2 = remark("боль", "неприятное ощущение")
         let result = RemarkApplier.apply(
             base: "боль в спине",
             accepted: [remark("боль", "дискомфорт"), r2]
         )
-        #expect(result.text == "дискомфорт в спине")
-        #expect(result.unresolvedIDs == [r2.id])
+        #expect(result.text.hasPrefix("дискомфорт в спине"))
+        #expect(result.text.contains("неприятное ощущение"))
+        #expect(result.appendedIDs == [r2.id])
     }
 
     // MARK: - Tolerant matching (LLM quotes rarely match the text byte-for-byte)
@@ -116,5 +136,38 @@ struct RemarkApplierTests {
         let result = RemarkApplier.apply(base: "текст **жирный** текст", accepted: [r])
         #expect(result.text == "текст **жирный** текст")
         #expect(result.unresolvedIDs == [r.id])
+    }
+
+    // MARK: - Title/H1/Description remarks (fields outside the article body)
+
+    @Test func emptyTitleRemarkSetsSeoTitleDirectly() {
+        // Reproduces the reported bug: an empty Title has no text in the body to quote,
+        // so the fix must go straight to the metadata field, not a body search.
+        let r = remark("Title:", "Title: Фаст Форвард при раке груди — лучевая терапия за 5 сеансов")
+        let result = RemarkApplier.apply(base: "Текст статьи без изменений.", accepted: [r])
+        #expect(result.text == "Текст статьи без изменений.")
+        #expect(result.metadataEdits[.seoTitle] == "Фаст Форвард при раке груди — лучевая терапия за 5 сеансов")
+        #expect(result.unresolvedIDs.isEmpty)
+        #expect(result.appendedIDs.isEmpty)
+    }
+
+    @Test func h1AndDescriptionRemarksRouteToTheirFields() {
+        let result = RemarkApplier.apply(
+            base: "Текст.",
+            accepted: [
+                remark("H1:", "H1: Новый заголовок H1"),
+                remark("Description:", "Description: Новое описание страницы")
+            ]
+        )
+        #expect(result.metadataEdits[.h1] == "Новый заголовок H1")
+        #expect(result.metadataEdits[.seoDescription] == "Новое описание страницы")
+        #expect(result.text == "Текст.")
+    }
+
+    @Test func metadataRemarkWithoutEchoedLabelStillWorks() {
+        // The model doesn't always repeat "Title:" in the suggestion itself.
+        let r = remark("Title:", "Короткий тайтл без повтора метки")
+        let result = RemarkApplier.apply(base: "Текст.", accepted: [r])
+        #expect(result.metadataEdits[.seoTitle] == "Короткий тайтл без повтора метки")
     }
 }
