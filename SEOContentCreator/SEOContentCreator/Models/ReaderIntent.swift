@@ -83,6 +83,11 @@ final class ReaderIntent {
         )
     }
 
+    /// A readable, labelled summary of the brief. Fields are free text — the user or the
+    /// "Обновить с ИИ" pass often fills them with whole sentences — so instead of splicing
+    /// them into one flowing phrase (which broke on their punctuation and capitalisation),
+    /// each non-empty field becomes its own labelled clause, robust to any phrasing.
+    /// Display-only: the prompt fed to the AI stages uses `ReaderIntentPromptRenderer`.
     static func taskFormula(
         audienceContext: String,
         hiddenGoal: String,
@@ -90,16 +95,29 @@ final class ReaderIntent {
         barriers: String,
         solutionFormat: String
     ) -> String {
-        let audience = clean(audienceContext)
+        var parts: [String] = []
+        func add(_ label: String, _ raw: String) {
+            let value = clean(raw)
+            guard !value.isEmpty else { return }
+            parts.append("\(label): \(terminate(value))")
+        }
+        add("Кому", audienceContext)
         let goal = clean(hiddenGoal)
-        let success = clean(successCriterion)
-        let obstacles = clean(barriers)
-        let format = clean(solutionFormat)
-        var result = "Помочь \(audience.isEmpty ? "читателю" : audience) \(goal.isEmpty ? "решить практическую задачу" : goal)"
-        if !success.isEmpty { result += ", чтобы \(success)" }
-        if !obstacles.isEmpty { result += ", учитывая \(obstacles)" }
-        if !format.isEmpty { result += ", в формате: \(format)" }
-        return result + "."
+        add("Задача", goal.isEmpty ? "решить практическую задачу" : goal)
+        add("Польза", successCriterion)
+        add("Барьеры", barriers)
+        add("Формат", solutionFormat)
+        return parts.joined(separator: " ")
+    }
+
+    /// Ensures a clause ends with exactly one sentence terminator, so a labelled part
+    /// reads cleanly whether the field was a whole sentence or a bare fragment: keep an
+    /// existing `. ! ? …`, turn a trailing `, ; :` into `.`, otherwise append `.`.
+    private static func terminate(_ value: String) -> String {
+        guard let last = value.last else { return value }
+        if ".!?…".contains(last) { return value }
+        if ",;:".contains(last) { return String(value.dropLast()) + "." }
+        return value + "."
     }
 
     func isStale(for topic: Topic) -> Bool {

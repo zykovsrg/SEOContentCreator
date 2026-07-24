@@ -65,3 +65,55 @@ struct ReaderIntentTests {
         #expect(ReaderIntentStatus.forTopic(topic) == .stale(summary: "понять решение"))
     }
 }
+
+struct ReaderIntentTaskFormulaTests {
+    private func formula(
+        audience: String = "", goal: String = "", success: String = "",
+        barriers: String = "", format: String = ""
+    ) -> String {
+        ReaderIntent.taskFormula(
+            audienceContext: audience, hiddenGoal: goal, successCriterion: success,
+            barriers: barriers, solutionFormat: format
+        )
+    }
+
+    @Test func labelsEachFilledFieldAsItsOwnClause() {
+        let result = formula(
+            audience: "Пациент после диагноза",
+            goal: "Понять варианты лечения",
+            success: "Различает методы",
+            barriers: "Тревога",
+            format: "Сравнение"
+        )
+        #expect(result == "Кому: Пациент после диагноза. Задача: Понять варианты лечения. Польза: Различает методы. Барьеры: Тревога. Формат: Сравнение.")
+    }
+
+    @Test func doesNotDoubleUpAnExistingSentencePeriod() {
+        // A field that already ends with "." must not become "..".
+        let result = formula(audience: "Читатель ищет врача.", goal: "Записаться.")
+        #expect(result == "Кому: Читатель ищет врача. Задача: Записаться.")
+        #expect(!result.contains(".."))
+    }
+
+    @Test func replacesTrailingCommaOrColonWithPeriod() {
+        let result = formula(goal: "Понять,", success: "Читатель уверен:")
+        #expect(result == "Задача: Понять. Польза: Читатель уверен.")
+    }
+
+    @Test func addsPeriodToAFragmentWithoutPunctuation() {
+        #expect(formula(goal: "решить задачу") == "Задача: решить задачу.")
+    }
+
+    @Test func skipsEmptyOptionalClauses() {
+        let result = formula(audience: "Пациент", goal: "Понять")
+        #expect(result == "Кому: Пациент. Задача: Понять.")
+    }
+
+    @Test func goalIsAlwaysPresentWithFallbackWhenEverythingEmpty() {
+        #expect(formula() == "Задача: решить практическую задачу.")
+    }
+
+    @Test func handlesEllipsisAsAValidTerminator() {
+        #expect(formula(goal: "разобраться…") == "Задача: разобраться…")
+    }
+}
