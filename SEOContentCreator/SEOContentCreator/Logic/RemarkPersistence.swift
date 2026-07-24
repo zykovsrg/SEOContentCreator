@@ -33,6 +33,7 @@ enum RemarkPersistence {
         var remarks: [Remark]
         var accepted: Set<UUID>
         var rejected: Set<UUID>
+        var baseText: String?
     }
 
     /// Finds the most recent checking-stage review that was never resolved
@@ -50,6 +51,7 @@ enum RemarkPersistence {
         let remarks = job.persistedRemarks.map(\.asRemark)
         let accepted = Set(job.persistedRemarks.filter { $0.status == .accepted }.map(\.uuid))
         let rejected = Set(job.persistedRemarks.filter { $0.status == .rejected }.map(\.uuid))
-        return RestoredReview(jobID: job.uuid, remarks: remarks, accepted: accepted, rejected: rejected)
+        return RestoredReview(jobID: job.uuid, remarks: remarks, accepted: accepted,
+                              rejected: rejected, baseText: job.reviewBaseText)
     }
 }

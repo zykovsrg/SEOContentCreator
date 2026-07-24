@@ -30,7 +30,7 @@ struct QuickCheckSheet: View {
 
     private var correctedText: String {
         let accepted = remarks.filter { acceptedRemarkIDs.contains($0.id) }
-        return RemarkApplier.apply(base: inputText, accepted: accepted)
+        return RemarkApplier.apply(base: inputText, accepted: accepted).text
     }
 
     init(showsCloseButton: Bool = true) {

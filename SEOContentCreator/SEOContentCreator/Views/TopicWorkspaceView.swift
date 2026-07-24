@@ -15,6 +15,18 @@ struct TopicWorkspaceView: View {
     @State private var acceptedRemarkIDs: Set<UUID> = []
     @State private var rejectedRemarkIDs: Set<UUID> = []
     @State private var redoingRemarkIDs: Set<UUID> = []
+    /// Accepted remarks whose quote could not be located in the text, so they were
+    /// not applied and are flagged as «не применено» instead of dropped silently.
+    @State private var unresolvedRemarkIDs: Set<UUID> = []
+    /// Frozen text the current review's remarks were made against. Accepted remarks
+    /// are re-applied from here on every toggle, so the current version can change
+    /// under us without the edits drifting.
+    @State private var reviewBaseSnapshot: String?
+    /// The version that was current when the review started, to revert to on «Отклонить всё».
+    @State private var reviewBaseVersionID: UUID?
+    /// The single version that holds this review's applied edits, updated in place as
+    /// remarks are accepted/rejected (so accepting N remarks does not create N versions).
+    @State private var reviewAppliedVersionID: UUID?
     @State private var highlightedQuote: String?
     @State private var showInspector = true
     @State private var inspectorTab: InspectorTab = .remarks
@@ -199,7 +211,7 @@ struct TopicWorkspaceView: View {
             if isReviewing {
                 HStack {
                     Spacer()
-                    Button("Отклонить всё", role: .destructive) { endReview() }
+                    Button("Отклонить всё", role: .destructive) { rejectAllReview() }
                     Button("Готово") { finishReview() }.keyboardShortcut(.defaultAction)
                 }
             } else if pendingVersion != nil {
@@ -307,16 +319,19 @@ struct TopicWorkspaceView: View {
                 remarks: executor?.remarks ?? [],
                 acceptedIDs: acceptedRemarkIDs,
                 rejectedIDs: rejectedRemarkIDs,
+                unresolvedIDs: unresolvedRemarkIDs,
                 redoingIDs: redoingRemarkIDs,
                 onAccept: {
                     acceptedRemarkIDs.insert($0.id); rejectedRemarkIDs.remove($0.id)
                     RemarkPersistence.updateStatus(remarkID: $0.id, status: .accepted,
                                                    jobID: executor?.lastRemarksJobID, topic: topic)
+                    applyAcceptedInstantly()
                 },
                 onReject: {
                     rejectedRemarkIDs.insert($0.id); acceptedRemarkIDs.remove($0.id)
                     RemarkPersistence.updateStatus(remarkID: $0.id, status: .rejected,
                                                    jobID: executor?.lastRemarksJobID, topic: topic)
+                    applyAcceptedInstantly()
                 },
                 onSelect: { highlightedQuote = $0.quote },
                 onRedo: { redoRemark($0, comment: $1) }
@@ -367,13 +382,15 @@ struct TopicWorkspaceView: View {
         return nil
     }
 
-    private var reviewBaseText: String {
-        topic.currentVersion?.text ?? ""
+    /// Frozen text the current review is applied against (falls back to the current
+    /// version before a snapshot exists).
+    private var reviewBase: String {
+        reviewBaseSnapshot ?? topic.currentVersion?.text ?? ""
     }
 
     private var workingCopy: String {
         let accepted = (executor?.remarks ?? []).filter { acceptedRemarkIDs.contains($0.id) }
-        return RemarkApplier.apply(base: reviewBaseText, accepted: accepted)
+        return RemarkApplier.apply(base: reviewBase, accepted: accepted).text
     }
 
     private var highlightedParagraphIndex: Int? {
@@ -475,6 +492,10 @@ struct TopicWorkspaceView: View {
         comparisonText = nil
         acceptedRemarkIDs = []
         rejectedRemarkIDs = []
+        unresolvedRemarkIDs = []
+        reviewBaseSnapshot = nil
+        reviewBaseVersionID = nil
+        reviewAppliedVersionID = nil
         highlightedQuote = nil
         checkedWithNoRemarks = false
         if let message = StageRunGuard.messagePreventingRun(stage: stage, topic: topic) {
@@ -489,6 +510,11 @@ struct TopicWorkspaceView: View {
                                    in: context)
             pendingVersionID = executor.lastResultVersionID
             if !executor.remarks.isEmpty {
+                // Freeze the reviewed text so accepted remarks re-apply from a stable base.
+                reviewBaseSnapshot = current ?? topic.currentVersion?.text ?? ""
+                reviewBaseVersionID = topic.currentVersionID
+                reviewAppliedVersionID = nil
+                unresolvedRemarkIDs = []
                 inspectorTab = .remarks
                 showInspector = true
             }
@@ -544,25 +570,68 @@ struct TopicWorkspaceView: View {
         comparisonText = nil
     }
 
-    private func finishReview() {
-        let base = reviewBaseText
+    /// Re-applies the currently accepted remarks to the frozen base and commits the
+    /// result to the review's single version — called on every accept/reject so edits
+    /// appear in the text immediately (per the user's chosen behaviour). Remarks whose
+    /// quote can't be located are surfaced as «не применено» rather than dropped.
+    private func applyAcceptedInstantly() {
         let accepted = (executor?.remarks ?? []).filter { acceptedRemarkIDs.contains($0.id) }
-        var result = RemarkApplier.apply(base: base, accepted: accepted)
+        let result = RemarkApplier.apply(base: reviewBase, accepted: accepted)
+        unresolvedRemarkIDs = result.unresolvedIDs
+        syncReviewVersion(text: result.text)
+    }
+
+    /// Writes `text` into the review's applied version, creating it lazily on the first
+    /// real change and updating it in place afterwards (one version per review, not per
+    /// accepted remark).
+    private func syncReviewVersion(text: String) {
+        if let id = reviewAppliedVersionID,
+           let version = topic.versions.first(where: { $0.uuid == id }) {
+            version.text = text
+            topic.currentVersionID = id
+            topic.updatedAt = .now
+            return
+        }
+        guard text != reviewBase else { return }   // nothing applied yet: don't spawn a no-op version
+        let base = topic.versions.first(where: { $0.uuid == reviewBaseVersionID })
+        let version = ArticleVersion(stage: selectedStage, source: .checkApplied, text: text)
+        version.status = .accepted
+        version.h1 = base?.h1 ?? topic.currentVersion?.h1
+        version.seoTitle = base?.seoTitle ?? topic.currentVersion?.seoTitle
+        version.seoDescription = base?.seoDescription ?? topic.currentVersion?.seoDescription
+        version.topic = topic
+        context.insert(version)
+        reviewAppliedVersionID = version.uuid
+        topic.currentVersionID = version.uuid
+        topic.updatedAt = .now
+    }
+
+    private func finishReview() {
+        let accepted = (executor?.remarks ?? []).filter { acceptedRemarkIDs.contains($0.id) }
+        var result = RemarkApplier.apply(base: reviewBase, accepted: accepted).text
         if selectedStage == .finalReview {
             result = TechInfoSectionBuilder.append(to: result, section: TechInfoSectionBuilder.section(for: topic))
         }
-        if result != base {
-            let version = ArticleVersion(stage: selectedStage, source: .checkApplied, text: result)
-            version.status = .accepted
-            version.h1 = topic.currentVersion?.h1
-            version.seoTitle = topic.currentVersion?.seoTitle
-            version.seoDescription = topic.currentVersion?.seoDescription
-            version.topic = topic
-            context.insert(version)
-            topic.currentVersionID = version.uuid
+        syncReviewVersion(text: result)
+        clearReviewState()
+    }
+
+    /// «Отклонить всё»: discard this review's edits and return to the pre-review text.
+    private func rejectAllReview() {
+        if let baseID = reviewBaseVersionID, topic.versions.contains(where: { $0.uuid == baseID }) {
+            if let id = reviewAppliedVersionID,
+               let version = topic.versions.first(where: { $0.uuid == id }) {
+                context.delete(version)
+            }
+            topic.currentVersionID = baseID
+            topic.updatedAt = .now
+        } else if let id = reviewAppliedVersionID,
+                  let version = topic.versions.first(where: { $0.uuid == id }) {
+            // Base version unknown (e.g. review restored after restart): revert text in place.
+            version.text = reviewBase
             topic.updatedAt = .now
         }
-        endReview()
+        clearReviewState()
     }
 
     /// «Финальная вычитка» прошла без замечаний: дописываем раздел
@@ -594,6 +663,8 @@ struct TopicWorkspaceView: View {
                 RemarkPersistence.updateSuggestion(remarkID: remark.id, suggestion: updated.suggestion,
                                                    jobID: executor.lastRemarksJobID, topic: topic)
             }
+            // If this remark was already accepted, re-apply so the refreshed suggestion lands.
+            if acceptedRemarkIDs.contains(remark.id) { applyAcceptedInstantly() }
         }
     }
 
@@ -603,13 +674,25 @@ struct TopicWorkspaceView: View {
         executor?.lastRemarksJobID = restored.jobID
         acceptedRemarkIDs = restored.accepted
         rejectedRemarkIDs = restored.rejected
+        // Recover the frozen base so accepted remarks keep re-applying consistently.
+        // The pre-review version id is not persisted, so «Отклонить всё» will revert
+        // the applied text in place instead of pointing back to it.
+        reviewBaseSnapshot = restored.baseText ?? topic.currentVersion?.text
+        reviewBaseVersionID = nil
+        reviewAppliedVersionID = nil
+        let accepted = restored.remarks.filter { restored.accepted.contains($0.id) }
+        unresolvedRemarkIDs = RemarkApplier.apply(base: reviewBaseSnapshot ?? "", accepted: accepted).unresolvedIDs
     }
 
-    private func endReview() {
+    private func clearReviewState() {
         RemarkPersistence.resolve(jobID: executor?.lastRemarksJobID, topic: topic)
         executor?.remarks = []
         acceptedRemarkIDs = []
         rejectedRemarkIDs = []
+        unresolvedRemarkIDs = []
+        reviewBaseSnapshot = nil
+        reviewBaseVersionID = nil
+        reviewAppliedVersionID = nil
         highlightedQuote = nil
     }
 }

@@ -22,6 +22,12 @@ final class GenerationJob {
     /// Lets an interrupted review (app closed mid-review) be told apart from a
     /// finished one when restoring on the next launch (FT-20260702-011).
     var reviewResolved: Bool = false
+    /// For checking-stage jobs: the article text as it was when this job's remarks
+    /// were produced. Accepting remarks re-applies them against this frozen base, so
+    /// applying them one at a time (and across an app restart) stays consistent even
+    /// though the topic's current version changes underneath. Nil for jobs that
+    /// predate this field or are not checking stages.
+    var reviewBaseText: String?
 
     @Relationship var topic: Topic?
     @Relationship(deleteRule: .cascade, inverse: \PersistedRemark.job)

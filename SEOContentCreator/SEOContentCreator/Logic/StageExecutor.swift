@@ -151,6 +151,10 @@ final class StageExecutor {
                 } else if stage.kind == .checking {
                     remarks = RemarksParser.parse(rawText: collected)
                     lastRemarksJobID = job.uuid
+                    // Freeze the text the remarks were made against, so accepting them can
+                    // re-apply from a stable base even across an app restart (the current
+                    // version mutates as remarks are applied one by one).
+                    job.reviewBaseText = currentText
                     RemarkPersistence.persist(remarks: remarks, job: job, in: context)
                     job.status = .success
                     job.finishedAt = .now
